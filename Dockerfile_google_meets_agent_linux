@@ -1,0 +1,24 @@
+FROM python:3.9-alpine
+
+# Install dependencies using apk (Alpine's package manager)
+RUN apk add --no-cache \
+    unzip curl wget ffmpeg pulseaudio \
+    chromium chromium-chromedriver \
+    postgresql-dev gcc g++ make python3-dev musl-dev
+
+# Set environment variables for Chromium & ChromeDriver
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMEDRIVER_BIN=/usr/bin/chromedriver
+
+# Install Python dependencies
+COPY requirements_google_meets_agent.txt .
+RUN pip install --no-cache-dir -r requirements_google_meets_agent.txt
+
+# Copy Python script
+COPY app/service/google_meets/google_meets_agent_linux.py /app/google_meets_agent_linux.py
+WORKDIR /app
+
+# Set entrypoint
+CMD ["python", "google_meets_agent_linux.py"]

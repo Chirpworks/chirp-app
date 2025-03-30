@@ -1,0 +1,37 @@
+{
+  "family": "celery-worker",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::248189910292:role/ECSExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "celery-worker-container",
+      "image": "248189910292.dkr.ecr.ap-south-1.amazonaws.com/celery-worker:latest",
+      "memory": 512,
+      "cpu": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "hostPort": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/celery-worker-task",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "environment": [
+        {"name": "SQS_QUEUE_URL", "value": "https://sqs.ap-south-1.amazonaws.com/248189910292/celery-task-queue"},
+        {"name": "CELERY_BROKER_URL", "value": "sqs://"}
+      ],
+      "command": ["celery", "-A", "app.celery", "worker", "--loglevel=info"]
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512"
+}

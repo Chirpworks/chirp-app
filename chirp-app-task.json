@@ -1,0 +1,32 @@
+{
+  "family": "chirp-app",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "arn:aws:iam::248189910292:role/ECSExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "chirp-app-container",
+      "image": "248189910292.dkr.ecr.ap-south-1.amazonaws.com/chirp-app:latest",
+      "memory": 512,
+      "cpu": 256,
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "hostPort": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/chirp-app-task",
+          "awslogs-region": "ap-south-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ],
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512"
+}

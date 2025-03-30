@@ -1,0 +1,40 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: ap-south-1
+    ECR_REPO_NAME: chirpworks-app/chirpworks-dev
+    ECS_CLUSTER_NAME: chirpworks-app
+    ECS_SERVICE_NAME: your-ecs-service
+    CODE_DEPLOY_APP_NAME: chirpworks-app
+    CODE_DEPLOY_GROUP_NAME: chirpworks-app-deployment-group
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo Installing Requirements
+      - pip install --upgrade pip
+      - pip install -r requirements.txt
+      - echo Logging in to Amazon ECR
+      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 248189910292.dkr.ecr.ap-south-1.amazonaws.com
+
+  build:
+    commands:
+      - echo Building Docker Image
+      - docker build -t chirpworks-app/chirpworks-dev:latest .
+
+  post_build:
+    commands:
+      - echo CodeDeploy App Name $CODE_DEPLOY_APP_NAME
+      - echo CodeDeploy Deployment Group $CODE_DEPLOY_GROUP_NAME
+      - docker tag chirpworks-app/chirpworks-dev:latest 248189910292.dkr.ecr.ap-south-1.amazonaws.com/chirpworks-app/chirpworks-dev:latest
+      - echo Pushing Docker image to ECR
+      - docker push 248189910292.dkr.ecr.ap-south-1.amazonaws.com/chirpworks-app/chirpworks-dev:latest
+      - echo Writing image definitions file
+      - printf '[{"name":"chirpworks-app","imageUri":"248189910292.dkr.ecr.%s.amazonaws.com/%s:latest"}]' $AWS_DEFAULT_REGION $ECR_REPO_NAME > imagedefinitions.json
+      - echo Uploading AppSpec file to S3
+      - aws s3 cp appspec.yml s3://appspec-files/appspec.yml
+      - echo Deploying to ECS via CodeDeploy...
+      - aws deploy create-deployment --application-name $CODE_DEPLOY_APP_NAME --deployment-group-name $CODE_DEPLOY_GROUP_NAME --revision '{"revisionType":"S3","s3Location":{"bucket":"appspec-files","key":"appspec.yml","bundleType":"YAML"}}'

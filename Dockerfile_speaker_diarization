@@ -1,0 +1,38 @@
+# Use the NVIDIA CUDA runtime as the base image
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+
+# Set the working directory
+WORKDIR /app
+
+# Install necessary dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git \
+    ffmpeg \
+    python3.10 \
+    python3-pip && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN python3.10 -m pip install --upgrade pip
+
+# Install PyTorch with CUDA support
+RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 --extra-index-url https://download.pytorch.org/whl/cu118
+
+# Install WhisperX
+RUN pip install git+https://github.com/m-bain/whisperx.git
+
+# Copy your application code
+COPY . /app
+
+# Expose a port if your worker exposes any HTTP interface (not strictly necessary for batch jobs)
+# EXPOSE 8000
+
+# Set the command to run your worker script.
+# Replace 'your_worker_script.py' with the actual script that:
+#   - downloads audio files from S3,
+#   - runs diarization via WhisperX,
+#   - and writes the transcript back to your meetings table.
+
+CMD ["python3", "app/service/transcription/speaker_diarization_linux.py"]

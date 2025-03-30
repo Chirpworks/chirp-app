@@ -1,0 +1,9 @@
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: "arn:aws:ecs:ap-south-1:248189910292:task-definition/chirpworks-app:1"
+        LoadBalancerInfo:
+          ContainerName: "chirpworks-app"
+          ContainerPort: 8000

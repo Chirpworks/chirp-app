@@ -1,0 +1,15 @@
+faster-whisper==0.10.0
+torch==2.0.0 
+torchvision==0.15.1
+torchaudio==2.0.1
+uvicorn==0.27.1
+pydantic==2.6.0
+Levenshtein==0.24.0
+fastapi==0.109.2
+pandas==2.0.3
+transformers==4.32.1
+setuptools>=65
+soundfile==0.12.1
+numpy==1.26.4
+pandas==2.0.3
+nltk
