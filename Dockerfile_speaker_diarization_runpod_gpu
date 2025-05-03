@@ -30,8 +30,12 @@ RUN pip install git+https://github.com/m-bain/whisperx.git
 RUN pip install pyannote.audio==3.0.1
 
 # Optional: install other Python packages you use
-COPY requirements_call_analysis.txt .
-RUN pip install -r requirements_call_analysis.txt
+COPY requirements_speaker_diarization.txt .
+RUN pip install -r requirements_speaker_diarization.txt
+
+# Optional: install other Python packages you use
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
 # Copy the full app source code
 WORKDIR /app
