@@ -1,6 +1,7 @@
 import os
 import time
 from datetime import datetime, timedelta
+import logging
 
 import boto3
 from flask import Flask
@@ -10,6 +11,8 @@ from app.constants import AWSConstants, CALENDAR_NAME_TO_ECS_TASK_DEFINITION_MAP
     AGENT_MEETING_TIME_IN_HOURS, CALENDAR_NAME_TO_ECS_CONTAINER_NAME_MAP
 from app.models.job import JobStatus
 
+logging = logging.getLogger(__name__)
+
 
 class ECSClient:
     def __init__(self):
@@ -17,6 +20,7 @@ class ECSClient:
         self.region = AWSConstants.AWS_REGION
         self.agent_cluster_name = AWSConstants.AGENT_ECS_CLUSTER_NAME
         self.speaker_diarization_cluster_name = AWSConstants.SPEAKER_DIARIZATION_ECS_CLUSTER_NAME
+        self.speaker_diarization_cpu_cluster_name = AWSConstants.SPEAKER_DIARIZATION_CPU_ECS_CLUSTER_NAME
         self.subnets = AWSConstants.SUBNETS
         self.security_groups = AWSConstants.SECURITY_GROUPS
 
@@ -99,36 +103,66 @@ class ECSClient:
 
                 time.sleep(60)  # Check every 60 seconds
 
+    def run_analysis_task(self, job_id: str):
+        """Run analysis task on ECS for fetching data via LLM"""
+        try:
+            logging.info(f"Starting analysis on ECS for job_id: {job_id}")
+            task_definition = AWSConstants.CALL_ANALYSIS_ECS_TASK_DEFINITION
+            container_name = AWSConstants.CALL_ANALYSIS_CONTAINER_NAME
+            return self.run_task(
+                task_definition=task_definition,
+                container_name=container_name,
+                job_id=job_id,
+                cluster_name=AWSConstants.CALL_ANALYSIS_CLUSTER_NAME
+            )
+        except Exception as e:
+            logging.error(f"Failed to run call analysis task on ECS for job id: {job_id} with error: {e}")
+            raise e
+
     def run_speaker_diarization_task(self, job_id: str):
         """Run a diarization job on ECS."""
-        task_definition = AWSConstants.SPEAKER_DIARIZATION_ECS_TASK_DEFINITION
-        container_name = AWSConstants.SPEAKER_DIARIZATION_CONTAINER_NAME
-        return self.run_task(task_definition=task_definition, container_name=container_name, job_id=job_id)
+        try:
+            logging.info(f"Starting diarization task on ECS for job_id: {job_id}")
+            task_definition = AWSConstants.SPEAKER_DIARIZATION_ECS_TASK_DEFINITION
+            container_name = AWSConstants.SPEAKER_DIARIZATION_CONTAINER_NAME
+            return self.run_task(
+                task_definition=task_definition,
+                container_name=container_name,
+                job_id=job_id,
+                cluster_name=self.speaker_diarization_cpu_cluster_name
+            )
+        except Exception as e:
+            logging.error(f"Failed to run diarization task on ECS for job id: {job_id} with error: {e}")
+            raise e
 
-    def run_task(self, task_definition: str, container_name: str, job_id: str):
-        response = self.client.run_task(
-            cluster=self.agent_cluster_name,
-            taskDefinition=task_definition,
-            launchType="FARGATE",
-            networkConfiguration={
-                "awsvpcConfiguration": {
-                    "subnets": self.subnets,
-                    "securityGroups": self.security_groups,
-                    "assignPublicIp": "ENABLED"
-                }
-            },
-            overrides={
-                "containerOverrides": [
-                    {
-                        "name": container_name,  # Replace with actual container name
-                        "environment": [
-                            {"name": "JOB_ID", "value": str(job_id)},
-                            {"name": "FLASK_API_URL", "value": os.environ["FLASK_API_URL"]},
-                            {"name": "DATABASE_URL", "value": os.environ["DATABASE_URL"]}
-                        ]
+    def run_task(self, task_definition: str, container_name: str, job_id: str, cluster_name: str):
+        try:
+            response = self.client.run_task(
+                cluster=cluster_name,
+                taskDefinition=task_definition,
+                launchType="FARGATE",
+                networkConfiguration={
+                    "awsvpcConfiguration": {
+                        "subnets": self.subnets,
+                        "securityGroups": self.security_groups,
+                        "assignPublicIp": "ENABLED"
                     }
-                ]
-            }
-        )
-        print(f"ECS Task Started for Job ID {job_id}: {response}")
-        return response
+                },
+                overrides={
+                    "containerOverrides": [
+                        {
+                            "name": container_name,
+                            "environment": [
+                                {"name": "JOB_ID", "value": str(job_id)},
+                                {"name": "FLASK_API_URL", "value": os.environ["FLASK_API_URL"]},
+                                {"name": "DATABASE_URL", "value": os.environ["DATABASE_URL"]}
+                            ]
+                        }
+                    ]
+                },
+            )
+            logging.info(f"ECS Task Started for Job ID {job_id}: {response}")
+            return response
+        except Exception as e:
+            logging.error(f"Failed to start diarization ECS task for job_id: {job_id} with error {str(e)}")
+            raise e

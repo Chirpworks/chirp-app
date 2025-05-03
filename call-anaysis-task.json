@@ -1,0 +1,108 @@
+{
+    "taskDefinitionArn": "arn:aws:ecs:ap-south-1:248189910292:task-definition/call-analysis:1",
+    "containerDefinitions": [
+        {
+            "name": "call-analysis",
+            "image": "248189910292.dkr.ecr.ap-south-1.amazonaws.com/call-analysis:latest",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "name": "call-analysis-80-tcp",
+                    "containerPort": 80,
+                    "hostPort": 80,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [
+                {
+                    "name": "BACKEND_API_URL",
+                    "value": "http://chirp-app-alb-1783910357.ap-south-1.elb.amazonaws.com:80"
+                },
+                {
+                    "name": "DATABASE_URL",
+                    "value": "postgresql+psycopg2://postgres::tRD7$k3EEQ*ysL>aR[mpsMo7!H]@chirp-db.c1ayu2waec3w.ap-south-1.rds.amazonaws.com:5432/chirp-db"
+                },
+                {
+                    "name": "OPENAI_API_KEY",
+                    "value": "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"
+                }
+            ],
+            "environmentFiles": [],
+            "mountPoints": [],
+            "volumesFrom": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/call-analysis",
+                    "mode": "non-blocking",
+                    "awslogs-create-group": "true",
+                    "max-buffer-size": "25m",
+                    "awslogs-region": "ap-south-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "family": "call-analysis",
+    "taskRoleArn": "arn:aws:iam::248189910292:role/ECSExecutionRole",
+    "executionRoleArn": "arn:aws:iam::248189910292:role/ECSExecutionRole",
+    "networkMode": "awsvpc",
+    "revision": 1,
+    "volumes": [],
+    "status": "ACTIVE",
+    "requiresAttributes": [
+        {
+            "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+        },
+        {
+            "name": "ecs.capability.execution-role-awslogs"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.ecr-auth"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.28"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.task-iam-role"
+        },
+        {
+            "name": "ecs.capability.execution-role-ecr-pull"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+        },
+        {
+            "name": "ecs.capability.task-eni"
+        },
+        {
+            "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+        }
+    ],
+    "placementConstraints": [],
+    "compatibilities": [
+        "EC2",
+        "FARGATE"
+    ],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "512",
+    "memory": "1024",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "registeredAt": "2025-04-20T12:57:05.832Z",
+    "registeredBy": "arn:aws:iam::248189910292:root",
+    "enableFaultInjection": false,
+    "tags": []
+}

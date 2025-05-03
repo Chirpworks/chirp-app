@@ -1,3 +1,7 @@
+import uuid
+
+from sqlalchemy import UUID
+
 from app import db
 from flask_login import UserMixin
 
@@ -11,27 +15,31 @@ from .agency import Agency
 
 class UserRole(Enum):
     ADMIN = "admin"
+    MANAGER = "manager"
     USER = "user"
     GUEST = "guest"
 
 
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = db.Column(db.String(150), nullable=False, unique=True)
     email = db.Column(db.String(150), nullable=False, unique=True)
+    phone = db.Column(db.String(20), nullable=False, unique=True)
     password_hash = db.Column(db.String(200), nullable=False)
     role = db.Column(db.Enum(UserRole), default=UserRole)
-    agency_id = db.Column(db.Integer, db.ForeignKey('agencies.id'), nullable=False)
+    agency_id = db.Column(UUID(as_uuid=True), db.ForeignKey('agencies.id'), nullable=False)
     agency = db.relationship('Agency', back_populates='users')
-    meetings = db.relationship('Meeting', back_populates='user', cascade='all, delete-orphan')
+    deals = db.relationship('Deal', back_populates='user', cascade='all, delete-orphan')
     last_week_performance_analysis = db.Column(db.String(), nullable=True)
 
-    def __init__(self, username, email, password, agency_id):
+    def __init__(self, username, email, phone, password, agency_id, role=None):
         self.username = username
         self.email = email
         self.set_password(password)
         self.agency_id = agency_id
+        self.role = UserRole(role) if role else UserRole.USER
+        self.phone = phone
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

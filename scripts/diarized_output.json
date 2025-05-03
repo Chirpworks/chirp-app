@@ -1,0 +1,722 @@
+[
+  {
+    "start": 6.32534375,
+    "end": 15.640343750000003,
+    "speaker": "SPEAKER_0",
+    "text": "Recently, we had a word with Shanti."
+  },
+  {
+    "start": 18.15471875,
+    "end": 22.15409375,
+    "speaker": "SPEAKER_0",
+    "text": "So, I am from Partnerships. Are you looking for a partnership?"
+  },
+  {
+    "start": 23.23409375,
+    "end": 30.33846875,
+    "speaker": "SPEAKER_1",
+    "text": " Just help me understand how do you, what do you offer in a partnership team and what kind of services do we get as a partner?"
+  },
+  {
+    "start": 31.317218750000002,
+    "end": 39.53534375,
+    "speaker": "SPEAKER_0",
+    "text": "Okay, okay."
+  },
+  {
+    "start": 39.53534375,
+    "end": 48.41159375,
+    "speaker": "SPEAKER_1",
+    "text": "So we're building a sales assistant for basically inside sales teams."
+  },
+  {
+    "start": 49.06971875,
+    "end": 52.42784375,
+    "speaker": "SPEAKER_1",
+    "text": "So it's a software service which we're offering to companies."
+  },
+  {
+    "start": 53.018468750000004,
+    "end": 63.27846875,
+    "speaker": "SPEAKER_1",
+    "text": " And what we're essentially doing is that we're collecting all of their sales communication data and interpreting it for them and helping them."
+  },
+  {
+    "start": 92.04896875,
+    "end": 98.02271875,
+    "speaker": "SPEAKER_1",
+    "text": " Now I just need the backend infrastructure to actually record that call."
+  },
+  {
+    "start": 98.74834375,
+    "end": 107.30396875,
+    "speaker": "SPEAKER_1",
+    "text": "So currently, I'm already using Exotel to do that."
+  },
+  {
+    "start": 107.30396875,
+    "end": 116.24771874999999,
+    "speaker": "SPEAKER_1",
+    "text": " kind of number."
+  },
+  {
+    "start": 125.40796875,
+    "end": 130.06546875,
+    "speaker": "SPEAKER_1",
+    "text": " From your point of view, you will get an incoming call and that incoming call has to be recorded."
+  },
+  {
+    "start": 130.62234375,
+    "end": 148.88109375,
+    "speaker": "SPEAKER_1",
+    "text": "So I just need one number which can be a universal number or you can give it to me at a company level. We can work out modalities. But from your infrastructure point of view, you are not doing any call merging or call recording. You are basically getting an incoming call on a number and that call has to be recorded. That's it."
+  },
+  {
+    "start": 179.12109375,
+    "end": 184.75734375,
+    "speaker": "SPEAKER_2",
+    "text": " No, no, no, no. So if you are going to integrate it, right, if you're going to integrate it, we have a"
+  },
+  {
+    "start": 185.55734375,
+    "end": 198.82109375,
+    "speaker": "SPEAKER_0",
+    "text": " So, I can share the use case with you. So, we are also partners with Doho, Kailash, Thrasher, and a lot of them with CRM companies."
+  },
+  {
+    "start": 199.25984375000002,
+    "end": 213.28296875,
+    "speaker": "SPEAKER_3",
+    "text": "So, and also some in-house CRM companies as well. So, what do they do? They do not want to use their client to MyOperator services. The client does not need to open the MyOperator panel to make the calls."
+  },
+  {
+    "start": 212.69234375,
+    "end": 235.55796875000001,
+    "speaker": "SPEAKER_0",
+    "text": "I'm so sorry Vidhur, actually I'm on my way to go home. So that is why I'm calling right now."
+  },
+  {
+    "start": 235.55796875000001,
+    "end": 239.47296875,
+    "speaker": "SPEAKER_3",
+    "text": "Otherwise I do not have problem talking to you."
+  },
+  {
+    "start": 240.16484375,
+    "end": 241.90296875,
+    "speaker": "SPEAKER_3",
+    "text": "No, it's fairly audible. Don't worry."
+  },
+  {
+    "start": 251.15746875,
+    "end": 283.15246875,
+    "speaker": "SPEAKER_0",
+    "text": " there will be a call icon there. So if we try to click on that icon, a call will be initiated directly from that CRM. This is because we have integrated and provided the public APIs for incoming calls and outgoing calls as well. So whenever a call will be coming, a lead pop-up will be there, a live  call real-time notification will be showed and activity log will be generated after the call gets ended. So that is the after in-call API and outgoing APIs as well."
+  },
+  {
+    "start": 283.15246875,
+    "end": 292.60246875,
+    "speaker": "SPEAKER_0",
+    "text": "The click-to-call feature works like this. Two calls will be initiated."
+  },
+  {
+    "start": 292.60246875,
+    "end": 298.57621875,
+    "speaker": "SPEAKER_0",
+    "text": "So they will answer calls."
+  },
+  {
+    "start": 298.57621875,
+    "end": 301.51246875,
+    "speaker": "SPEAKER_0",
+    "text": " So click to call will work here."
+  },
+  {
+    "start": 302.60934375,
+    "end": 307.14871875,
+    "speaker": "SPEAKER_0",
+    "text": "This is the kind of use case I just wanted to let you know."
+  },
+  {
+    "start": 343.89471875,
+    "end": 360.01034375,
+    "speaker": "SPEAKER_1",
+    "text": " Okay. But are you saying that I can continue using my existing mobile number and the client will see the call coming from my mobile number or what will the lead see on their phone? What is the origin of that call?"
+  },
+  {
+    "start": 372.88646875,
+    "end": 374.72584375,
+    "speaker": "SPEAKER_1",
+    "text": " Sorry, I couldn't understand."
+  },
+  {
+    "start": 378.97834375,
+    "end": 384.96896875,
+    "speaker": "SPEAKER_1",
+    "text": "That's fine. Maybe once you get home, can you call me then?"
+  },
+  {
+    "start": 385.67771875,
+    "end": 387.90521875,
+    "speaker": "SPEAKER_0",
+    "text": "I'm about to reach into my phone."
+  },
+  {
+    "start": 401.23646875000003,
+    "end": 410.26459375,
+    "speaker": "SPEAKER_1",
+    "text": " No, I want the mobile phone to be used to make and receive calls."
+  },
+  {
+    "start": 414.48334375,
+    "end": 429.62021875,
+    "speaker": "SPEAKER_0",
+    "text": "One common business number to all. Like my operator, he has reached out to 9 to 1 to 9, 9 to 1 to 9. Correct?"
+  },
+  {
+    "start": 432.99296875,
+    "end": 440.60359375,
+    "speaker": "SPEAKER_4",
+    "text": " This rep has a relationship with the client and they're using the same number to communicate with the clients on WhatsApp and on phone."
+  },
+  {
+    "start": 441.71734375,
+    "end": 446.25671875,
+    "speaker": "SPEAKER_0",
+    "text": "That is also possible."
+  },
+  {
+    "start": 447.13421875,
+    "end": 454.93046875,
+    "speaker": "SPEAKER_4",
+    "text": "This is my personal number."
+  },
+  {
+    "start": 454.93046875,
+    "end": 462.67609375,
+    "speaker": "SPEAKER_0",
+    "text": "I can also receive the incoming calls on the same number and also I can use the WhatsApp on the same number."
+  },
+  {
+    "start": 476.42921875,
+    "end": 482.94296875,
+    "speaker": "SPEAKER_4",
+    "text": "So the call is, then how does it work? Let's say I'm using, so is this number a MyOperator number or is this your actual SIM card number?"
+  },
+  {
+    "start": 497.34296875,
+    "end": 505.29109375,
+    "speaker": "SPEAKER_5",
+    "text": " But it's a VoIP call."
+  },
+  {
+    "start": 526.82359375,
+    "end": 535.0248437500001,
+    "speaker": "SPEAKER_5",
+    "text": " Let's suppose we have four agents in our company. We are not going to buy those four agents, we are going to work in a company forever."
+  },
+  {
+    "start": 545.33546875,
+    "end": 552.79421875,
+    "speaker": "SPEAKER_0",
+    "text": "Let's take an example over here."
+  },
+  {
+    "start": 552.79421875,
+    "end": 555.9160937500001,
+    "speaker": "SPEAKER_5",
+    "text": "Whenever I will call her, she will answer this call."
+  },
+  {
+    "start": 556.42234375,
+    "end": 558.0929687500001,
+    "speaker": "SPEAKER_5",
+    "text": " I had made the company."
+  },
+  {
+    "start": 567.97934375,
+    "end": 588.3980937499999,
+    "speaker": "SPEAKER_0",
+    "text": "The phone number hasn't changed but the background user has been changed. So my phone number has been deleted from the system and another agent's phone number has been added. Whenever someone will call on this phone, the call will be directly routed to the agent's number which has been mapped on the system."
+  },
+  {
+    "start": 589.49496875,
+    "end": 609.86309375,
+    "speaker": "SPEAKER_1",
+    "text": " Okay, and how and what is the transfer time? Like how long does it like if I'm trying to call you, I'll call your number directly give me a call directly right now."
+  },
+  {
+    "start": 617.62559375,
+    "end": 620.27496875,
+    "speaker": "SPEAKER_0",
+    "text": " You can give me a call back."
+  },
+  {
+    "start": 668.6189687499999,
+    "end": 675.57146875,
+    "speaker": "SPEAKER_1",
+    "text": "Got it. And are you giving separate numbers, like it's possible to give a separate virtual number to every agent?"
+  },
+  {
+    "start": 676.80334375,
+    "end": 684.2452187499999,
+    "speaker": "SPEAKER_0",
+    "text": "So we provide every agent a particular DID number. Most of the companies use the same number."
+  },
+  {
+    "start": 699.27321875,
+    "end": 702.71571875,
+    "speaker": "SPEAKER_4",
+    "text": "Otherwise, the call will be routed to different agents."
+  },
+  {
+    "start": 703.28946875,
+    "end": 716.51946875,
+    "speaker": "SPEAKER_5",
+    "text": " under 48 hours or beyond 48 hours. Now I have this number 08690 is my personal DID number because in my operator everyone has their own DID number."
+  },
+  {
+    "start": 722.98259375,
+    "end": 733.02321875,
+    "speaker": "SPEAKER_4",
+    "text": "And the second thing is that are all these numbers recycled by your company like right now on my phone like I think through Truecaller it's showing that it's a my operator number."
+  },
+  {
+    "start": 733.9175937499999,
+    "end": 737.27571875,
+    "speaker": "SPEAKER_5",
+    "text": " Yes, we are also called a premium partner."
+  },
+  {
+    "start": 738.94634375,
+    "end": 751.48446875,
+    "speaker": "SPEAKER_4",
+    "text": "So, Adi, let's say you've given me a particular number, would that number have been used by some other company before? So basically, what I'm trying to get to is would that number possibly show up"
+  },
+  {
+    "start": 755.99446875,
+    "end": 762.18759375,
+    "speaker": "SPEAKER_5",
+    "text": "Sorry, can you please repeat it once again?"
+  },
+  {
+    "start": 772.43071875,
+    "end": 775.08009375,
+    "speaker": "SPEAKER_4",
+    "text": "No, no, no, no."
+  },
+  {
+    "start": 775.08009375,
+    "end": 777.3244687499999,
+    "speaker": "SPEAKER_5",
+    "text": "All fresh numbers."
+  },
+  {
+    "start": 777.93196875,
+    "end": 797.0850937499999,
+    "speaker": "SPEAKER_5",
+    "text": " It's depending on the usage only. If you are using this number a lot and if you are making calls to the clients or the customers and if they are marking it as spam, then of course the number will show spam."
+  },
+  {
+    "start": 799.07634375,
+    "end": 799.98759375,
+    "speaker": "SPEAKER_4",
+    "text": "Got it. Okay."
+  },
+  {
+    "start": 801.18571875,
+    "end": 808.71196875,
+    "speaker": "SPEAKER_4",
+    "text": "And how does the WhatsApp work then? Like if I save this number,  WhatsApp number and if I message her, will you receive a WhatsApp?"
+  },
+  {
+    "start": 809.91009375,
+    "end": 829.02946875,
+    "speaker": "SPEAKER_5",
+    "text": "Yes, I will receive the WhatsApp but right now what happened that I tried to set up my own Baba account from this number by my own and due to setting up by my own and creating my own website on Facebook manager and doing everything by myself, I have been"
+  },
+  {
+    "start": 828.8508437500001,
+    "end": 840.29209375,
+    "speaker": "SPEAKER_5",
+    "text": " logged by Meta on this number. So right now I'm using different DID for WhatsApp and different DID for calling because this has been my primary calling number."
+  },
+  {
+    "start": 845.94521875,
+    "end": 856.00271875,
+    "speaker": "SPEAKER_5",
+    "text": "So basically whenever I give this number to a sales rep then the setup process also I'll have to own and I'll have to make sure that they're setting it up correctly."
+  },
+  {
+    "start": 857.26834375,
+    "end": 866.80271875,
+    "speaker": "SPEAKER_6",
+    "text": " It has to be accepted and accepted by the meta that this number verified by the meta."
+  },
+  {
+    "start": 866.80271875,
+    "end": 890.25896875,
+    "speaker": "SPEAKER_5",
+    "text": "When the WhatsApp was launched with my operator, I was trying to do the experiment and that experiment went wrong. And due to that, my number was blocked. But I've been using this number from very long time and all my partners have this number so I cannot change it.  I have informed everyone that I am using different WhatsApp numbers so they are reaching me out there."
+  },
+  {
+    "start": 894.4472187499999,
+    "end": 903.03659375,
+    "speaker": "SPEAKER_1",
+    "text": "We will have to do it, but we will have to make sure that the numbers don't get blocked and we will have to make sure that the setup process happens properly."
+  },
+  {
+    "start": 903.32346875,
+    "end": 909.58409375,
+    "speaker": "SPEAKER_3",
+    "text": "But it was my experiment, so I won't suggest that it will not happen with any other partners or anyone."
+  },
+  {
+    "start": 911.05221875,
+    "end": 914.37659375,
+    "speaker": "SPEAKER_1",
+    "text": "Got it."
+  },
+  {
+    "start": 923.80971875,
+    "end": 931.65659375,
+    "speaker": "SPEAKER_1",
+    "text": "Can you share the recording of this call with me so that I can also see the quality of call recording?"
+  },
+  {
+    "start": 932.63534375,
+    "end": 941.44409375,
+    "speaker": "SPEAKER_3",
+    "text": "Absolutely. So Vidhur, you can just let me know your availability for tomorrow, half an hour or one hour anytime between 11 to 6."
+  },
+  {
+    "start": 942.11909375,
+    "end": 950.86034375,
+    "speaker": "SPEAKER_3",
+    "text": " So I can send you the invitation. I have your email ID as well. I will send you the invitation. And it's with the answer. It's works.ai."
+  },
+  {
+    "start": 956.4968437499999,
+    "end": 964.25934375,
+    "speaker": "SPEAKER_5",
+    "text": " Yes, I have it. And I'll send you the invitation."
+  },
+  {
+    "start": 967.29684375,
+    "end": 974.41809375,
+    "speaker": "SPEAKER_5",
+    "text": "So everything, whatever is going out, I'll be able to know."
+  },
+  {
+    "start": 974.41809375,
+    "end": 978.58621875,
+    "speaker": "SPEAKER_7",
+    "text": "Got it. And can you just give me an overview of your pricing structure?"
+  },
+  {
+    "start": 980.32434375,
+    "end": 999.54496875,
+    "speaker": "SPEAKER_5",
+    "text": " Yeah, so we have a user-based pricing. And we have two types of pricing. One is the office cloud, office contact system, and one is the cloud call center. So cloud call center is included, has the feature of API."
+  },
+  {
+    "start": 1000.21996875,
+    "end": 1004.43871875,
+    "speaker": "SPEAKER_5",
+    "text": "So we use user-based plan."
+  },
+  {
+    "start": 1005.04621875,
+    "end": 1010.58121875,
+    "speaker": "SPEAKER_5",
+    "text": "Right now,  depending on the use case of the users."
+  },
+  {
+    "start": 1011.90034375,
+    "end": 1017.53659375,
+    "speaker": "SPEAKER_0",
+    "text": " For incoming, up to 5 users, we have a plan of 1250 per user per month."
+  },
+  {
+    "start": 1018.39721875,
+    "end": 1027.54346875,
+    "speaker": "SPEAKER_8",
+    "text": "If up to 5 users per user price for incoming, outgoing per month is 1800. But if the users are 10, it is 1500."
+  },
+  {
+    "start": 1031.50909375,
+    "end": 1034.71534375,
+    "speaker": "SPEAKER_0",
+    "text": "One is, if I am talking about only incoming,"
+  },
+  {
+    "start": 1039.33909375,
+    "end": 1051.21909375,
+    "speaker": "SPEAKER_0",
+    "text": "So as much as you will increase the users, the price will get decreased."
+  },
+  {
+    "start": 1055.47159375,
+    "end": 1068.34721875,
+    "speaker": "SPEAKER_0",
+    "text": " The prices are negotiable as well. It's not like that. And we have one special exclusive plan as well, where we will reduce the channel line and the per user price is 1250 for incoming users."
+  },
+  {
+    "start": 1072.07971875,
+    "end": 1086.54159375,
+    "speaker": "SPEAKER_8",
+    "text": " Channel lines are the simultaneous calls that the agents can be connected at the same time. So, let's suppose that I am providing the same users and 5 channel lines."
+  },
+  {
+    "start": 1116.05596875,
+    "end": 1119.75159375,
+    "speaker": "SPEAKER_1",
+    "text": "And there is some scope for negotiation here also."
+  },
+  {
+    "start": 1124.8647187499998,
+    "end": 1125.25284375,
+    "speaker": "SPEAKER_1",
+    "text": "Got it."
+  },
+  {
+    "start": 1126.21471875,
+    "end": 1135.64784375,
+    "speaker": "SPEAKER_1",
+    "text": " Currently, I am piloting my product with two companies. One company has about 7 users and the other company has about 20 users."
+  },
+  {
+    "start": 1136.95896875,
+    "end": 1141.1439687499999,
+    "speaker": "SPEAKER_0",
+    "text": "And did you, I'm sorry to ask, what is your location exactly?"
+  },
+  {
+    "start": 1141.92021875,
+    "end": 1143.9452187499999,
+    "speaker": "SPEAKER_9",
+    "text": "We are based, like our company is based out of Noida."
+  },
+  {
+    "start": 1145.9195937499999,
+    "end": 1146.2064687499999,
+    "speaker": "SPEAKER_9",
+    "text": "Sorry?"
+  },
+  {
+    "start": 1153.02396875,
+    "end": 1154.79584375,
+    "speaker": "SPEAKER_0",
+    "text": "So, okay, Noida which sector?"
+  },
+  {
+    "start": 1158.10334375,
+    "end": 1160.07771875,
+    "speaker": "SPEAKER_9",
+    "text": "The client or my office?"
+  },
+  {
+    "start": 1172.76771875,
+    "end": 1177.83021875,
+    "speaker": "SPEAKER_9",
+    "text": "Okay. That's the main hub anyways."
+  },
+  {
+    "start": 1192.69709375,
+    "end": 1196.69646875,
+    "speaker": "SPEAKER_0",
+    "text": " Yeah, in 91 springboard is our office."
+  },
+  {
+    "start": 1197.63234375,
+    "end": 1204.73671875,
+    "speaker": "SPEAKER_3",
+    "text": " So anytime you wish to come or we want to see the demo live, we can have that also."
+  },
+  {
+    "start": 1205.12484375,
+    "end": 1205.96859375,
+    "speaker": "SPEAKER_4",
+    "text": "Perfect."
+  },
+  {
+    "start": 1209.17484375,
+    "end": 1214.57484375,
+    "speaker": "SPEAKER_4",
+    "text": "Absolutely. Absolutely."
+  },
+  {
+    "start": 1217.88234375,
+    "end": 1222.30359375,
+    "speaker": "SPEAKER_3",
+    "text": "Anytime you want to mention, I can send you the invitation accordingly."
+  },
+  {
+    "start": 1222.79296875,
+    "end": 1228.54734375,
+    "speaker": "SPEAKER_4",
+    "text": " Let's have a call tomorrow. You said 11 to 6, right? So 11.30, let's have a call tomorrow."
+  },
+  {
+    "start": 1233.47484375,
+    "end": 1235.55046875,
+    "speaker": "SPEAKER_3",
+    "text": "Yeah."
+  },
+  {
+    "start": 1236.36046875,
+    "end": 1243.21171875,
+    "speaker": "SPEAKER_3",
+    "text": "Yes, you can send me an invitation."
+  },
+  {
+    "start": 1244.83171875,
+    "end": 1248.86484375,
+    "speaker": "SPEAKER_4",
+    "text": "Okay. So, one second."
+  },
+  {
+    "start": 1249.89421875,
+    "end": 1253.67421875,
+    "speaker": "SPEAKER_4",
+    "text": " I'm telling you one number."
+  },
+  {
+    "start": 1254.43359375,
+    "end": 1257.31921875,
+    "speaker": "SPEAKER_4",
+    "text": "I'll do that. That number."
+  },
+  {
+    "start": 1258.2244687500001,
+    "end": 1261.7344687500001,
+    "speaker": "SPEAKER_10",
+    "text": " Yes, yes, I'm telling you the number, so it's 80."
+  },
+  {
+    "start": 1271.96071875,
+    "end": 1272.33196875,
+    "speaker": "SPEAKER_11",
+    "text": "Yeah."
+  },
+  {
+    "start": 1273.17571875,
+    "end": 1277.68134375,
+    "speaker": "SPEAKER_11",
+    "text": "One second, one second, let me confirm that number. I recently changed it."
+  },
+  {
+    "start": 1285.76446875,
+    "end": 1288.12696875,
+    "speaker": "SPEAKER_10",
+    "text": "Yeah, 8069."
+  },
+  {
+    "start": 1288.95384375,
+    "end": 1289.37571875,
+    "speaker": "SPEAKER_10",
+    "text": " Mm hmm."
+  },
+  {
+    "start": 1313.4732187500001,
+    "end": 1316.2913437500001,
+    "speaker": "SPEAKER_11",
+    "text": "8069 seven five zero five double zero."
+  },
+  {
+    "start": 1339.76496875,
+    "end": 1340.18684375,
+    "speaker": "SPEAKER_12",
+    "text": " Yeah."
+  },
+  {
+    "start": 1360.38621875,
+    "end": 1361.1793437499998,
+    "speaker": "SPEAKER_13",
+    "text": "Okay."
+  },
+  {
+    "start": 1366.51184375,
+    "end": 1368.99246875,
+    "speaker": "SPEAKER_12",
+    "text": "Okay. And the recording can be fresh by API, right?"
+  },
+  {
+    "start": 1379.10059375,
+    "end": 1388.65184375,
+    "speaker": "SPEAKER_13",
+    "text": "Yes, but they will be unable to download it. They have to come to my panel to download the recording."
+  },
+  {
+    "start": 1390.0355937499999,
+    "end": 1393.88309375,
+    "speaker": "SPEAKER_12",
+    "text": " I can't download it via API."
+  },
+  {
+    "start": 1393.1405937499999,
+    "end": 1401.7130937499999,
+    "speaker": "SPEAKER_13",
+    "text": "You can listen to it and the recording will be there but you will be unable to download it from the API."
+  },
+  {
+    "start": 1406.66871875,
+    "end": 1414.26246875,
+    "speaker": "SPEAKER_1",
+    "text": "No, but that doesn't work. I because I need the call to be recorded into my system so I can analyze it."
+  },
+  {
+    "start": 1420.75934375,
+    "end": 1424.65746875,
+    "speaker": "SPEAKER_1",
+    "text": "But I do need to download it right because I need to process that file."
+  },
+  {
+    "start": 1425.93996875,
+    "end": 1436.19996875,
+    "speaker": "SPEAKER_8",
+    "text": " Okay, we will check it tomorrow. But as far as I'm sure that we will be unable to download the API."
+  },
+  {
+    "start": 1448.90684375,
+    "end": 1465.32621875,
+    "speaker": "SPEAKER_8",
+    "text": "For that, I need guidance from the tech team as well. As far as I know, and I have the knowledge of the call recording, but as far as I know. But allow me some time, I'll come from the tech team and with one of my senior as well."
+  },
+  {
+    "start": 1483.11596875,
+    "end": 1496.73409375,
+    "speaker": "SPEAKER_8",
+    "text": " not working. So it does not worry."
+  },
+  {
+    "start": 1496.73409375,
+    "end": 1500.83471875,
+    "speaker": "SPEAKER_8",
+    "text": "Yeah, yeah, yeah. Absolutely. Absolutely."
+  },
+  {
+    "start": 1502.40409375,
+    "end": 1506.23471875,
+    "speaker": "SPEAKER_8",
+    "text": "If anything is required, I'll bring on my trainer. I've been on the call."
+  },
+  {
+    "start": 1506.23471875,
+    "end": 1520.19034375,
+    "speaker": "SPEAKER_8",
+    "text": "So I'll bring on Nashi. Nashi is the VP of the channel partnership. So he is the CEO of this company for Nashi. So he has product knowledge. Okay. Okay."
+  },
+  {
+    "start": 1522.28284375,
+    "end": 1524.35846875,
+    "speaker": "SPEAKER_8",
+    "text": " So if required, I'll bring him along."
+  },
+  {
+    "start": 1527.25509375,
+    "end": 1529.2632187499999,
+    "speaker": "SPEAKER_14",
+    "text": " I'll send you the invitation shortly."
+  }
+]

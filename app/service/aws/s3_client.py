@@ -1,3 +1,5 @@
+import json
+
 import boto3
 import os
 from dotenv import load_dotenv
@@ -30,7 +32,7 @@ class S3Client:
 
         try:
             self.s3.upload_file(file_path, bucket_name, object_name)
-            return f"File {file_path} uploaded successfully to {bucket_name}/{object_name}"
+            return
         except Exception as e:
             return str(e)
 
@@ -41,3 +43,12 @@ class S3Client:
             return f"File {object_name} downloaded successfully to {download_path}"
         except Exception as e:
             return str(e)
+
+    def get_file_content(self, bucket_name, key):
+        try:
+            response = self.s3.get_object(Bucket=bucket_name, Key=key)
+            content = response['Body'].read().decode('utf-8')
+            return json.loads(content)
+        except Exception as e:
+            print(f"Failed to fetch agency mapping from S3: {e}")
+            return {}

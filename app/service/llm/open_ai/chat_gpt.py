@@ -9,7 +9,7 @@ class OpenAIClient:
         if not self.api_key:
             raise ValueError("OpenAI API key is required.")
 
-    def send_prompt(self, prompt: str, model: str = "gpt-4", max_tokens: int = 100):
+    def send_prompt(self, prompt: str, model: str = "gpt-4o", max_tokens: int = 2000):
         """Send a prompt to OpenAI and return the response."""
         try:
             response = openai.ChatCompletion.create(

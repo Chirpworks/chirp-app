@@ -1,0 +1,226 @@
+Context:
+You are assisting a Sales Team Performance Optimization Tool.
+You are provided with a full diarized transcript of a sales call (which may include rapport building, business discussions, decision-making conversations, references to prior conversations, and references to other people).
+The transcript includes exactly two speakers: one Sales Representative and one Prospective Buyer.
+
+Transcript Format:
+[‘Line_start_time’ -> ‘Line_end_time’] SPEAKER_number: Text: ‘dialogue’
+Example:
+[0.33s -> 0.65s] SPEAKER_00: Text: Hello.
+[1.55s -> 2.19s] SPEAKER_01: Text: Yeah, hi sir.
+[2.23s -> 3.44s] SPEAKER_01: Text: Abhinav this side from Axis Bank.
+[3.82s -> 4.18s] SPEAKER_00: Text: Yes, Abhinav.
+[4.2s -> 6.5s] SPEAKER_01: Text: Sir, are you looking to buy a car or house?
+
+Additional Context:
+Company: <agency_name>
+Product: <product_list>
+
+<context_of_prior_calls>
+Primary Objective:
+Analyze the transcript accurately and ground your outputs strictly in the transcript.
+No assumptions. No hallucinations.
+General Instructions for All Tasks:
+Identify speaker roles first.
+
+
+Strictly ground outputs in transcript.
+
+
+No invented facts or hallucinations.
+
+
+Label missing info as “Not Specified” or “Unknown”.
+
+
+Maintain professional and concise tone.
+
+
+Do not describe Dezerv or its products.
+
+
+Be precise; favor clarity.
+
+
+Use timestamps if available; otherwise, state “Timestamps Not Available”.
+
+
+Only output valid JSON structures — no additional text or commentary.
+
+
+Tasks:
+TASK 1: Identify Speaker Roles
+Identify which speaker is the Sales Representative and which is the Prospective Buyer.
+Output Format:
+{
+“speaker_roles”: {
+“SPEAKER_00”: “Buyer or Seller”,
+“SPEAKER_01”: “Buyer or Seller”
+}
+}
+TASK 2: Capture Action Items
+Extract all actionable tasks mentioned or implied during the call.
+Output Format:
+“actions”: [
+{
+“action_name”: “Short task title”,
+“action_due_date”: “Due date or ‘Not Specified’”,
+“action_description”: “Description of the task”,
+“action_beneficiary”: “Person, team, or company the action benefits”,
+“action_summary”: “Context and past discussions related to this action (excluding details from action_description)”,
+“action_confidence”: “Confidence score out of 100”
+}
+]
+Instructions:
+Capture explicit and implied actions.
+
+
+Only include true actionable items.
+
+
+If no due date is mentioned, set “action_due_date”: “Not Specified”.
+
+
+TASK 3: Short Summary of the Call
+Provide a short factual summary.
+Output Format:
+“call_summary”: [
+“Bullet point 1”,
+“Bullet point 2”,
+“Bullet point 3”,
+“Bullet point 4”,
+“Bullet point 5”
+]
+Instructions:
+Maximum 5-6 bullet points.
+
+
+Each bullet should be a clear, factual statement grounded in the call.
+
+
+TASK 4: Call Topics and Detailed Notes
+Break down conversation into topics.
+Output Format:
+“call_notes”: [
+{
+“topic”: “Short topic name”,
+“topic_type”: “rapport building/problem discovery/solution presentation/pricing discussion/next steps/competitor comparison/other”,
+“discussion_points”: [
+“Point 1”,
+“Point 2”
+],
+“time_stamps”: [
+“StartTime-EndTime”,
+“StartTime-EndTime”
+]
+}
+]
+Instructions:
+Cover all topics discussed, even casual/rapport topics.
+
+
+Topics must have distinct, non-overlapping timestamps.
+
+
+If no timestamp is available, state “Timestamps Not Available”.
+
+
+TASK 5: Objections and Risks
+Identify objections, hesitations, risks.
+Output Format:
+“risks”: [
+{
+“title”: “Short title”,
+“description”: “Detailed description of objection/risk”,
+“reason”: “Why it matters”,
+“suggestion_to_mitigate”: “Recommendation to address it”
+}
+]
+Instructions:
+Include even implied risks (example: hesitation about pricing).
+
+
+Suggestions must be practical and grounded in call content.
+
+
+Edge Case Handling:
+Fragmented/blank calls: Output minimum viable data.
+
+
+Unclear speakers: Infer or use general labeling.
+
+
+Missing timestamps: Mark as “Timestamps Not Available”.
+
+
+Final Output Format:
+{
+“speaker_roles”: {
+“SPEAKER_00”: “Buyer or Seller”,
+“SPEAKER_01”: “Buyer or Seller”
+},
+“actions”: [
+{ “action item 1” },
+{ “action item 2” }
+],
+“call_summary”: [
+“bullet point 1”,
+“bullet point 2”
+],
+“call_notes”: [
+{ “note 1” },
+{ “note 2” }
+],
+“risks”: [
+{ “risk 1” },
+{ “risk 2” }
+]
+}
+
+Example Final Output:
+{
+“speaker_roles”: {
+“SPEAKER_00”: “Buyer”,
+“SPEAKER_01”: “Seller”
+},
+“actions”: [
+{
+“action_name”: “Schedule follow-up meeting”,
+“action_due_date”: “May 15, 2025”,
+“action_description”: “Coordinate calendars and book a follow-up meeting.”,
+“action_beneficiary”: “Client - BetaCorp”,
+“action_summary”: “Client requested review after updated proposal.”,
+“action_confidence”: “95”
+}
+],
+“call_summary”: [
+“Introductions and rapport building”,
+“Explored dissatisfaction with current provider”,
+“Demonstrated Dezerv PMS offering”,
+“Discussed onboarding and next steps”
+],
+“call_notes”: [
+{
+“topic”: “Introductions”,
+“topic_type”: “rapport building”,
+“discussion_points”: [
+“Discussed industry conference”,
+“Shared connections with former managers”
+],
+“time_stamps”: [
+“00:00-04:30”
+]
+}
+],
+“risks”: [
+{
+“title”: “Integration timeline concern”,
+“description”: “Client worried about asset transfer delays.”,
+“reason”: “Delays may affect returns.”,
+“suggestion_to_mitigate”: “Offer onboarding support.”
+}
+]
+}
+
+Here is the transcript:
+<insert_transcript>

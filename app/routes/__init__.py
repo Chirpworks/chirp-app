@@ -6,15 +6,19 @@ def register_routes(app):
     from .meetings import meetings_bp
     from .auth import auth_bp
     from .health import health_bp
-    from .call_recordings import recording_bp
-    from .tasks import task_bp
+    from .call_records import call_record_bp
     from .agencies import agency_bp
+    from .actions import action_bp
+    from .analysis import analysis_bp
+    from .deals import deals_bp
 
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(meetings_bp, url_prefix="/api/meetings")
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(google_auth_bp, url_prefix="/api/google_auth")
     app.register_blueprint(health_bp, url_prefix="/api/health")
-    app.register_blueprint(recording_bp, url_prefix='/api/call_recording')
-    app.register_blueprint(task_bp, url_prefix='/api/task')
+    app.register_blueprint(call_record_bp, url_prefix='/api/call_records')
     app.register_blueprint(agency_bp, url_prefix='/api/agency')
+    app.register_blueprint(action_bp, url_prefix='/api/action')
+    app.register_blueprint(analysis_bp, url_prefix='/api/analysis')
+    app.register_blueprint(deals_bp, url_prefix='/api/deals')

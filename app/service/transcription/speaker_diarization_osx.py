@@ -149,6 +149,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     results = transcribe_and_diarize(AUDIO_PATH)
+    print(results)
     print_results(results)
 
     end_time = time.time()

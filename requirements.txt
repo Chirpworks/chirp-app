@@ -12,7 +12,6 @@ flask-bcrypt==1.0.1
 flask-login==0.6.3
 Flask-WTF==1.2.2
 wtforms~=3.2.1
-apscheduler==3.11.0
 boto3~=1.36.7
 openai~=1.61.0
 psycopg2-binary==2.9.10
@@ -24,4 +23,5 @@ requests~=2.32.3
 Flask-Session==0.8.0
 redis~=5.2.1
 flask-session==0.8.0
-celery==5.4.0
+flask-cors==5.0.1
+pydub==0.25.1

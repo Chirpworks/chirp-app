@@ -1,58 +1,106 @@
 from datetime import timedelta
+import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app import db
-from app.constants import AGENCY_NAME_TO_AGENCY_ID_MAPPING
 from app.models.user import User
 from app.models.jwt_token_blocklist import TokenBlocklist
+from app.service.aws.s3_client import S3Client
+from app.utils.auth_utils import generate_secure_otp, send_otp_email
+from werkzeug.security import check_password_hash, generate_password_hash
+
+logging = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
 
 
+def load_agency_mapping_from_s3():
+    return {
+        "chirpworks":  "00e4c232-45a3-4642-b055-75ae856911fb"
+    }
+    try:
+        s3_client = S3Client()
+        content = s3_client.get_file_content(bucket_name="agency-name-mapping-config", key="agency_mapping.json")
+        return content
+    except Exception as e:
+        print(f"Failed to fetch agency mapping from S3: {e}")
+        return {}
+
+
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
-    data = request.get_json()
-    username = data.get('username')
-    email = data.get('email')
-    password = data.get('password')
-    agency_name = data.get('agency_name')
+    try:
+        logging.info("signup flow initiated")
+        data = request.get_json()
+        username = data.get('username')
+        email = data.get('email')
+        agency_name = data.get('agency_name')
+        phone = data.get('phone')
+        role = data.get('role')
 
-    if not username or not email or not password or not agency_name:
-        return jsonify({'error': 'Missing required fields'}), 400
+        logging.info(f"Data received for signup: {username}, {email}, {agency_name}, {phone}")
 
-    agency_id = AGENCY_NAME_TO_AGENCY_ID_MAPPING.get(agency_name)
-    if not agency_id:
-        return jsonify({'error': 'Invalid Agency Name'}), 400
+        if not username or not email or not agency_name or not phone:
+            logging.error({'error': 'Missing required fields'})
+            return jsonify({'error': 'Missing required fields'}), 400
 
-    existing_user = User.query.filter((User.email == email) | (User.username == username)).first()
-    if existing_user:
-        return jsonify({'error': 'User already exists'}), 400
+        agency_id_name_mapping = load_agency_mapping_from_s3()
+        agency_id = agency_id_name_mapping.get(agency_name)
+        if not agency_id:
+            logging.error({'error': 'Invalid Agency Name'})
+            return jsonify({'error': 'Invalid Agency Name'}), 400
 
-    new_user = User(username=username, email=email, password=password, agency_id=agency_id)
+        logging.info("Checking if User already exists")
+        existing_user = User.query.filter((User.email == email) | (User.username == username) | (User.phone == phone)).first()
+        if existing_user:
+            logging.error({'error': 'User already exists'})
+            return jsonify({'error': 'User already exists'}), 400
+        logging.info(f"User doesn't exist. Creating new user with username {username} and email {email}")
 
-    db.session.add(new_user)
-    db.session.commit()
+        logging.info(f"generating secure otp")
+        otp = generate_secure_otp(length=8)
 
-    return jsonify({'message': 'User created successfully', 'user_id': str(new_user.id)}), 201
+        logging.info(f"Creating user")
+        new_user = User(username=username, email=email, password=otp, agency_id=agency_id, phone=phone, role=role)
+
+        logging.info("Sending OTP via email")
+        _ = send_otp_email(to_email=email, otp=otp)
+
+        logging.info("Committing new user to DB")
+        db.session.add(new_user)
+        db.session.commit()
+
+        logging.info(f"Created new user successfully with email={email}, username={username}")
+        return jsonify({'message': 'User created successfully', 'user_id': str(new_user.id)}), 201
+    except Exception as e:
+        logging.error(f"Failed to complete signup with error {e}")
+        return jsonify({'error': 'Signup Failed'}), 500
 
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    try:
+        logging.info("Logging in")
+        data = request.get_json()
+        email = data.get('email')
+        password = data.get('password')
 
-    if not email or not password:
-        return jsonify({'error': 'Missing email or password'}), 400
+        if not email or not password:
+            logging.error({'error': 'Missing email or password'})
+            return jsonify({'error': 'Missing email or password'}), 400
 
-    user = User.query.filter_by(email=email).first()
-    if not user or not user.check_password(password):
-        return jsonify({'error': 'Invalid credentials'}), 401
+        user = User.query.filter_by(email=email).first()
+        if not user or not user.check_password(password):
+            logging.error({'error': 'Invalid credentials'})
+            return jsonify({'error': f'Invalid credentials for email: {email}'}), 401
 
-    access_token = user.generate_access_token()
-    refresh_token = user.generate_refresh_token()
-    return jsonify({'access_token': access_token, 'refresh_token': refresh_token, 'user_id': user.id}), 200
+        access_token = user.generate_access_token(expires_delta=timedelta(minutes=15))
+        refresh_token = user.generate_refresh_token()
+        return jsonify({'access_token': access_token, 'refresh_token': refresh_token, 'user_id': user.id}), 200
+    except Exception as e:
+        logging.error({'error': f"Failed to login with error with error: {e}"})
+        return jsonify({'error': 'Login Failed'}), 500
 
 
 @auth_bp.route('/refresh', methods=['POST'])
@@ -61,8 +109,9 @@ def refresh():
     user_id = get_jwt_identity()  # Get user ID from refresh token
     user = User.query.filter_by(id=user_id).first()
     new_access_token = user.generate_access_token(expires_delta=timedelta(minutes=15))
+    refresh_token = user.generate_refresh_token()
 
-    return jsonify({'access_token': new_access_token}), 200
+    return jsonify({'access_token': new_access_token, 'refresh_token': refresh_token}), 200
 
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -73,3 +122,30 @@ def logout():
     db.session.commit()
 
     return jsonify({"message": "Successfully logged out"}), 200
+
+
+@auth_bp.route('/update_password', methods=['POST'])
+def update_password():
+    try:
+        data = request.get_json()
+        email = data.get('email') or ''
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            logging.error({"error": f"User not found with email {email}"})
+            return jsonify({"message": "User not found"}), 404
+
+        if not check_password_hash(user.password_hash, old_password):
+            logging.error({"error": f"Old password incorrect for user with email {email}"})
+            return jsonify({"message": "Old password incorrect"}), 401
+
+        user.password_hash = generate_password_hash(new_password)
+        db.session.commit()
+
+        return jsonify({"message": "Password updated successfully"}), 200
+    except Exception as e:
+        logging.error(
+            {"error": f"Failed to update password for user with email {email} with error {e}"}
+        )

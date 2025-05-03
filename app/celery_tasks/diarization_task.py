@@ -1,11 +1,9 @@
-from app import celery
 import openai
 import os
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
-@celery.task
 def process_diarization(job_id):
     from app.models.job import Job
     from app import db

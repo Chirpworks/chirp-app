@@ -15,16 +15,18 @@ import hashlib
 # else:
 #     print("Incorrect password.")
 
+import scipy.cluster.hierarchy as sch
 
 def run():
-    from itertools import permutations
-
-    words = ["COMMERCIAL", "CVM", "SIXDEE", "20JAN2025", "20JANUARY2025", "JAN2025", "JANUARY2025", "PROPOSAL", "MKT", "PRICELIST"]
-    # words = ["SIXDEE", "COMMERCIAL", "PROPOSAL", "DOCUMENT", "VERSION", "V", "20", "25", "2025", "JAN", "JANUARY", "MKT", "CVM", "1", "_", "@", "^", "6", "d", "D", "6d", "6D", "^d", "^D", "sixdee", "commercial", "proposal", "document", "version", "v", "jan", "january", "mkt", "cvm"]
-    with open("middle_combinations_1.txt", "w") as f:
-        for i in range(1, len(words) + 1):
-            for perm in permutations(words, i):
-                f.write("".join(perm) + "\n")
+    # from itertools import permutations
+    #
+    # words = ["COMMERCIAL", "CVM", "SIXDEE", "20JAN2025", "20JANUARY2025", "JAN2025", "JANUARY2025", "PROPOSAL", "MKT", "PRICELIST"]
+    # # words = ["SIXDEE", "COMMERCIAL", "PROPOSAL", "DOCUMENT", "VERSION", "V", "20", "25", "2025", "JAN", "JANUARY", "MKT", "CVM", "1", "_", "@", "^", "6", "d", "D", "6d", "6D", "^d", "^D", "sixdee", "commercial", "proposal", "document", "version", "v", "jan", "january", "mkt", "cvm"]
+    # with open("middle_combinations_1.txt", "w") as f:
+    #     for i in range(1, len(words) + 1):
+    #         for perm in permutations(words, i):
+    #             f.write("".join(perm) + "\n")
+    print(sch.__doc__)
 
 
 if __name__=='__main__':

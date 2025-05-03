@@ -1,6 +1,11 @@
-from flask import Blueprint, jsonify
+import logging
 
+from flask import Blueprint, jsonify, request
+
+from app import Agency, db
 from app.constants import AgencyName
+
+logging = logging.getLogger(__name__)
 
 agency_bp = Blueprint("agency", __name__)
 
@@ -9,3 +14,25 @@ agency_bp = Blueprint("agency", __name__)
 def get_agencies():
     agency_names = [agency.value for agency in AgencyName]
     return jsonify({"agencies": agency_names}), 200
+
+
+@agency_bp.route("/create_agency", methods=["POST"])
+def create_agency():
+    try:
+        logging.info("agency creation api initiated")
+        data = request.get_json()
+
+        id = data.get("id")
+        name = data.get("name")
+
+        logging.info(f"Creating Agency with id {id} and name {name}")
+
+        new_agency = Agency(id=id, name=name)
+        logging.info("Committing new agency to DB")
+        db.session.add(new_agency)
+        db.session.commit()
+        logging.info(f"Created new agency successfully with name={name}")
+        return jsonify({'message': 'Agency created successfully', 'agency_id': str(new_agency.id)}), 201
+    except Exception as e:
+        logging.error(f"Failed to create agency with error {e}")
+        return jsonify({'error': 'Agency creation failed'}), 500

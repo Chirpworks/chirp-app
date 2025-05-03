@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 python:3.11
+FROM --platform=linux/amd64 python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -10,11 +10,27 @@ WORKDIR /app
 
 COPY . .
 
-# Install dependencies
-RUN apt-get update && apt-get install -y gcc libpq-dev && \
+# Install system dependencies and Python requirements
+RUN echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99insecure && \
+    apt-get update && \
+    apt-get install -y gcc libpq-dev netcat-openbsd ffmpeg && \
+    rm -rf /var/lib/apt/lists/* && \
     pip install --upgrade pip && \
     pip install -r requirements.txt
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "wsgi:app"]
+# This command will:
+# - Wait until DB is reachable
+# - Run DB migrations
+# - Start the Flask app using Gunicorn
+CMD bash -c "\
+  echo 'Waiting for database...'; \
+  until nc -z -v -w30 \$DB_HOST \$DB_PORT; do \
+    echo 'Waiting for Postgres at '\$DB_HOST':'\$DB_PORT'...'; \
+    sleep 5; \
+  done; \
+  echo 'Running migrations...'; \
+  flask db upgrade; \
+  echo 'Starting app...'; \
+  exec gunicorn wsgi:app --bind 0.0.0.0:5000 --timeout 60"

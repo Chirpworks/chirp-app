@@ -1,32 +1,40 @@
-import os
-import threading
+import logging
+import sys
 
-from celery import Celery
-from flask import Flask
 from flask_session import Session
+from flask_cors import CORS
 
 from app.extensions import migrate, db, jwt
 from app.config import Config
-
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
 from app.models.agency import Agency
 from app.models.user import User
 from app.models.job import Job
 from app.models.meeting import Meeting
+from app.models.deal import Deal
+from app.models.action import Action
+from app.models.exotel_calls import ExotelCall
+from app.models.mobile_app_calls import MobileAppCall
 from app.models.jwt_token_blocklist import TokenBlocklist
 from app.service.aws.ecs_client import ECSClient
 
 from flask import Flask
 
-# Initialize APScheduler with Flask
-jobstore = {
-    "default": SQLAlchemyJobStore(url="sqlite:///jobs.db")  # Use SQLite for simplicity
-}
-scheduler = BackgroundScheduler(jobstores=jobstore)
-celery = Celery(__name__, broker=Config.CELERY_BROKER_URL)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
+logger = logging.getLogger(__name__)
+logger.info("Logging is set up and initialized.")
+
+
+def allow_localhost_origin(origin):
+    return origin and origin.startswith("http://localhost")
 
 @jwt.token_in_blocklist_loader
 def check_if_token_revoked(jwt_header, jwt_payload):
@@ -36,6 +44,7 @@ def check_if_token_revoked(jwt_header, jwt_payload):
 
 def create_app():
     app = Flask(__name__)
+    CORS(app, supports_credentials=True, origins=["http://localhost:8080"])
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
     app.config.update(
@@ -48,13 +57,9 @@ def create_app():
 
     jwt.init_app(app)
 
-    global celery
-    celery = make_celery(celery, app)
-
     with app.app_context():
         from app.routes import register_routes
         register_routes(app)
-        scheduler.start()
 
         # ecs_client = ECSClient()
 
@@ -68,21 +73,3 @@ def create_app():
         return check_if_token_revoked(jwt_header, jwt_payload)
 
     return app
-
-
-def make_celery(celery, app):
-    celery.conf.update(app.config)
-    celery.conf.update(
-        broker_transport_options={
-            "region": "ap-south-1",
-            "visibility_timeout": 300,  # Avoid task duplication issues
-            "wait_time_seconds": 20  # Long polling (max 20s)
-        }
-    )
-
-    class ContextTask(celery.Task):
-        def __call__(self, *args, **kwargs):
-            with app.app_context():
-                return self.run(*args, **kwargs)
-
-    celery.Task = ContextTask
