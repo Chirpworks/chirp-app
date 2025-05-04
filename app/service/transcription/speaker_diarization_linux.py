@@ -201,7 +201,7 @@ def transcribe_and_diarize(audio_path):
     # Step 3: Diarization with PyAnnote
     logger.info("Running speaker diarization with PyAnnote...")
     diarization_pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization@2.1",
+        "pyannote/speaker-diarization-3.0",
         use_auth_token="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"
     )
     diarization_pipeline.to(torch.device("cuda"))
