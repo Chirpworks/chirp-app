@@ -44,6 +44,7 @@ cache_dir = os.getenv("TRANSFORMERS_CACHE", "/model_cache")
 model_cache_path = os.path.join(cache_dir, "large-v1")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+logger.info(f"Using device: {device}")
 
 # Check if the model appears to be cached.
 if not os.path.exists(model_cache_path):
@@ -58,7 +59,7 @@ if not os.path.exists(model_cache_path):
         logger.info("Model does not support explicit saving; relying on default caching.")
 else:
     logger.info("Loading model from cache...")
-    model = whisperx.load_model("large-v1", device="cuda", compute_type='float32')
+    model = whisperx.load_model("large-v1", device=device, compute_type='float32')
 
 logger.info("WhisperX large-v1 model is loaded and ready.")
 

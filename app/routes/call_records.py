@@ -219,7 +219,7 @@ def post_exotel_recording():
                 }
             }
             response = requests.post(
-                "https://api.runpod.ai/v2/izpeaha15yz4ma/run", headers=headers, data=json.dumps(payload)
+                "https://api.runpod.ai/v2/sc9iarthgtdbtd/run", headers=headers, data=json.dumps(payload)
             )
             if response.status_code == 200:
                 result = response.json()
@@ -372,7 +372,7 @@ def post_app_call_record():
                     }
                 }
                 response = requests.post(
-                    "https://api.runpod.ai/v2/izpeaha15yz4ma/run", headers=headers, data=json.dumps(payload)
+                    "https://api.runpod.ai/v2/sc9iarthgtdbtd/run", headers=headers, data=json.dumps(payload)
                 )
                 if response.status_code == 200:
                     result = response.json()
