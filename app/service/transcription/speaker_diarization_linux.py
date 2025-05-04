@@ -41,7 +41,7 @@ session = Session()
 cache_dir = os.getenv("TRANSFORMERS_CACHE", "/model_cache")
 
 # Define a path within the cache directory for the 'large-v1' model.
-model_cache_path = os.path.join(cache_dir, "large-v1")
+model_cache_path = os.path.join(cache_dir, "large-v2")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
@@ -49,7 +49,7 @@ logger.info(f"Using device: {device}")
 # Check if the model appears to be cached.
 if not os.path.exists(model_cache_path):
     logger.info("Model not found in cache; downloading and caching the model...")
-    model = whisperx.load_model("large-v1", device=device)
+    model = whisperx.load_model("large-v2", device=device, compute_type="float32")
     # If the loaded model supports explicit saving, do so:
     try:
         model.save_pretrained(model_cache_path)
@@ -59,9 +59,9 @@ if not os.path.exists(model_cache_path):
         logger.info("Model does not support explicit saving; relying on default caching.")
 else:
     logger.info("Loading model from cache...")
-    model = whisperx.load_model("large-v1", device=device)
+    model = whisperx.load_model("large-v2", device=device, compute_type="float32")
 
-logger.info("WhisperX large-v1 model is loaded and ready.")
+logger.info("WhisperX large-v2 model is loaded and ready.")
 
 
 def convert_mp3_to_wav(mp3_path):
@@ -201,7 +201,7 @@ def transcribe_and_diarize(audio_path):
     # Step 3: Diarization with PyAnnote
     logger.info("Running speaker diarization with PyAnnote...")
     diarization_pipeline = Pipeline.from_pretrained(
-        "pyannote/speaker-diarization@2.1",
+        "pyannote/speaker-diarization-3.0",
         use_auth_token="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"
     )
     diarization_pipeline.to(torch.device("cuda"))
