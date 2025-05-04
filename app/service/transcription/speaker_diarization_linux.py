@@ -204,6 +204,7 @@ def transcribe_and_diarize(audio_path):
         "pyannote/speaker-diarization@2.1",
         use_auth_token="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"
     )
+    diarization_pipeline.to(torch.device("cuda"))
 
     # ✅ Load parameters from pretrained model
     hyperparameters = {
