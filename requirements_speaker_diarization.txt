@@ -3,16 +3,7 @@ uvicorn==0.27.1
 pydantic==2.6.0
 Levenshtein==0.24.0
 fastapi==0.109.2
-pandas==2.0.3
 transformers==4.32.1
 setuptools>=65
 soundfile==0.12.1
-numpy==1.26.4
-pandas==2.0.3
 nltk
-boto3~=1.36.7
-requests~=2.32.3
-Flask-SQLAlchemy==3.1.1
-psycopg2-binary==2.9.10
-SQLAlchemy~=2.0.37
-runpod==1.7.9
