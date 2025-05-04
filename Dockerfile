@@ -20,7 +20,7 @@ RUN python -m pip install --upgrade pip
 RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 --extra-index-url https://download.pytorch.org/whl/cu118
 
 # Install whisperx and pyannote
-RUN pip install git+https://github.com/m-bain/whisperx.git
+RUN pip install git+https://github.com/m-bain/whisperx.git@1df7f3a0d7ed225d31d92bd305bc73375573d9da
 RUN pip install pyannote.audio==3.0.1
 
 # Set working directory
