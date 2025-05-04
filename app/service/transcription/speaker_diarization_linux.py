@@ -204,16 +204,14 @@ def transcribe_and_diarize(audio_path):
         "pyannote/speaker-diarization-3.0",
         use_auth_token="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"
     )
-    diarization_pipeline.to(torch.device("cuda"))
+    diarization_pipeline.to(torch.device(device))
 
     # ✅ Load parameters from pretrained model
     hyperparameters = {
         "segmentation": {
-            "threshold": 0.7,  # 🔥 Improves speaker separation
             "min_duration_off": 0.5  # 🔥 Prevents rapid speaker switching
         },
         "clustering": {
-            "threshold": 0.5,  # 🔥 Tighter speaker grouping
             "method": "ward",  # 🔥 Better clustering approach
             "min_cluster_size": 15  # 🔥 Avoids small noise clusters
         }

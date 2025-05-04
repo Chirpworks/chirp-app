@@ -36,5 +36,8 @@ RUN pip install -r requirements_speaker_diarization.txt
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+RUN pip uninstall onnxruntime
+RUN pip install onnxruntime-gpu
+
 # Run your serverless handler
 ENTRYPOINT ["python", "app/serverless_handler.py"]
