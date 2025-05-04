@@ -26,3 +26,5 @@ flask-session==0.8.0
 flask-cors==5.0.1
 pydub==0.25.1
 runpod==1.7.9
+numpy==1.26.4
+pandas==2.0.3
