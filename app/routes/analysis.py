@@ -21,11 +21,11 @@ def trigger_analysis():
         if not job_id:
             return jsonify({"error": "Missing job_id"}), 400
 
-        job = Job.query().filter_by(id=job_id).first()
+        job = Job.query.filter_by(id=job_id).first()
         if not job:
             logging.error(f"Job with id {job_id} not found")
 
-        meeting = Meeting.query().filter_by(id=job.meeting_id).first()
+        meeting = Meeting.query.filter_by(id=job.meeting_id).first()
         if not meeting:
             logging.error(f"Meeting for job {job_id} not found")
         if not meeting.diarization:
