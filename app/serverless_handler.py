@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 def handler(event):
     logger.info(f"Received event: {event}")
     try:
-        job_id = event.get("job_id")
+        job_id = event.get("input").get("job_id")
         if not job_id:
             raise ValueError("Missing 'job_id' in event payload.")
         os.environ["JOB_ID"] = job_id
