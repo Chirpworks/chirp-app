@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import subprocess
 import tempfile
 from datetime import timedelta
 from urllib.parse import urlparse
@@ -60,6 +61,13 @@ else:
     model = whisperx.load_model("large-v1", device="cuda", compute_type='float32')
 
 logger.info("WhisperX large-v1 model is loaded and ready.")
+
+
+def convert_mp3_to_wav(mp3_path):
+    wav_path = mp3_path.replace('.mp3', '.wav')
+    command = ['ffmpeg', '-y', '-i', mp3_path, '-ar', '16000', '-ac', '1', wav_path]
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    return wav_path
 
 
 def format_timestamp(seconds):
@@ -148,7 +156,9 @@ def process_audio(job_id, bucket, key):
             local_audio_path = tmp_file.name
 
         logger.info(f"Downloading audio file from S3: bucket={bucket}, key={key}")
-        s3_client.download_file(bucket, key, local_audio_path)
+        mp3_path = local_audio_path.replace('.wav', '.mp3')
+        s3_client.download_file(bucket, key, mp3_path)
+        local_audio_path = convert_mp3_to_wav(mp3_path)
         logger.info(f"Audio file downloaded to {local_audio_path}")
 
         transcripion, diarization = transcribe_and_diarize(local_audio_path)
