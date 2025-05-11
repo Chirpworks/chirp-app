@@ -1,5 +1,10 @@
-import openai
+import json
+import logging
+
+from openai import OpenAI
 import os
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIClient:
@@ -8,18 +13,45 @@ class OpenAIClient:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
             raise ValueError("OpenAI API key is required.")
+        self.client = OpenAI(api_key=self.api_key)
 
     def send_prompt(self, prompt: str, model: str = "gpt-4o", max_tokens: int = 2000):
         """Send a prompt to OpenAI and return the response."""
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens
+                messages=[{"role": "user", "content": prompt}]
             )
-            return response["choices"][0]["message"]["content"].strip()
+            if not response:
+                logger.info("OpenAI response was empty or failed")
+                raise Exception("OpenAI response was empty or failed")
+            raw_response = response.choices[0].message.content
+            content = self.clean_json_content(raw_response)
+            return content
         except Exception as e:
-            print(f"Error communicating with OpenAI: {e}")
+            logger.error(f"Error communicating with OpenAI: {e}")
+            raise e
+
+    def clean_json_content(self, raw_response_string: str):
+        # Step 1: Remove Markdown-style ```json and ```
+        if raw_response_string.startswith("```json"):
+            raw_response_string = raw_response_string.lstrip("`json").strip()
+        if raw_response_string.endswith("```"):
+            raw_response_string = raw_response_string[:-3].strip()
+
+        # Step 2: Remove escaped newline and literal newline characters
+        raw_response_string = raw_response_string.replace("\\n", "").replace("\n", "")
+
+        # Step 3: Unescape quotes (\" → ")
+        raw_response_string = raw_response_string.replace('\\"', '"')
+        logger.info(f"raw response string: {raw_response_string}")
+        # Step 4: Parse JSON
+        try:
+            r = json.loads(raw_response_string)
+            logger.info(f"OpenAI returned {r}")
+            return r
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse response JSON from OpenAI:", e)
             return None
 
 

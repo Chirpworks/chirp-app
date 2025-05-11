@@ -32,6 +32,7 @@ class User(db.Model, UserMixin):
     agency = db.relationship('Agency', back_populates='users')
     deals = db.relationship('Deal', back_populates='user', cascade='all, delete-orphan')
     last_week_performance_analysis = db.Column(db.String(), nullable=True)
+    name = db.Column(db.String(100), nullable=True, unique=False)
 
     def __init__(self, username, email, phone, password, agency_id, role=None):
         self.username = username

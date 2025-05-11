@@ -218,8 +218,9 @@ def post_exotel_recording():
                     "job_id": str(job.id),
                 }
             }
+            runpod_diarization_url = os.getenv("RUNPOD_DIARIZATION_URL")
             response = requests.post(
-                "https://api.runpod.ai/v2/sc9iarthgtdbtd/run", headers=headers, data=json.dumps(payload)
+                runpod_diarization_url, headers=headers, data=json.dumps(payload)
             )
             if response.status_code == 200:
                 result = response.json()
@@ -371,8 +372,9 @@ def post_app_call_record():
                         "job_id": str(job.id),
                     }
                 }
+                runpod_diarization_url = os.getenv("RUNPOD_DIARIZATION_URL")
                 response = requests.post(
-                    "https://api.runpod.ai/v2/sc9iarthgtdbtd/run", headers=headers, data=json.dumps(payload)
+                    runpod_diarization_url, headers=headers, data=json.dumps(payload)
                 )
                 if response.status_code == 200:
                     result = response.json()

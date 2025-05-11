@@ -1,3 +1,4 @@
+import json
 import logging
 
 from flask import Blueprint, request, jsonify
@@ -56,16 +57,20 @@ def get_actions():
                 "due_date": action.due_date.isoformat() if action.due_date else None,
                 "description": action.description,
                 "deal_name": action.meeting.deal.name,
-                "deal_id": str(action.meeting.deal_id)
+                "deal_id": str(action.meeting.deal_id),
+                "reasoning": action.reasoning,
+                "signals": action.signals,
+                "type": action.type.value
             })
 
         return jsonify(result), 200
 
     except Exception as e:
+        logging.info(f"Failed to fetch actions with error: {e}")
         return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
 
 
-@action_bp.route("/actions/<uuid:action_id>", methods=["GET"])
+@action_bp.route("/get_action_details/<uuid:action_id>", methods=["GET"])
 @jwt_required()
 def get_action_by_id(action_id):
     try:
@@ -82,6 +87,8 @@ def get_action_by_id(action_id):
 
         if not action:
             return jsonify({"error": "Action not found or unauthorized"}), 404
+        if not user_id:
+            return jsonify({"error": "User not found or unauthorized"}), 401
 
         is_complete = action.status == ActionStatus.COMPLETED
         result = {
@@ -91,18 +98,21 @@ def get_action_by_id(action_id):
             "is_complete": is_complete,
             "due_date": action.due_date.isoformat() if action.due_date else None,
             "description": action.description,
-            "call_context": action.call_context,
+            "deal_name": action.meeting.deal.name,
             "deal_id": str(action.meeting.deal_id),
-            "deal_name": action.meeting.deal.name
+            "reasoning": action.reasoning,
+            "signals": action.signals,
+            "type": action.type.value
         }
 
         return jsonify(result), 200
 
     except Exception as e:
+        logging.error(f"Failed to fetch action details: {e}")
         return jsonify({"error": f"Failed to fetch action: {str(e)}"}), 500
 
 
-@action_bp.route("/actions/status", methods=["POST"])
+@action_bp.route("/status", methods=["POST"])
 @jwt_required()
 def update_multiple_action_statuses():
     try:
@@ -118,7 +128,7 @@ def update_multiple_action_statuses():
         try:
             new_status = ActionStatus[status_str.upper()]
         except KeyError:
-            return jsonify({"error": "Invalid status. Must be 'PENDING' or 'COMPLETED'"}), 400
+            return jsonify({"error": "Invalid status. Must be 'pending' or 'completed'"}), 400
 
         # Fetch and filter actions that belong to this user
         actions = (
@@ -131,6 +141,9 @@ def update_multiple_action_statuses():
 
         if not actions:
             return jsonify({"error": "No valid actions found for current user"}), 404
+
+        if not user_id:
+            return jsonify({"error": "User not found or unauthorized"}), 401
 
         updated_ids = []
         for action in actions:
@@ -146,5 +159,6 @@ def update_multiple_action_statuses():
         }), 200
 
     except Exception as e:
+        logging.error(f"Failed to change action status: {e}")
         db.session.rollback()
         return jsonify({"error": f"Failed to update actions: {str(e)}"}), 500

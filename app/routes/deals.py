@@ -1,3 +1,4 @@
+import json
 import logging
 
 from flask import Blueprint, request, jsonify
@@ -65,3 +66,45 @@ def get_deals():
 
     except Exception as e:
         return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
+
+
+@deals_bp.route("/deal_details/<uuid:deal_id>", methods=["GET"])
+@jwt_required()
+def get_meeting_by_id(deal_id):
+    try:
+        user_id = get_jwt_identity()
+
+        # Join through deal to verify the meeting belongs to this user's deals
+        deal = (
+            Deal.query
+            .filter(Deal.id == deal_id)
+            .first()
+        )
+
+        if not deal or not user_id:
+            return jsonify({"error": "Deal not found or unauthorized"}), 404
+
+        result = {
+            "id": str(deal.id),
+            "name": deal.name,
+            "stage": deal.stage,
+            "stage_signals": deal.stage_signals,
+            "stage_reasoning": deal.stage_reasoning,
+            "focus_areas": deal.focus_areas,
+            "risks": deal.risks,
+            "lead_qualification": deal.risks,
+            "overview": deal.overview,
+            "key_stakeholders": deal.key_stakeholders,
+            "buyer_number": deal.buyer_number,
+            "seller_number": deal.seller_number,
+            "summary": deal.summary,
+            "pain_points": deal.pain_points,
+            "solutions": deal.solutions,
+            "user_id": deal.user_id,
+        }
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch deal data: {e}")
+        return jsonify({"error": f"Failed to fetch deal: {str(e)}"}), 500

@@ -144,11 +144,16 @@ def get_meeting_by_id(meeting_id):
             "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
             "status": meeting.status.value,
             "summary": meeting.summary,
+            "buyer_number": meeting.buyer_number,
+            "call_notes": meeting.call_notes,
+            "deal_id": meeting.deal_id,
+            "diarization": meeting.diarization
         }
 
         return jsonify(result), 200
 
     except Exception as e:
+        logging.error(f"Failed to fetch call data: {e}")
         return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
 
 

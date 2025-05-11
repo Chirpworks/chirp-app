@@ -19,6 +19,6 @@ def register_routes(app):
     app.register_blueprint(health_bp, url_prefix="/api/health")
     app.register_blueprint(call_record_bp, url_prefix='/api/call_records')
     app.register_blueprint(agency_bp, url_prefix='/api/agency')
-    app.register_blueprint(action_bp, url_prefix='/api/action')
+    app.register_blueprint(action_bp, url_prefix='/api/actions')
     app.register_blueprint(analysis_bp, url_prefix='/api/analysis')
     app.register_blueprint(deals_bp, url_prefix='/api/deals')

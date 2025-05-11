@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from sqlalchemy.dialects.postgresql import ENUM
+
 
 from sqlalchemy import UUID
 
@@ -26,7 +28,7 @@ class Action(db.Model):
     title = db.Column(db.String(300), nullable=False)
     due_date = db.Column(db.DateTime, default=None, nullable=True)
     status = db.Column(db.Enum(ActionStatus), default=ActionStatus.PENDING, nullable=False)
-    type = db.Column(db.Enum(ActionType), default=ActionType.CONTEXTUAL_ACTION, nullable=True)
+    type = db.Column(ENUM(ActionType, name="actiontype", values_callable=lambda x: [e.value for e in x]), default=ActionType.CONTEXTUAL_ACTION, nullable=True)
     description = db.Column(db.Text, nullable=True)
     reasoning = db.Column(db.Text, nullable=True)
     signals = db.Column(db.JSON, nullable=True)
