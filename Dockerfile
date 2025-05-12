@@ -25,19 +25,25 @@ WORKDIR /app
 # Set Python path so app/ is importable
 ENV PYTHONPATH=/app
 
-# Copy only relevant contents
+# Copy application code
 COPY app/ ./app/
 
-# Optional: install other Python packages you use
+# Install dependencies
 COPY requirements_speaker_diarization.txt .
 RUN pip install -r requirements_speaker_diarization.txt
 
-# Optional: install other Python packages you use
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+# Ensure GPU ONNX runtime is used
 RUN pip uninstall -y onnxruntime
 RUN pip install onnxruntime-gpu
+
+# Optional: set Hugging Face cache directory
+ENV HF_HOME=/root/.cache/huggingface
+
+# Pre-download the WhisperX model (faster-whisper-large-v2)
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Systran/faster-whisper-large-v2', local_dir='/root/.cache/huggingface/hub/models--Systran--faster-whisper-large-v2', local_dir_use_symlinks=False)"
 
 # Run your serverless handler
 ENTRYPOINT ["python", "app/serverless_handler.py"]
