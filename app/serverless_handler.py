@@ -10,6 +10,7 @@ from service.transcription.speaker_diarization_linux import run_diarization
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # Define handler
 def handler(event):
     logger.info(f"Received event: {event}")
@@ -25,6 +26,7 @@ def handler(event):
         logger.error("Exception occurred in handler:")
         logger.error(traceback.format_exc())
         return {"status": "error", "message": str(e)}
+
 
 # 🟡 This keeps the worker alive for RunPod Serverless
 runpod.serverless.start({"handler": handler})
