@@ -18,6 +18,10 @@ from sqlalchemy.orm import sessionmaker
 from app import Job
 from app import Meeting
 from app.models.job import JobStatus
+import os
+# Added: Set Hugging Face cache directory
+os.environ["HF_HOME"] = "/root/.cache/huggingface"
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

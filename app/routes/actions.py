@@ -19,6 +19,12 @@ def get_actions():
     try:
         user_id = get_jwt_identity()
 
+        if not user_id:
+            logging.error("Failed to get action - Unauthorized")
+            return jsonify({"error": "User not found or unauthorized"}), 401
+
+        action_type = request.args.get("actionType")
+
         # Parse optional query params
         deal_id = request.args.get("deal_id")
         is_complete_str = request.args.get("is_complete")
@@ -37,6 +43,9 @@ def get_actions():
 
         if deal_id:
             query = query.filter(Meeting.deal_id == deal_id)
+
+        if action_type:
+            query = query.filter(Action.action_type == action_type)
 
         if is_complete is True:
             query = query.filter(Action.status == ActionStatus.COMPLETED)
