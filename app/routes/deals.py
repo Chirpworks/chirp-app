@@ -70,7 +70,7 @@ def get_deals():
 
 @deals_bp.route("/deal_details/<uuid:deal_id>", methods=["GET"])
 @jwt_required()
-def get_meeting_by_id(deal_id):
+def get_deal_by_id(deal_id):
     try:
         user_id = get_jwt_identity()
 
@@ -79,6 +79,15 @@ def get_meeting_by_id(deal_id):
             Deal.query
             .filter(Deal.id == deal_id)
             .first()
+        )
+
+        num_pending_actions = (
+            db.session.query(func.count(Action.id))
+            .join(Meeting, Action.meeting_id == Meeting.id)
+            .join(Deal, Meeting.deal_id == Deal.id)
+            .filter(Deal.id == deal.id)
+            .filter(Action.status == ActionStatus.PENDING)
+            .scalar()
         )
 
         if not deal or not user_id:
@@ -101,6 +110,7 @@ def get_meeting_by_id(deal_id):
             "pain_points": deal.pain_points,
             "solutions": deal.solutions,
             "user_id": deal.user_id,
+            "num_pending_actions": num_pending_actions
         }
 
         return jsonify(result), 200

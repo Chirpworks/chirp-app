@@ -24,20 +24,20 @@ class CallAnalysis:
         self.descriptive_call_analysis = None
         self.deal = None
         self.agency = None
+        self.user = None
 
     def get_previous_calls_context(self, meetings):
-        text = "Additional Context:\n"
         text = "Call History Summary:\n"
         for i, meeting in enumerate(meetings):
-            text += f"Call {i}:\n"
+            text += f"Call {i+1}:\n"
             text += f"{meeting.summary}\n\n"
         return text
 
     def analyze_meeting(self):
         try:
             seller_number = self.meeting.seller_number
-            user = User.query.filter_by(phone=seller_number).first()
-            self.agency = Agency.query.filter_by(id=user.agency_id).first()
+            self.user = User.query.filter_by(phone=seller_number).first()
+            self.agency = Agency.query.filter_by(id=self.user.agency_id).first()
             self.deal = Deal.query.filter_by(id=self.meeting.deal_id).first()
 
             self.process_analytical_prompt()
@@ -59,8 +59,11 @@ class CallAnalysis:
 
         with open(prompt_path, "r") as f:
             prompt_text = f.read()
+            prompt_text = prompt_text.replace("<seller_name>", self.user.name)
+            prompt_text = prompt_text.replace("<call_date>", self.meeting.start_time.date())
             prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
             prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+
             if len(deal_meetings) > 1:
                 text = self.get_previous_calls_context(deal_meetings[:-1])
                 prompt_text = prompt_text.replace("<additional_context>", text)
@@ -70,6 +73,7 @@ class CallAnalysis:
         self.analytical_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
 
         if not prompt_text:
+            logging.error("Analytical prompt text not found. Failed to generate analysis")
             raise Exception("unable to generate prompt for this analysis")
 
         speaker_roles = self.analytical_call_analysis.get("speaker_roles")
@@ -108,7 +112,7 @@ class CallAnalysis:
                 reasoning=reasoning,
                 signals=signals,
                 meeting_id=self.meeting.id,
-                type=ActionType.SUGGESTED_ACTION.value
+                type=ActionType.SUGGESTED_ACTION
             )
             db.session.add(action)
             db.session.flush()
@@ -123,8 +127,11 @@ class CallAnalysis:
 
         with open(prompt_path, "r") as f:
             prompt_text = f.read()
+            prompt_text = prompt_text.replace("<seller_name>", self.user.name)
+            prompt_text = prompt_text.replace("<call_date>", self.meeting.start_time.date())
             prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
             prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+
             if len(deal_meetings) > 1:
                 text = self.get_previous_calls_context(deal_meetings[:-1])
                 prompt_text = prompt_text.replace("<additional_context>", text)
@@ -134,6 +141,7 @@ class CallAnalysis:
         self.descriptive_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
 
         if not prompt_text:
+            logging.error("Descriptive Prompt text not generated. Failed to generate analysis")
             raise Exception("unable to generate prompt for this analysis")
         speaker_roles = self.descriptive_call_analysis.get("speaker_roles")
 
@@ -153,14 +161,16 @@ class CallAnalysis:
             due_date = act.get('action_due_date') if (
                     act.get('action_due_date') != "Not Specified") else None
             action_description = act.get("action_description")
-            action_call_context = act.get("action_call_context")
+            action_reasoning = act.get("action_reasoning")
+            signals = act.get("signals")
             action = Action(
                 title=act.get("action_name"),
                 due_date=due_date,
                 description=action_description,
-                reasoning=action_call_context,
+                reasoning=action_reasoning,
                 meeting_id=self.meeting.id,
-                type=ActionType.CONTEXTUAL_ACTION.value
+                type=ActionType.CONTEXTUAL_ACTION,
+                signals=signals
             )
             db.session.add(action)
             db.session.flush()
