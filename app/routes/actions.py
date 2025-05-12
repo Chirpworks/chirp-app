@@ -45,7 +45,7 @@ def get_actions():
             query = query.filter(Meeting.deal_id == deal_id)
 
         if action_type:
-            query = query.filter(Action.action_type == action_type)
+            query = query.filter(Action.type == action_type)
 
         if is_complete is True:
             query = query.filter(Action.status == ActionStatus.COMPLETED)
@@ -69,7 +69,9 @@ def get_actions():
                 "deal_id": str(action.meeting.deal_id),
                 "reasoning": action.reasoning,
                 "signals": action.signals,
-                "type": action.type.value
+                "type": action.type.value,
+                "created_at": action.created_at,
+                "meeting_id": action.meeting_id
             })
 
         return jsonify(result), 200
@@ -111,7 +113,9 @@ def get_action_by_id(action_id):
             "deal_id": str(action.meeting.deal_id),
             "reasoning": action.reasoning,
             "signals": action.signals,
-            "type": action.type.value
+            "type": action.type.value,
+            "created_at": action.created_at,
+            "meeting_id": action.meeting_id
         }
 
         return jsonify(result), 200

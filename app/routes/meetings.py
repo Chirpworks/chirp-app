@@ -109,7 +109,8 @@ def get_meeting_history():
                 "buyer_number": meeting.buyer_number,
                 "seller_number": meeting.seller_number,
                 "analysis_status": analysis_status,
-                "duration": duration
+                "duration": duration,
+                "call_notes": meeting.call_notes
             })
 
         return jsonify(result), 200
@@ -135,6 +136,8 @@ def get_meeting_by_id(meeting_id):
         if not meeting:
             return jsonify({"error": "Meeting not found or unauthorized"}), 404
 
+        analysis_status = meeting.job.status.value
+        duration = human_readable_duration(meeting.end_time, meeting.start_time)
         result = {
             "id": str(meeting.id),
             "source": meeting.source.value,
@@ -147,13 +150,43 @@ def get_meeting_by_id(meeting_id):
             "buyer_number": meeting.buyer_number,
             "call_notes": meeting.call_notes,
             "deal_id": meeting.deal_id,
-            "diarization": meeting.diarization
+            "analysis_status": analysis_status,
+            "duration": duration
         }
 
         return jsonify(result), 200
 
     except Exception as e:
         logging.error(f"Failed to fetch call data: {e}")
+        return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
+
+
+@meetings_bp.route("/call_diarization/<uuid:meeting_id>", methods=["GET"])
+@jwt_required()
+def get_meeting_diarization_by_id(meeting_id):
+    try:
+        user_id = get_jwt_identity()
+
+        # Join through deal to verify the meeting belongs to this user's deals
+        meeting = (
+            Meeting.query
+            .join(Meeting.deal)
+            .filter(Meeting.id == meeting_id, Deal.user_id == user_id)
+            .first()
+        )
+
+        if not meeting:
+            return jsonify({"error": "Meeting not found or unauthorized"}), 404
+
+        result = {
+            "id": str(meeting.id),
+            "diarization": meeting.diarization,
+        }
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch meeting diarization data: {e}")
         return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
 
 

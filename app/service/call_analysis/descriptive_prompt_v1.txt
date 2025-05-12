@@ -110,7 +110,7 @@ If roles cannot be clearly determined from the transcript, use:
 3. "action_description" needs to be clear and comprehensive. Cover questions like what needs to be done, why, and for whom.
 4. Summarize the conversation related to the action item in "action_call_context". It should be written in third person and refer to the speakers by name.
 5. If no date is mentioned, set "action_due_date": "Not Specified".
-6. Provide quotes from the transcript for action_signals.
+6. Provide verbatim examples from the transcript for action_signals.
 7. Use a professional tone. Use short and crisp sentences.
 
 **Example Output:**
@@ -125,7 +125,7 @@ If roles cannot be clearly determined from the transcript, use:
         "Bullet point 3"
       ],
       "action_reasoning": "Clear interpretation of signals and reasoning for this action",
-      "action_signals": ["List of all signals - implicit and explicit from the call for this action"]
+      "action_signals": ["Buyer said to schedule a call", "Buyer was available at a later date"]
       "action_confidence": "Confidence score out of 100"
     }
   ]
@@ -156,35 +156,29 @@ If roles cannot be clearly determined from the transcript, use:
 
 Example Output:
 {
-  "deal_summary": [
-    {
-      "deal_overview": [
+  "deal_summary": {
+    "deal_overview": [
         "Topic 1 – short summary of topic 1",
         "Topic 2 – short summary of topic 2",
         "Topic 3 – short summary of topic 3",
         "Topic 4 – short summary of topic 4",
         "Topic 5 – short summary of topic 5"
-      ]
-    },
-    {
-      "deal_problem_discovery": [
+    ]
+    "deal_problem_discovery": [
         "Pain point or issue identified by the client",
         "Reason they are dissatisfied with their current setup",
         "Underlying concern or blocker to decision-making",
         "Additional frustration or limitation",
         "Trigger that made them consider switching"
-      ]
-    },
-    {
-      "deal_proposed_solution": [
+    ]
+    "deal_proposed_solution": [
         "How your offering solves their key issue",
         "Differentiator compared to their current provider",
         "Value proposition tailored to their profile",
         "Flexibility or ease of transition",
         "Any relevant personalization or customization"
-      ]
-    }
-  ]
+    ]
+  }
 }
 
 # Final Output
@@ -196,7 +190,7 @@ Return one JSON object with all task results inside:
   "call_notes": [ ],
   "actions": [ ],
   "deal_title": " ",
-  "deal_summary": [ ]
+  "deal_summary": { }
 }
 
 

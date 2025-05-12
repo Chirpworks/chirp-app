@@ -224,9 +224,9 @@ def post_exotel_recording():
             )
             if response.status_code == 200:
                 result = response.json()
-                logging.info("✅ Success:", json.dumps(result, indent=2))
+                logging.info(f"Successfully started diarization: {str(result)}")
             else:
-                logging.error("❌ Error:", response.status_code, response.text)
+                logging.error(f"Error in starting diarization: {response.status_code}, {response.text}")
         else:
             logging.info(f"No matching app call found. Saving in Exotel call temp table with id {exotel_call.id}")
 
@@ -378,9 +378,9 @@ def post_app_call_record():
                 )
                 if response.status_code == 200:
                     result = response.json()
-                    logging.info("✅ Success:", json.dumps(result, indent=2))
+                    logging.info(f"Successfully started diarization: {str(result)}")
                 else:
-                    logging.error("❌ Error:", response.status_code, response.text)
+                    logging.error(f"Error in starting diarization: {response.status_code}, {response.text}")
 
                 logging.info(f"Intialized task for diarization for appcallID: {meeting.mobile_app_call_id}")
             else:

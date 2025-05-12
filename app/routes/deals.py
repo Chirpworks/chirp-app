@@ -62,6 +62,8 @@ def get_deals():
                 "last_contacted_on": last_contacted_on
             })
 
+        result = sorted(result, key=lambda x: x["last_contacted_on"], reverse=True)
+
         return jsonify(result), 200
 
     except Exception as e:

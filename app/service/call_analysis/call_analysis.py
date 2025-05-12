@@ -50,135 +50,150 @@ class CallAnalysis:
             raise e
 
     def process_analytical_prompt(self):
-        prompt_text = ''
-        deal_meetings = self.deal.meetings
-        deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
+        try:
+            prompt_text = ''
+            deal_meetings = self.deal.meetings
+            deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        prompt_path = os.path.join(base_dir, "analytical_prompt_v1.txt")
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            prompt_path = os.path.join(base_dir, "analytical_prompt_v1.txt")
 
-        with open(prompt_path, "r") as f:
-            prompt_text = f.read()
-            prompt_text = prompt_text.replace("<seller_name>", self.user.name)
-            prompt_text = prompt_text.replace("<call_date>", self.meeting.start_time.date())
-            prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-            prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+            with open(prompt_path, "r") as f:
+                prompt_text = f.read()
+                prompt_text = prompt_text.replace("<seller_name>", self.user.name)
+                prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
+                prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
+                prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
 
-            if len(deal_meetings) > 1:
-                text = self.get_previous_calls_context(deal_meetings[:-1])
-                prompt_text = prompt_text.replace("<additional_context>", text)
-            prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
+                if len(deal_meetings) > 1:
+                    text = self.get_previous_calls_context(deal_meetings[:-1])
+                    prompt_text = prompt_text.replace("<additional_context>", text)
+                prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
 
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-        self.analytical_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
+            if not prompt_text:
+                logging.error("Analytical prompt text not found. Failed to generate analysis")
+                raise Exception("unable to generate prompt for this analysis")
 
-        if not prompt_text:
-            logging.error("Analytical prompt text not found. Failed to generate analysis")
-            raise Exception("unable to generate prompt for this analysis")
+            model = os.getenv("OPENAI_MODEL", "gpt-4o")
+            self.analytical_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
 
-        speaker_roles = self.analytical_call_analysis.get("speaker_roles")
+            speaker_roles = self.analytical_call_analysis.get("speaker_roles")
 
-        deal_stage = self.analytical_call_analysis.get("deal_stage")
-        stage = deal_stage.get("deal_stage")
-        if stage == 'Not Specified':
-            if not self.deal.stage:
-                self.deal.stage = 'Discovery & Lead Qualification'
-        else:
-            self.deal.stage = stage
-        stage_signals = deal_stage.get("stage_signals")
-        self.deal.stage_signals = stage_signals
-        stage_reasoning = deal_stage.get("stage_reasoning")
-        self.deal.stage_reasoning = stage_reasoning
+            deal_stage = self.analytical_call_analysis.get("deal_stage")
+            stage = deal_stage.get("deal_stage")
+            if stage == 'Not Specified':
+                if not self.deal.stage:
+                    self.deal.stage = 'Discovery & Lead Qualification'
+            else:
+                self.deal.stage = stage
+            stage_signals = deal_stage.get("stage_signals")
+            self.deal.stage_signals = stage_signals
+            stage_reasoning = deal_stage.get("stage_reasoning")
+            self.deal.stage_reasoning = stage_reasoning
 
-        focus_areas = self.analytical_call_analysis.get("focus_areas")
-        self.deal.focus_areas = focus_areas
+            focus_areas = self.analytical_call_analysis.get("focus_areas")
+            self.deal.focus_areas = focus_areas
 
-        risks = self.analytical_call_analysis.get("risks")
-        self.deal.risks = risks
+            risks = self.analytical_call_analysis.get("risks")
+            self.deal.risks = risks
 
-        actions = self.analytical_call_analysis.get("suggested_actions")
-        for act in actions:
-            if act == 'Not Specified':
-                break
-            due_date = act.get('suggested_action_due_date') if (
-                    act.get('suggested_action_due_date') != "Not Specified") else None
-            suggested_action_reason = act.get('suggested_action_reasoning')
-            reasoning = suggested_action_reason.get("reasoning")
-            signals = suggested_action_reason.get("signals")
-            action = Action(
-                title=act.get("suggested_action_name"),
-                due_date=due_date,
-                description=act.get("suggested_action_description"),
-                reasoning=reasoning,
-                signals=signals,
-                meeting_id=self.meeting.id,
-                type=ActionType.SUGGESTED_ACTION
-            )
-            db.session.add(action)
+            actions = self.analytical_call_analysis.get("suggested_actions")
+            for act in actions:
+                if act == 'Not Specified':
+                    break
+                due_date = act.get('suggested_action_due_date') if (
+                        act.get('suggested_action_due_date') != "Not Specified") else None
+                suggested_action_reason = act.get('suggested_action_reasoning')
+                reasoning = suggested_action_reason.get("reasoning")
+                signals = suggested_action_reason.get("signals")
+                action = Action(
+                    title=act.get("suggested_action_name"),
+                    due_date=due_date,
+                    description=act.get("suggested_action_description"),
+                    reasoning=reasoning,
+                    signals=signals,
+                    meeting_id=self.meeting.id,
+                    type=ActionType.SUGGESTED_ACTION
+                )
+                db.session.add(action)
             db.session.flush()
+        except Exception as e:
+            logging.error(f"Failed to run analytical analysis with error {e}")
+            raise e
 
     def process_descriptive_prompt(self):
-        prompt_text = ''
-        deal_meetings = self.deal.meetings
-        deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
+        try:
+            prompt_text = ''
+            deal_meetings = self.deal.meetings
+            deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        prompt_path = os.path.join(base_dir, "descriptive_prompt_v1.txt")
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            prompt_path = os.path.join(base_dir, "descriptive_prompt_v1.txt")
 
-        with open(prompt_path, "r") as f:
-            prompt_text = f.read()
-            prompt_text = prompt_text.replace("<seller_name>", self.user.name)
-            prompt_text = prompt_text.replace("<call_date>", self.meeting.start_time.date())
-            prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-            prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+            with open(prompt_path, "r") as f:
+                prompt_text = f.read()
+                prompt_text = prompt_text.replace("<seller_name>", self.user.name)
+                prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
+                prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
+                prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
 
-            if len(deal_meetings) > 1:
-                text = self.get_previous_calls_context(deal_meetings[:-1])
-                prompt_text = prompt_text.replace("<additional_context>", text)
-            prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
+                if len(deal_meetings) > 1:
+                    text = self.get_previous_calls_context(deal_meetings[:-1])
+                    prompt_text = prompt_text.replace("<additional_context>", text)
+                prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
 
-        model = os.getenv("OPENAI_MODEL", "gpt-4o")
-        self.descriptive_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
+            if not prompt_text:
+                logging.error("Descriptive Prompt text not generated. Failed to generate analysis")
+                raise Exception("unable to generate prompt for this analysis")
 
-        if not prompt_text:
-            logging.error("Descriptive Prompt text not generated. Failed to generate analysis")
-            raise Exception("unable to generate prompt for this analysis")
-        speaker_roles = self.descriptive_call_analysis.get("speaker_roles")
+            model = os.getenv("OPENAI_MODEL", "gpt-4o")
+            self.descriptive_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
 
-        call_title = self.descriptive_call_analysis.get("call_title")
-        self.meeting.title = call_title
+            speaker_roles = self.descriptive_call_analysis.get("speaker_roles")
+            if speaker_roles != 'Not Specified':
+                diarization = self.meeting.diarization
+                for key, value in speaker_roles.items():
+                    diarization = diarization.replace(key, value)
+                self.meeting.diarization = diarization
 
-        call_summary = self.descriptive_call_analysis.get("call_summary")
-        self.meeting.summary = call_summary
+            call_title = self.descriptive_call_analysis.get("call_title")
+            self.meeting.title = call_title
 
-        call_notes = self.descriptive_call_analysis.get("call_notes")
-        self.meeting.call_notes = call_notes
+            call_summary = self.descriptive_call_analysis.get("call_summary")
+            self.meeting.summary = call_summary
 
-        actions = self.descriptive_call_analysis.get("actions")
-        for act in actions:
-            if act == 'Not Specified':
-                break
-            due_date = act.get('action_due_date') if (
-                    act.get('action_due_date') != "Not Specified") else None
-            action_description = act.get("action_description")
-            action_reasoning = act.get("action_reasoning")
-            signals = act.get("signals")
-            action = Action(
-                title=act.get("action_name"),
-                due_date=due_date,
-                description=action_description,
-                reasoning=action_reasoning,
-                meeting_id=self.meeting.id,
-                type=ActionType.CONTEXTUAL_ACTION,
-                signals=signals
-            )
-            db.session.add(action)
+            call_notes = self.descriptive_call_analysis.get("call_notes")
+            self.meeting.call_notes = call_notes
+
+            actions = self.descriptive_call_analysis.get("actions")
+            for act in actions:
+                if act == 'Not Specified':
+                    break
+                due_date = act.get('action_due_date') if (
+                        act.get('action_due_date') != "Not Specified") else None
+                action_description = act.get("action_description")
+                action_reasoning = act.get("action_reasoning")
+                signals = act.get("action_signals")
+                action = Action(
+                    title=act.get("action_name"),
+                    due_date=due_date,
+                    description=action_description,
+                    reasoning=action_reasoning,
+                    meeting_id=self.meeting.id,
+                    type=ActionType.CONTEXTUAL_ACTION,
+                    signals=signals
+                )
+                db.session.add(action)
+
+            deal_title = self.descriptive_call_analysis.get("deal_title")
+            self.deal.name = deal_title
+
+            deal_summary = self.descriptive_call_analysis.get("deal_summary")
+            self.deal.overview = deal_summary.get("deal_overview")
+            self.deal.pain_points = deal_summary.get("deal_pain_points")
+            self.deal.solutions = deal_summary.get("deal_proposed_solutions")
+
             db.session.flush()
-
-        deal_title = self.descriptive_call_analysis.get("deal_title")
-        self.deal.name = deal_title
-
-        deal_summary = self.descriptive_call_analysis.get("deal_summary")
-        self.deal.overview = deal_summary.get("deal_overview")
-        self.deal.pain_points = deal_summary.get("deal_pain_points")
-        self.deal.solutions = deal_summary.get("deal_proposed_solutions")
+        except Exception as e:
+            logging.info(f"Failed to run predictive analysis with error {e}")
+            raise e
