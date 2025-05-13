@@ -31,15 +31,15 @@ def signup():
     try:
         logging.info("signup flow initiated")
         data = request.get_json()
-        username = data.get('username')
         email = data.get('email')
         agency_name = data.get('agency_name')
         phone = data.get('phone')
         role = data.get('role')
+        name = data.get('name')
 
-        logging.info(f"Data received for signup: {username}, {email}, {agency_name}, {phone}")
+        logging.info(f"Data received for signup: {email=}, {agency_name=}, {phone=}, {name=}")
 
-        if not username or not email or not agency_name or not phone:
+        if not name or not email or not agency_name or not phone:
             logging.error({'error': 'Missing required fields'})
             return jsonify({'error': 'Missing required fields'}), 400
 
@@ -50,17 +50,17 @@ def signup():
             return jsonify({'error': 'Invalid Agency Name'}), 400
 
         logging.info("Checking if User already exists")
-        existing_user = User.query.filter((User.email == email) | (User.username == username) | (User.phone == phone)).first()
+        existing_user = User.query.filter((User.email == email) | (User.phone == phone)).first()
         if existing_user:
             logging.error({'error': 'User already exists'})
             return jsonify({'error': 'User already exists'}), 400
-        logging.info(f"User doesn't exist. Creating new user with username {username} and email {email}")
+        logging.info(f"User doesn't exist. Creating new user with name {name} and email {email} and phone {phone}")
 
         logging.info(f"generating secure otp")
-        otp = generate_secure_otp(length=8)
+        otp = generate_secure_otp(length=16)
 
         logging.info(f"Creating user")
-        new_user = User(username=username, email=email, password=otp, agency_id=agency_id, phone=phone, role=role)
+        new_user = User(email=email, password=otp, agency_id=agency_id, phone=phone, role=role, name=name)
 
         logging.info("Sending OTP via email")
         _ = send_otp_email(to_email=email, otp=otp)
@@ -69,7 +69,7 @@ def signup():
         db.session.add(new_user)
         db.session.commit()
 
-        logging.info(f"Created new user successfully with email={email}, username={username}")
+        logging.info(f"Created new user successfully with email={email}, name={name}")
         return jsonify({'message': 'User created successfully', 'user_id': str(new_user.id)}), 201
     except Exception as e:
         logging.error(f"Failed to complete signup with error {e}")

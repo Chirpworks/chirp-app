@@ -23,7 +23,7 @@ class UserRole(Enum):
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    username = db.Column(db.String(150), nullable=False, unique=True)
+    username = db.Column(db.String(150), nullable=True, unique=True)
     email = db.Column(db.String(150), nullable=False, unique=True)
     phone = db.Column(db.String(20), nullable=False, unique=True)
     password_hash = db.Column(db.String(200), nullable=False)
@@ -32,14 +32,14 @@ class User(db.Model, UserMixin):
     agency = db.relationship('Agency', back_populates='users')
     deals = db.relationship('Deal', back_populates='user', cascade='all, delete-orphan')
     last_week_performance_analysis = db.Column(db.String(), nullable=True)
-    name = db.Column(db.String(100), nullable=True, unique=False)
+    name = db.Column(db.String(100), nullable=False, unique=False)
 
-    def __init__(self, username, email, phone, password, agency_id, role=None):
-        self.username = username
+    def __init__(self, email, phone, password, agency_id, name, role=None):
         self.email = email
         self.set_password(password)
         self.agency_id = agency_id
         self.role = UserRole(role) if role else UserRole.USER
+        self.name = name
         self.phone = phone
 
     def set_password(self, password):
