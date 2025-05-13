@@ -15,6 +15,5 @@ class Agency(db.Model):
     products = db.Column(db.JSON, nullable=True)
     description = db.Column(db.String(300), nullable=True)
 
-    def __init__(self, id, name):
-        self.id = id
+    def __init__(self, name):
         self.name = name

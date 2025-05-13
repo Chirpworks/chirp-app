@@ -1,3 +1,4 @@
+import json
 import random
 import string
 import logging
@@ -6,6 +7,7 @@ import smtplib
 from email.mime.text import MIMEText
 
 from app.constants import AWSConstants
+from app.service.aws.s3_client import S3Client
 
 logging = logging.getLogger(__name__)
 
@@ -41,3 +43,14 @@ def send_otp_email(to_email, otp):
     except Exception as e:
         logging.info(f"SES email failed: {e}")
         return False
+
+
+def add_agency_to_list(agency_id, agency_name):
+    s3_client = S3Client()
+    content = s3_client.get_file_content(bucket_name="agency-name-mapping-config", key="agency_mapping.json")
+    content = json.loads(content)
+    content[agency_name] = agency_id
+    updated_agency_list = json.dumps(content)
+    s3_client.put_file_content(
+        bucket_name="agency-name-mapping-config", key="agency_mapping.json", content=updated_agency_list
+    )

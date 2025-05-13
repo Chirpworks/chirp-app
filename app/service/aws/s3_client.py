@@ -2,12 +2,15 @@ import json
 
 import boto3
 import os
+
+import logging
 from dotenv import load_dotenv
 
 from app.constants import AWSConstants
 
 load_dotenv()
 
+logging = logging.getLogger(__name__)
 
 class S3Client:
     def __init__(self):
@@ -48,7 +51,16 @@ class S3Client:
         try:
             response = self.s3.get_object(Bucket=bucket_name, Key=key)
             content = response['Body'].read().decode('utf-8')
-            return json.loads(content)
+            return content
         except Exception as e:
-            print(f"Failed to fetch agency mapping from S3: {e}")
-            return {}
+            logging.error(f"Failed to fetch agency mapping from S3: {e}")
+            raise e
+
+    def put_file_content(self, bucket_name, key, content):
+        try:
+            self.s3.put_object(Bucket=bucket_name, Key=key, Body=content.encode('utf-8'))
+            logging.info(f"File {key} uploaded successfully")
+        except Exception as e:
+            logging.error(f'Failed to upload file {key} to S3: {e}')
+            raise e
+

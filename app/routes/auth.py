@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 import logging
 
@@ -16,13 +17,10 @@ auth_bp = Blueprint('auth', __name__)
 
 
 def load_agency_mapping_from_s3():
-    return {
-        "chirpworks":  "00e4c232-45a3-4642-b055-75ae856911fb"
-    }
     try:
         s3_client = S3Client()
         content = s3_client.get_file_content(bucket_name="agency-name-mapping-config", key="agency_mapping.json")
-        return content
+        return json.loads(content)
     except Exception as e:
         print(f"Failed to fetch agency mapping from S3: {e}")
         return {}
