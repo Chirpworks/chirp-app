@@ -26,7 +26,7 @@ class Deal(db.Model):
     focus_areas = db.Column(db.JSON, nullable=True)
     risks = db.Column(db.JSON, nullable=True)
     lead_qualification = db.Column(db.JSON, nullable=True)
-    overview = db.Column(db.Text, nullable=True)
+    overview = db.Column(db.JSON, nullable=True)
     key_stakeholders = db.Column(db.JSON, nullable=True)
     buyer_number = db.Column(db.String(15), nullable=False)
     seller_number = db.Column(db.String(15), nullable=False)

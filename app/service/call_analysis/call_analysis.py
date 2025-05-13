@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -87,35 +88,62 @@ class CallAnalysis:
             else:
                 self.deal.stage = stage
             stage_signals = deal_stage.get("stage_signals")
-            self.deal.stage_signals = stage_signals
+            if stage_signals != ['Not Specified']:
+                self.deal.stage_signals = stage_signals
             stage_reasoning = deal_stage.get("stage_reasoning")
-            self.deal.stage_reasoning = stage_reasoning
+            if stage_reasoning != ['Not Specified']:
+                self.deal.stage_reasoning = stage_reasoning
 
             focus_areas = self.analytical_call_analysis.get("focus_areas")
-            self.deal.focus_areas = focus_areas
+            if focus_areas != ["Not Specified"]:
+                self.deal.focus_areas = focus_areas
 
             risks = self.analytical_call_analysis.get("risks")
-            self.deal.risks = risks
+            if risks != "Not Specified":
+                self.deal.risks = risks
+
+            actions = self.descriptive_call_analysis.get("actions")
+            if actions != ['Not Specified']:
+                for act in actions:
+                    action_name = act.get('action_name')
+                    due_date = act.get('action_due_date') if (
+                            act.get('action_due_date') != "Not Specified") else None
+                    if due_date:
+                        due_date = datetime.fromisoformat(due_date)
+                    action_description = act.get("action_description")
+                    action_reasoning = act.get("action_reasoning")
+                    signals = act.get("action_signals")
+                    action = Action(
+                        title=action_name,
+                        due_date=due_date,
+                        description=action_description,
+                        reasoning=action_reasoning,
+                        meeting_id=self.meeting.id,
+                        type=ActionType.CONTEXTUAL_ACTION,
+                        signals=signals
+                    )
+                    db.session.add(action)
 
             actions = self.analytical_call_analysis.get("suggested_actions")
-            for act in actions:
-                if act == 'Not Specified':
-                    break
-                due_date = act.get('suggested_action_due_date') if (
-                        act.get('suggested_action_due_date') != "Not Specified") else None
-                suggested_action_reason = act.get('suggested_action_reasoning')
-                reasoning = suggested_action_reason.get("reasoning")
-                signals = suggested_action_reason.get("signals")
-                action = Action(
-                    title=act.get("suggested_action_name"),
-                    due_date=due_date,
-                    description=act.get("suggested_action_description"),
-                    reasoning=reasoning,
-                    signals=signals,
-                    meeting_id=self.meeting.id,
-                    type=ActionType.SUGGESTED_ACTION
-                )
-                db.session.add(action)
+            if actions != ['Not Specified']:
+                for act in actions:
+                    action_name = act.get("suggested_action_name")
+                    due_date = act.get("suggested_action_due_date")
+                    due_date = datetime.fromisoformat(due_date)
+                    action_description = act.get("suggested_action_description")
+                    suggested_action_reason = act.get("suggested_action_reasoning")
+                    reasoning = suggested_action_reason.get("reasoning")
+                    signals = suggested_action_reason.get("signals")
+                    action = Action(
+                        title=action_name,
+                        due_date=due_date,
+                        description=action_description,
+                        reasoning=reasoning,
+                        signals=signals,
+                        meeting_id=self.meeting.id,
+                        type=ActionType.SUGGESTED_ACTION
+                    )
+                    db.session.add(action)
             db.session.flush()
         except Exception as e:
             logging.error(f"Failed to run analytical analysis with error {e}")
@@ -165,33 +193,13 @@ class CallAnalysis:
             call_notes = self.descriptive_call_analysis.get("call_notes")
             self.meeting.call_notes = call_notes
 
-            actions = self.descriptive_call_analysis.get("actions")
-            for act in actions:
-                if act == 'Not Specified':
-                    break
-                due_date = act.get('action_due_date') if (
-                        act.get('action_due_date') != "Not Specified") else None
-                action_description = act.get("action_description")
-                action_reasoning = act.get("action_reasoning")
-                signals = act.get("action_signals")
-                action = Action(
-                    title=act.get("action_name"),
-                    due_date=due_date,
-                    description=action_description,
-                    reasoning=action_reasoning,
-                    meeting_id=self.meeting.id,
-                    type=ActionType.CONTEXTUAL_ACTION,
-                    signals=signals
-                )
-                db.session.add(action)
-
             deal_title = self.descriptive_call_analysis.get("deal_title")
             self.deal.name = deal_title
 
             deal_summary = self.descriptive_call_analysis.get("deal_summary")
             self.deal.overview = deal_summary.get("deal_overview")
-            self.deal.pain_points = deal_summary.get("deal_pain_points")
-            self.deal.solutions = deal_summary.get("deal_proposed_solutions")
+            self.deal.pain_points = deal_summary.get("deal_problem_discovery")
+            self.deal.solutions = deal_summary.get("deal_proposed_solution")
 
             db.session.flush()
         except Exception as e:

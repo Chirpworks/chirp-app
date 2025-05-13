@@ -84,14 +84,21 @@ def get_meeting_history():
     try:
         user_id = get_jwt_identity()
 
+        deal_id = request.args.get("dealId")
+
         # Join through deals to fetch user's meetings
-        meetings = (
+        query = (
             Meeting.query
             .join(Meeting.deal)
             .filter(Deal.user_id == user_id)
             .order_by(Meeting.start_time.desc())
             .all()
         )
+
+        if deal_id:
+            query = query.filter(Meeting.deal_id == deal_id)
+
+        meetings = query.all()
 
         result = []
         for meeting in meetings:

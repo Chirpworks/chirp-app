@@ -35,7 +35,7 @@ If roles cannot be clearly determined from the transcript, use:
 
 ## Task 2 – Give a short title for the call
 **Instructions**
-1. Capture the essence of the call. Using the title, the seller should identify and recall what this call was about.
+1. Capture the essense of the call. Using the title, the seller should identify and recall what this call was about.
 2. Be specific events in the call title. 
 3. Examples of specific details include: call stage, call agenda, actions, decisions, objections, or next steps discussed, result.
 4. Use sentence fragments if necessary separated by "-" or "|" if needed.
@@ -103,35 +103,8 @@ If roles cannot be clearly determined from the transcript, use:
     "Bullet point 5"
   ]
 }
-## Task 5 – Capture Action Items for the Seller
-**Instructions**
-1. Extract all action items mentioned or implied during the call. Ensure that no action item is missed out.
-2. If the buyer is supposed to complete a task, then create an action item on the seller to follow up with the buyer about it.
-3. "action_description" needs to be clear and comprehensive. Cover questions like what needs to be done, why, and for whom.
-4. Summarize the conversation related to the action item in "action_call_context". It should be written in third person and refer to the speakers by name.
-5. If no date is mentioned, set "action_due_date": "Not Specified".
-6. Provide verbatim examples from the transcript for action_signals.
-7. Use a professional tone. Use short and crisp sentences.
 
-**Example Output:**
-{
-  "actions": [
-    {
-      "action_name": "Short task title",
-      "action_due_date": "Due date or 'Not Specified'",
-      "action_description": [
-        "Bullet point 1",
-        "Bullet point 2",
-        "Bullet point 3"
-      ],
-      "action_reasoning": "Clear interpretation of signals and reasoning for this action",
-      "action_signals": ["Buyer said to schedule a call", "Buyer was available at a later date"]
-      "action_confidence": "Confidence score out of 100"
-    }
-  ]
-}
-
-## Task 6 – Deal Title
+## Task 5 – Deal Title
 **Instructions**
 1. Based on the provided sales call transcript, generate a short, easily recognisable deal title (maximum 5–6 words). 
 2. The title should reflect:
@@ -146,7 +119,7 @@ If roles cannot be clearly determined from the transcript, use:
   "deal_title": "Vidur - PMS switch from Anand Rathi"
 }
 
-## Task 7 – Deal Summary
+## Task 6 – Deal Summary
 **Instructions:**
 1. Use the prior call data in Call History Summary section of the prompt, in addition to the latest transcript to create a summary for this deal. 
 3. Explicitly call out any changes in deal dynamics such as change in requrirements, point of contact for buyer, seller etc.
@@ -158,25 +131,25 @@ Example Output:
 {
   "deal_summary": {
     "deal_overview": [
-        "Topic 1 – short summary of topic 1",
-        "Topic 2 – short summary of topic 2",
-        "Topic 3 – short summary of topic 3",
-        "Topic 4 – short summary of topic 4",
-        "Topic 5 – short summary of topic 5"
+      "Topic 1 – short summary of topic 1",
+      "Topic 2 – short summary of topic 2",
+      "Topic 3 – short summary of topic 3",
+      "Topic 4 – short summary of topic 4",
+      "Topic 5 – short summary of topic 5"
     ]
     "deal_problem_discovery": [
-        "Pain point or issue identified by the client",
-        "Reason they are dissatisfied with their current setup",
-        "Underlying concern or blocker to decision-making",
-        "Additional frustration or limitation",
-        "Trigger that made them consider switching"
+      "Pain point or issue identified by the client",
+      "Reason they are dissatisfied with their current setup",
+      "Underlying concern or blocker to decision-making",
+      "Additional frustration or limitation",
+      "Trigger that made them consider switching"
     ]
     "deal_proposed_solution": [
-        "How your offering solves their key issue",
-        "Differentiator compared to their current provider",
-        "Value proposition tailored to their profile",
-        "Flexibility or ease of transition",
-        "Any relevant personalization or customization"
+      "How your offering solves their key issue",
+      "Differentiator compared to their current provider",
+      "Value proposition tailored to their profile",
+      "Flexibility or ease of transition",
+      "Any relevant personalization or customization"
     ]
   }
 }
@@ -184,13 +157,12 @@ Example Output:
 # Final Output
 Return one JSON object with all task results inside:
 {
-  "speaker_roles": { },
-  "call_title": " ",
-  "call_summary": [ ],
-  "call_notes": [ ],
-  "actions": [ ],
-  "deal_title": " ",
-  "deal_summary": { }
+  "speaker_roles": {},
+  "call_title": "",
+  "call_summary": [],
+  "call_notes": [],
+  "deal_title": "",
+  "deal_summary": {}
 }
 
 

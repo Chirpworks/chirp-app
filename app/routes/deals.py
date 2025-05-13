@@ -83,6 +83,10 @@ def get_deal_by_id(deal_id):
             .first()
         )
 
+        if not deal or not user_id:
+            return jsonify({"error": "Deal not found or unauthorized"}), 404
+
+        logging.info("Calculating number of pending actions")
         num_pending_actions = (
             db.session.query(func.count(Action.id))
             .join(Meeting, Action.meeting_id == Meeting.id)
@@ -91,9 +95,11 @@ def get_deal_by_id(deal_id):
             .filter(Action.status == ActionStatus.PENDING)
             .scalar()
         )
-
-        if not deal or not user_id:
-            return jsonify({"error": "Deal not found or unauthorized"}), 404
+        last_contacted_on = (
+            db.session.query(func.max(Meeting.start_time))
+            .filter(Meeting.deal_id == deal.id)
+            .scalar()
+        )
 
         result = {
             "id": str(deal.id),
@@ -112,7 +118,8 @@ def get_deal_by_id(deal_id):
             "pain_points": deal.pain_points,
             "solutions": deal.solutions,
             "user_id": deal.user_id,
-            "num_pending_actions": num_pending_actions
+            "num_pending_actions": num_pending_actions,
+            "last_contacted_on": last_contacted_on,
         }
 
         return jsonify(result), 200
