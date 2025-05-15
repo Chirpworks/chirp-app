@@ -64,6 +64,6 @@ def get_audio_duration_seconds(filepath):
 
 
 def normalize_phone_number(phone_number):
-    if len(phone_number) > 10:
+    if len(phone_number) >= 10:
         phone_number = '0091' + phone_number[len(phone_number)-10:]
     return phone_number

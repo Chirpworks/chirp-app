@@ -24,10 +24,8 @@ Identify the roles of the speakers. Use this information to perform all followin
 
 **Example Output:**
 {
-  "speaker_roles": {
-    "SPEAKER_00": "Buyer",
-    "SPEAKER_01": "Seller"
-  }
+   "SPEAKER_00": "Buyer",
+   "SPEAKER_01": "Seller"
 }
 
 If roles cannot be clearly determined from the transcript, use:
@@ -146,7 +144,10 @@ If there are no risks evident or data is insufficient:
         "Bullet point 3"
       ],
       "action_reasoning": "Clear interpretation of signals and reasoning for this action",
-      "action_signals": ["Signal 1", "Signal 2"]
+      "action_signals": [
+        "Seller proposed to schedule a follow up",
+        "Buyer asked for specific information"
+      ]
     }
   ]
 }

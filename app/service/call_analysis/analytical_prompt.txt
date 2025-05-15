@@ -27,7 +27,7 @@ Example Output:
 If roles cannot be clearly determined from the transcript, use:
 
 {
-  "speaker_roles": "Not Specified"
+  "Not Specified"
 }
 
 Task 2 – Identify the Deal Stage

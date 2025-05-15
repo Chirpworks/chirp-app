@@ -22,10 +22,8 @@ Identify the roles of the speakers. Use this information to perform all followin
 
 **Example Output:**
 {
-  "speaker_roles": {
-    "SPEAKER_00": "Buyer",
-    "SPEAKER_01": "Seller"
-  }
+   "SPEAKER_00": "Buyer",
+   "SPEAKER_01": "Seller"
 }
 
 If roles cannot be clearly determined from the transcript, use:
@@ -164,7 +162,6 @@ Return one JSON object with all task results inside:
   "deal_title": "",
   "deal_summary": {}
 }
-
 
 # Additional Context
 Seller Name: <seller_name>

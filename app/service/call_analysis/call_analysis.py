@@ -45,7 +45,7 @@ class CallAnalysis:
             self.process_descriptive_prompt()
             self.meeting.status = ProcessingStatus.COMPLETE
             db.session.commit()
-            logging.info("Meeeting has been analysed successfully")
+            logging.info("Meeting has been analysed successfully")
         except Exception as e:
             logging.error(f"Failed to analyze call for meeting with id: {self.meeting.id}")
             raise e
@@ -63,8 +63,14 @@ class CallAnalysis:
                 prompt_text = f.read()
                 prompt_text = prompt_text.replace("<seller_name>", self.user.name)
                 prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
-                prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-                prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+                if self.agency.name:
+                    prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
+                else:
+                    prompt_text = prompt_text.replace("<agency_name>", '')
+                if self.agency.description:
+                    prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+                else:
+                    prompt_text = prompt_text.replace("<agency_description>", '')
 
                 if len(deal_meetings) > 1:
                     text = self.get_previous_calls_context(deal_meetings[:-1])
@@ -77,6 +83,9 @@ class CallAnalysis:
 
             model = os.getenv("OPENAI_MODEL", "gpt-4o")
             self.analytical_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
+            if not self.analytical_call_analysis:
+                logging.error(f"Failed to run analytical analysis as OpenAI returned empty response")
+                return
 
             speaker_roles = self.analytical_call_analysis.get("speaker_roles")
 
@@ -95,14 +104,14 @@ class CallAnalysis:
                 self.deal.stage_reasoning = stage_reasoning
 
             focus_areas = self.analytical_call_analysis.get("focus_areas")
-            if focus_areas != ["Not Specified"]:
+            if focus_areas != ['Not Specified']:
                 self.deal.focus_areas = focus_areas
 
             risks = self.analytical_call_analysis.get("risks")
             if risks != "Not Specified":
                 self.deal.risks = risks
 
-            actions = self.descriptive_call_analysis.get("actions")
+            actions = self.analytical_call_analysis.get("actions")
             if actions != ['Not Specified']:
                 for act in actions:
                     action_name = act.get('action_name')
@@ -162,8 +171,14 @@ class CallAnalysis:
                 prompt_text = f.read()
                 prompt_text = prompt_text.replace("<seller_name>", self.user.name)
                 prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
-                prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-                prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+                if self.agency.name:
+                    prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
+                else:
+                    prompt_text = prompt_text.replace("<agency_name>", '')
+                if self.agency.description:
+                    prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
+                else:
+                    prompt_text = prompt_text.replace("<agency_description>", '')
 
                 if len(deal_meetings) > 1:
                     text = self.get_previous_calls_context(deal_meetings[:-1])
@@ -176,6 +191,9 @@ class CallAnalysis:
 
             model = os.getenv("OPENAI_MODEL", "gpt-4o")
             self.descriptive_call_analysis = self.open_ai_client.send_prompt(prompt=prompt_text, model=model)
+            if not self.descriptive_call_analysis:
+                logging.error(f"Failed to run descriptive analysis as OpenAI returned empty response")
+                return
 
             speaker_roles = self.descriptive_call_analysis.get("speaker_roles")
             if speaker_roles != 'Not Specified':

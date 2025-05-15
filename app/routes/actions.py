@@ -144,13 +144,14 @@ def update_multiple_action_statuses():
             return jsonify({"error": "Invalid status. Must be 'pending' or 'completed'"}), 400
 
         # Fetch and filter actions that belong to this user
-        actions = (
+        query = (
             Action.query
             .join(Action.meeting)
             .join(Meeting.deal)
             .filter(Action.id.in_(action_ids), Deal.user_id == user_id)
-            .all()
         )
+
+        actions = query.all()
 
         if not actions:
             return jsonify({"error": "No valid actions found for current user"}), 404

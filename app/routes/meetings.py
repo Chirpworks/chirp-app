@@ -83,6 +83,7 @@ def create_meeting():
 def get_meeting_history():
     try:
         user_id = get_jwt_identity()
+        logging.info(f"Fetching call history for user {user_id}")
 
         deal_id = request.args.get("dealId")
 
@@ -92,7 +93,6 @@ def get_meeting_history():
             .join(Meeting.deal)
             .filter(Deal.user_id == user_id)
             .order_by(Meeting.start_time.desc())
-            .all()
         )
 
         if deal_id:
@@ -123,7 +123,8 @@ def get_meeting_history():
         return jsonify(result), 200
 
     except Exception as e:
-        return jsonify({"error": f"Failed to fetch meeting history: {str(e)}"}), 500
+        logging.error(f"Failed to fetch call history with error {e}")
+        return jsonify({"error": f"Failed to fetch call history: {str(e)}"}), 500
 
 
 @meetings_bp.route("/call_data/<uuid:meeting_id>", methods=["GET"])
@@ -131,6 +132,7 @@ def get_meeting_history():
 def get_meeting_by_id(meeting_id):
     try:
         user_id = get_jwt_identity()
+        logging.info(f"Fetching call_data for meeting_id {meeting_id} for user {user_id}")
 
         # Join through deal to verify the meeting belongs to this user's deals
         meeting = (

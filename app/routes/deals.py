@@ -19,6 +19,7 @@ deals_bp = Blueprint("deal", __name__)
 def get_deals():
     try:
         user_id = get_jwt_identity()
+        logging.info(f"Fetching deals for user {user_id}")
 
         # Parse optional query params
         deal_id = request.args.get("deal_id")
@@ -75,6 +76,7 @@ def get_deals():
 def get_deal_by_id(deal_id):
     try:
         user_id = get_jwt_identity()
+        logging.info(f"Fetching deal {deal_id} for user {user_id}")
 
         # Join through deal to verify the meeting belongs to this user's deals
         deal = (

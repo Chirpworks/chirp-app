@@ -70,7 +70,7 @@ def signup():
         db.session.commit()
 
         logging.info(f"Created new user successfully with email={email}, name={name}")
-        return jsonify({'message': 'User created successfully', 'user_id': str(new_user.id)}), 201
+        return jsonify({'message': 'User created successfully', 'name': name, 'user_id': str(new_user.id)}), 201
     except Exception as e:
         logging.error(f"Failed to complete signup with error {e}")
         return jsonify({'error': 'Signup Failed'}), 500
