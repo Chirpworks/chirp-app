@@ -43,7 +43,7 @@ RUN pip install onnxruntime-gpu
 ENV HF_HOME=/root/.cache/huggingface
 
 # Pre-download the WhisperX model (faster-whisper-large-v2)
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Systran/faster-whisper-large-v2', local_dir='/root/.cache/huggingface/hub/models--Systran--faster-whisper-large-v2', local_dir_use_symlinks=False)"
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='Systran/faster-whisper-large-v3', local_dir='/root/.cache/huggingface/hub/models--Systran--faster-whisper-large-v3', local_dir_use_symlinks=False)"
 
 # Run your serverless handler
 ENTRYPOINT ["python", "app/serverless_handler.py"]

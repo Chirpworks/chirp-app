@@ -45,7 +45,7 @@ session = Session()
 cache_dir = os.getenv("TRANSFORMERS_CACHE", "/model_cache")
 
 # Define a path within the cache directory for the 'large-v1' model.
-model_cache_path = os.path.join(cache_dir, "large-v2")
+model_cache_path = os.path.join(cache_dir, "large-v3")
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
@@ -65,7 +65,7 @@ else:
     logger.info("Loading model from cache...")
     model = whisperx.load_model("large-v3", device=device, compute_type="float32")
 
-logger.info("WhisperX large-v2 model is loaded and ready.")
+logger.info("WhisperX large-v3 model is loaded and ready.")
 
 
 def convert_mp3_to_wav(mp3_path):
