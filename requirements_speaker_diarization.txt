@@ -3,7 +3,7 @@ uvicorn
 pydantic
 Levenshtein
 fastapi
-transformers
+transformers>=4.38.0
 setuptools
 soundfile
 nltk
