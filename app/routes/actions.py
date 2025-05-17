@@ -108,35 +108,17 @@ def get_action_by_id(action_id):
             logging.error("Failed to get action - Unauthorized")
             return jsonify({"error": "User not found or unauthorized"}), 401
 
-        team_member_id = request.args.get("team_member_id")
-        if team_member_id:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
-            user_id = team_member_id
-
-        logging.info(f"Fetching actions data for user {user_id}")
-
         # Join to verify ownership through deal
         action = (
             Action.query
             .join(Action.meeting)
             .join(Meeting.deal)
-            .filter(Action.id == action_id, Deal.user_id == user_id)
+            .filter(Action.id == action_id)
             .first()
         )
 
         if not action:
-            return jsonify({"error": "Action not found or unauthorized"}), 404
-        if not user_id:
-            return jsonify({"error": "User not found or unauthorized"}), 401
+            return jsonify({"error": "Action not found"}), 404
 
         is_complete = action.status == ActionStatus.COMPLETED
         result = {

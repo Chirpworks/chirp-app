@@ -85,8 +85,9 @@ def get_meeting_history():
     try:
         user_id = get_jwt_identity()
 
-        team_member_id = request.args.get("team_member_id")
-        if team_member_id:
+        deal_id = request.args.get("dealId")
+        team_member_ids = request.args.getlist("team_member_id")
+        if team_member_ids:
             user = User.query.filter_by(id=user_id).first()
             if not user:
                 logging.error("User not found; unauthorized")
@@ -96,25 +97,33 @@ def get_meeting_history():
                 return jsonify(
                     {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
                 )
-            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
-            user_id = team_member_id
 
-        logging.info(f"Fetching call history for user {user_id}")
+            logging.info(f"Fetching call history for users {team_member_ids}")
+            # Join through deals to fetch user's meetings
+            query = (
+                Meeting.query
+                .join(Meeting.deal)
+                .filter(Deal.user_id.in_(team_member_ids))
+                .order_by(Meeting.start_time.desc())
+            )
+            if deal_id:
+                query = query.filter(Meeting.deal_id == deal_id)
 
-        deal_id = request.args.get("dealId")
+            meetings = query.all()
 
-        # Join through deals to fetch user's meetings
-        query = (
-            Meeting.query
-            .join(Meeting.deal)
-            .filter(Deal.user_id == user_id)
-            .order_by(Meeting.start_time.desc())
-        )
+        else:
+            # Join through deals to fetch user's meetings
+            query = (
+                Meeting.query
+                .join(Meeting.deal)
+                .filter(Deal.user_id == user_id)
+                .order_by(Meeting.start_time.desc())
+            )
 
-        if deal_id:
-            query = query.filter(Meeting.deal_id == deal_id)
+            if deal_id:
+                query = query.filter(Meeting.deal_id == deal_id)
 
-        meetings = query.all()
+            meetings = query.all()
 
         result = []
         for meeting in meetings:
@@ -133,7 +142,9 @@ def get_meeting_history():
                 "seller_number": meeting.seller_number,
                 "analysis_status": analysis_status,
                 "duration": duration,
-                "call_notes": meeting.call_notes
+                "call_notes": meeting.call_notes,
+                "user_name": meeting.deal.user.name,
+                "user_email": meeting.deal.user.email
             })
 
         return jsonify(result), 200
@@ -191,7 +202,9 @@ def get_meeting_by_id(meeting_id):
             "call_notes": meeting.call_notes,
             "deal_id": meeting.deal_id,
             "analysis_status": analysis_status,
-            "duration": duration
+            "duration": duration,
+            "user_name": meeting.deal.user.name,
+            "user_email": meeting.deal.user.email
         }
 
         return jsonify(result), 200

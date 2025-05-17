@@ -12,9 +12,9 @@ logging = logging.getLogger(__name__)
 user_bp = Blueprint("user", __name__)
 
 
-@user_bp.route("/get_manager_team", methods=["GET"])
+@user_bp.route("/get_team", methods=["GET"])
 @jwt_required()
-def get_users():
+def get_team():
     try:
         user_id = get_jwt_identity()
         user = User.query.filter_by(id=user_id).first()
@@ -39,7 +39,8 @@ def get_users():
             result.append({
                 "name": team_member.name,
                 "email": team_member.email,
-                "id": team_member.id
+                "id": team_member.id,
+                "phone": team_member.phone
             })
 
         return jsonify(result), 200
