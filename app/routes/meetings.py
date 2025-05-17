@@ -9,6 +9,7 @@ from app import User, Meeting, db, Job
 from app.models.deal import Deal
 from app.models.job import JobStatus
 from app.models.mobile_app_calls import MobileAppCall
+from app.models.user import UserRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
 from app.utils.utils import human_readable_duration
 
@@ -83,6 +84,21 @@ def create_meeting():
 def get_meeting_history():
     try:
         user_id = get_jwt_identity()
+
+        team_member_id = request.args.get("team_member_id")
+        if team_member_id:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
+            user_id = team_member_id
+
         logging.info(f"Fetching call history for user {user_id}")
 
         deal_id = request.args.get("dealId")
@@ -132,6 +148,21 @@ def get_meeting_history():
 def get_meeting_by_id(meeting_id):
     try:
         user_id = get_jwt_identity()
+
+        team_member_id = request.args.get("team_member_id")
+        if team_member_id:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
+            user_id = team_member_id
+
         logging.info(f"Fetching call_data for meeting_id {meeting_id} for user {user_id}")
 
         # Join through deal to verify the meeting belongs to this user's deals
@@ -175,6 +206,22 @@ def get_meeting_by_id(meeting_id):
 def get_meeting_diarization_by_id(meeting_id):
     try:
         user_id = get_jwt_identity()
+
+        team_member_id = request.args.get("team_member_id")
+        if team_member_id:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
+            user_id = team_member_id
+
+        logging.info(f"Fetching diarization for meeting_id {meeting_id} for user {user_id}")
 
         # Join through deal to verify the meeting belongs to this user's deals
         meeting = (

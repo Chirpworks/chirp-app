@@ -11,6 +11,8 @@ from app.service.aws.s3_client import S3Client
 from app.utils.auth_utils import generate_secure_otp, send_otp_email
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from app.utils.call_recording_utils import normalize_phone_number
+
 logging = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__)
@@ -58,6 +60,9 @@ def signup():
 
         logging.info(f"generating secure otp")
         otp = generate_secure_otp(length=16)
+
+        logging.info(f"normalizing phone number")
+        phone = normalize_phone_number(phone)
 
         logging.info(f"Creating user")
         new_user = User(email=email, password=otp, agency_id=agency_id, phone=phone, role=role, name=name)

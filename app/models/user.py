@@ -33,6 +33,8 @@ class User(db.Model, UserMixin):
     deals = db.relationship('Deal', back_populates='user', cascade='all, delete-orphan')
     last_week_performance_analysis = db.Column(db.String(), nullable=True)
     name = db.Column(db.String(100), nullable=False, unique=False)
+    manager_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=True)
+    manager = db.relationship('User', remote_side=[id], backref='team_members')
 
     def __init__(self, email, phone, password, agency_id, name, role=None):
         self.email = email

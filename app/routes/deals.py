@@ -5,9 +5,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
 
-from app import Meeting, db
+from app import Meeting, db, User
 from app.models.action import Action, ActionStatus
 from app.models.deal import Deal
+from app.models.user import UserRole
 
 logging = logging.getLogger(__name__)
 
@@ -19,6 +20,21 @@ deals_bp = Blueprint("deal", __name__)
 def get_deals():
     try:
         user_id = get_jwt_identity()
+
+        team_member_id = request.args.get("team_member_id")
+        if team_member_id:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
+            user_id = team_member_id
+
         logging.info(f"Fetching deals for user {user_id}")
 
         # Parse optional query params
@@ -76,6 +92,21 @@ def get_deals():
 def get_deal_by_id(deal_id):
     try:
         user_id = get_jwt_identity()
+
+        team_member_id = request.args.get("team_member_id")
+        if team_member_id:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
+            user_id = team_member_id
+
         logging.info(f"Fetching deal {deal_id} for user {user_id}")
 
         # Join through deal to verify the meeting belongs to this user's deals
