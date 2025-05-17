@@ -106,11 +106,6 @@ def get_meeting_history():
                 .filter(Deal.user_id.in_(team_member_ids))
                 .order_by(Meeting.start_time.desc())
             )
-            if deal_id:
-                query = query.filter(Meeting.deal_id == deal_id)
-
-            meetings = query.all()
-
         else:
             # Join through deals to fetch user's meetings
             query = (
@@ -120,10 +115,10 @@ def get_meeting_history():
                 .order_by(Meeting.start_time.desc())
             )
 
-            if deal_id:
-                query = query.filter(Meeting.deal_id == deal_id)
+        if deal_id:
+            query = query.filter(Meeting.deal_id == deal_id)
 
-            meetings = query.all()
+        meetings = query.all()
 
         result = []
         for meeting in meetings:

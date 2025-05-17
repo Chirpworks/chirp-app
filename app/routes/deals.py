@@ -35,27 +35,21 @@ def get_deals():
                 )
 
             logging.info(f"Fetching call history for users {team_member_ids}")
-            # Join through deals to fetch user's meetings
+
             query = (
-                Meeting.query
-                .join(Meeting.deal)
+                Deal.query
                 .filter(Deal.user_id.in_(team_member_ids))
-                .order_by(Meeting.start_time.desc())
             )
-            if deal_id:
-                query = query.filter(Meeting.deal_id == deal_id)
-
-            deals = query.all()
-
         else:
             # Base query: actions joined through meetings and deals
             query = (
                 Deal.query
                 .filter(Deal.user_id == user_id)
             )
-            if deal_id:
-                query = query.filter(Deal.id == deal_id)
-            deals = query.all()
+
+        if deal_id:
+            query = query.filter(Deal.id == deal_id)
+        deals = query.all()
 
         # Prepare response
         result = []

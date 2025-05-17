@@ -20,12 +20,21 @@ def get_actions():
     try:
         user_id = get_jwt_identity()
 
+        # Parse optional query params
+        deal_id = request.args.get("deal_id")
+        is_complete_str = request.args.get("is_complete")
+        is_complete = None
+        action_type = request.args.get("actionType")
+
+        if is_complete_str is not None:
+            is_complete = is_complete_str.lower() == "true"
+
         if not user_id:
             logging.error("Failed to get action - Unauthorized")
             return jsonify({"error": "User not found or unauthorized"}), 401
 
-        team_member_id = request.args.get("team_member_id")
-        if team_member_id:
+        team_member_ids = request.args.getlist("team_member_id")
+        if team_member_ids:
             user = User.query.filter_by(id=user_id).first()
             if not user:
                 logging.error("User not found; unauthorized")
@@ -35,28 +44,24 @@ def get_actions():
                 return jsonify(
                     {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
                 )
-            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
-            user_id = team_member_id
+            logging.info(f"Fetching actions data for users {team_member_ids}")
 
-        logging.info(f"Fetching actions data for user {user_id}")
-
-        action_type = request.args.get("actionType")
-
-        # Parse optional query params
-        deal_id = request.args.get("deal_id")
-        is_complete_str = request.args.get("is_complete")
-        is_complete = None
-
-        if is_complete_str is not None:
-            is_complete = is_complete_str.lower() == "true"
-
-        # Base query: actions joined through meetings and deals
-        query = (
-            Action.query
-            .join(Action.meeting)
-            .join(Meeting.deal)
-            .filter(Deal.user_id == user_id)
-        )
+            # Join through deals to fetch user's meetings
+            query = (
+                Action.query
+                .join(Action.meeting)
+                .join(Meeting.deal)
+                .filter(Deal.user_id.in_(team_member_ids))
+            )
+        else:
+            logging.info(f"Fetching actions data for user {user_id}")
+            # Base query: actions joined through meetings and deals
+            query = (
+                Action.query
+                .join(Action.meeting)
+                .join(Meeting.deal)
+                .filter(Deal.user_id == user_id)
+            )
 
         if deal_id:
             query = query.filter(Meeting.deal_id == deal_id)
