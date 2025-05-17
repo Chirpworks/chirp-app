@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import UUID
+from sqlalchemy.dialects.postgresql import ENUM
 
 from app import db
 
@@ -10,9 +11,9 @@ from .user import User
 
 
 class DealStatus(Enum):
-    SCHEDULED = "scheduled"
-    COMPLETED = "completed"
-    ONGOING = "ongoing"
+    OPEN = "open"
+    SUCCESS = "success"
+    FAILURE = "failure"
 
 
 # Deal model
@@ -36,3 +37,5 @@ class Deal(db.Model):
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=False)
     user = db.relationship('User', back_populates='deals')
     meetings = db.relationship('Meeting', back_populates='deal', cascade='all, delete-orphan')
+    history = db.Column(db.JSON, nullable=True)
+    status = db.Column(ENUM(DealStatus, name="dealstatus", values_callable=lambda x: [e.value for e in x]), default=DealStatus.OPEN, nullable=True)

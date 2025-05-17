@@ -11,7 +11,7 @@ from sqlalchemy import and_
 
 from app import Job, db, User, Meeting
 from app.constants import AWSConstants, CallDirection, MeetingSource
-from app.models.deal import Deal
+from app.models.deal import Deal, DealStatus
 from app.models.exotel_calls import ExotelCall
 from app.models.job import JobStatus
 from app.models.meeting import ProcessingStatus
@@ -171,6 +171,13 @@ def post_exotel_recording():
                     buyer_number=matching_app_call.buyer_number,
                     seller_number=call_from,
                     user_id=user.id,
+                    status=DealStatus.OPEN,
+                    deal_history={
+                        "events": [
+                            {"assignee": user.id, "timestamp": datetime.now()},
+                            {"status": DealStatus.OPEN.value, "timestamp": datetime.now()}
+                        ]
+                    }
                 )
                 db.session.add(deal)
                 db.session.flush()

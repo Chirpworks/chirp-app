@@ -1,4 +1,6 @@
 import json
+from datetime import datetime
+
 import logging
 
 from flask import Blueprint, request, jsonify
@@ -96,13 +98,13 @@ def get_deals():
 def get_deal_by_id(deal_id):
     try:
         user_id = get_jwt_identity()
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            logging.error("User not found; unauthorized")
+            return jsonify({"error": "User not found or unauthorized"}), 404
 
         team_member_id = request.args.get("team_member_id")
         if team_member_id:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
             if user.role != UserRole.MANAGER:
                 logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
                 return jsonify(
@@ -166,3 +168,54 @@ def get_deal_by_id(deal_id):
     except Exception as e:
         logging.error(f"Failed to fetch deal data: {e}")
         return jsonify({"error": f"Failed to fetch deal: {str(e)}"}), 500
+
+
+@deals_bp.route("/update/change_assignee", methods=["POST"])
+@jwt_required()
+def change_deal_assignee():
+    try:
+        data = request.get_json()
+        user_id = get_jwt_identity()
+        user = User.query.filter_by(id=user_id).first()
+        if not user:
+            logging.error("User not found; unauthorized")
+            return jsonify({"error": "User not found or unauthorized"}), 404
+
+        deal_id = data.get("deal_id", None)
+        assignee_id = data.get("assignee_id", None)
+
+        if not deal_id or not assignee_id:
+            logging.error("Both deal_id and assignee_id required")
+            return jsonify({"error": f"Both deal_id and assignee_id required"}), 400
+
+        deal = Deal.query.filter_by(id=deal_id).first()
+        if not deal:
+            logging.error(f"Deal with {deal_id=} not found")
+            return jsonify({"error": f"Deal with {deal_id=} not found"}), 404
+
+        assignee = User.query.filter_by(id=assignee_id).first()
+        if not assignee:
+            logging.error(f"User with {assignee=} not found")
+            return jsonify({"error": f"User with {assignee_id=} not found"}), 404
+
+        deal.user_id = assignee_id
+        deal_history = deal.history
+        deal_history_events = deal_history.get("events")
+        if deal_history_events:
+            deal_history_events.append(
+                {"assignee": user.id, "timestamp": datetime.now()},
+            )
+        deal.history = {"events": deal_history_events}
+        db.session.commit()
+
+        return jsonify(
+            {
+                'message': 'Deal assignee updated successfully',
+                'assignee_name': assignee.name,
+                'assignee_email': assignee.email
+            }
+        ), 201
+
+    except Exception as e:
+        logging.error(f"Failed to update deal assignee: {e}")
+        return jsonify({"error": f"Failed to update deal assignee: {str(e)}"}), 500
