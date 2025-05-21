@@ -8,7 +8,7 @@ from app import db
 from app.models.user import User
 from app.models.jwt_token_blocklist import TokenBlocklist
 from app.service.aws.s3_client import S3Client
-from app.utils.auth_utils import generate_secure_otp, send_otp_email
+from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_user_claims
 from werkzeug.security import check_password_hash, generate_password_hash
 
 logging = logging.getLogger(__name__)
@@ -93,7 +93,8 @@ def login():
             logging.error({'error': 'Invalid credentials'})
             return jsonify({'error': f'Invalid credentials for email: {email}'}), 401
 
-        access_token = user.generate_access_token(expires_delta=timedelta(minutes=15))
+        user_claims = generate_user_claims(user)
+        access_token = user.generate_access_token(expires_delta=timedelta(minutes=15), additional_claims=user_claims)
         refresh_token = user.generate_refresh_token()
         return jsonify({'access_token': access_token, 'refresh_token': refresh_token, 'user_id': user.id}), 200
     except Exception as e:
@@ -106,7 +107,8 @@ def login():
 def refresh():
     user_id = get_jwt_identity()  # Get user ID from refresh token
     user = User.query.filter_by(id=user_id).first()
-    new_access_token = user.generate_access_token(expires_delta=timedelta(minutes=15))
+    user_claims = generate_user_claims(user)
+    new_access_token = user.generate_access_token(expires_delta=timedelta(minutes=15), additional_claims=user_claims)
     refresh_token = user.generate_refresh_token()
 
     return jsonify({'access_token': new_access_token, 'refresh_token': refresh_token}), 200

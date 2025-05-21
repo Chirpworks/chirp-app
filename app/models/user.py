@@ -31,6 +31,7 @@ class User(db.Model, UserMixin):
     agency_id = db.Column(UUID(as_uuid=True), db.ForeignKey('agencies.id'), nullable=False)
     agency = db.relationship('Agency', back_populates='users')
     deals = db.relationship('Deal', back_populates='user', cascade='all, delete-orphan')
+    unmapped_app_calls = db.relationship('MobileAppCall', back_populates='user', cascade='all, delete-orphan')
     last_week_performance_analysis = db.Column(db.String(), nullable=True)
     name = db.Column(db.String(100), nullable=False, unique=False)
 

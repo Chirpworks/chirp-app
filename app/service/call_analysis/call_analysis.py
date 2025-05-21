@@ -212,7 +212,8 @@ class CallAnalysis:
             self.meeting.call_notes = call_notes
 
             deal_title = self.descriptive_call_analysis.get("deal_title")
-            self.deal.name = deal_title
+            if not self.deal.name or self.deal.name == 'Not Specified':
+                self.deal.name = deal_title
 
             deal_summary = self.descriptive_call_analysis.get("deal_summary")
             self.deal.overview = deal_summary.get("deal_overview")

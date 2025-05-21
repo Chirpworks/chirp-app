@@ -6,6 +6,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 
+from app import User
 from app.constants import AWSConstants
 from app.service.aws.s3_client import S3Client
 
@@ -54,3 +55,13 @@ def add_agency_to_list(agency_id, agency_name):
     s3_client.put_file_content(
         bucket_name="agency-name-mapping-config", key="agency_mapping.json", content=updated_agency_list
     )
+
+
+def generate_user_claims(user: User):
+    user_claims = {
+        "user_id": str(user.id),
+        "user_name": user.name,
+        "user_email": user.email,
+        "user_role": user.role.value,
+    }
+    return user_claims
