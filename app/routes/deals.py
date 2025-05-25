@@ -203,7 +203,7 @@ def change_deal_assignee():
         deal_history_events = deal_history.get("events")
         if deal_history_events:
             deal_history_events.append(
-                {"assignee": user.id, "timestamp": datetime.now()},
+                {"assignee": user.id, "timestamp": str(datetime.now())},
             )
         deal.history = {"events": deal_history_events}
         db.session.commit()

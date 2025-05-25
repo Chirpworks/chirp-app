@@ -1,11 +1,16 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Union
+from zoneinfo import ZoneInfo
+
 import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from sqlalchemy import and_
 
 from app import User, Meeting, db, Job
+from app.constants import MeetingSource
+from app.models import meeting
 from app.models.deal import Deal
 from app.models.job import JobStatus
 from app.models.mobile_app_calls import MobileAppCall
@@ -100,46 +105,91 @@ def get_meeting_history():
 
             logging.info(f"Fetching call history for users {team_member_ids}")
             # Join through deals to fetch user's meetings
-            query = (
+            meetings_query = (
                 Meeting.query
                 .join(Meeting.deal)
                 .filter(Deal.user_id.in_(team_member_ids))
                 .order_by(Meeting.start_time.desc())
             )
+            mobile_app_calls_query = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id.in_(team_member_ids))
+                .order_by(MobileAppCall.start_time.desc())
+            )
         else:
             # Join through deals to fetch user's meetings
-            query = (
+            meetings_query = (
                 Meeting.query
                 .join(Meeting.deal)
                 .filter(Deal.user_id == user_id)
                 .order_by(Meeting.start_time.desc())
             )
+            mobile_app_calls_query = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == user_id)
+                .order_by(MobileAppCall.start_time.desc())
+            )
 
         if deal_id:
-            query = query.filter(Meeting.deal_id == deal_id)
+            meetings_query = meetings_query.filter(Meeting.deal_id == deal_id)
+            deal = Deal.query.get(deal_id)
+            mobile_app_calls_query = mobile_app_calls_query.filter(
+                and_(
+                    MobileAppCall.buyer_number == deal.buyer_number,
+                    MobileAppCall.seller_number == deal.seller_number,
+                ))
 
-        meetings = query.all()
+        meetings = meetings_query.all()
+        mobile_app_calls = mobile_app_calls_query.all()
+        meetings.extend(mobile_app_calls)
+        meetings = sorted(meetings, key=lambda x: x.start_time, reverse=True)
 
+        local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
         result = []
-        for meeting in meetings:
-            analysis_status = meeting.job.status.value
-            duration = human_readable_duration(meeting.end_time, meeting.start_time)
+        for call_record in meetings:
+            title = f"Meeting between {call_record.buyer_number} and {call_record.seller_number}"
+            analysis_status = 'Processing'
+            if isinstance(call_record, Meeting):
+                job_status = call_record.job.status
+                if job_status in [JobStatus.INIT, JobStatus.IN_PROGRESS]:
+                    analysis_status = 'Processing'
+                elif job_status == JobStatus.COMPLETED:
+                    analysis_status = 'Completed'
+                else:
+                    analysis_status = 'Not Recorded'
+            elif isinstance(call_record, MobileAppCall):
+                analysis_status = call_record.status
+            duration = human_readable_duration(call_record.end_time, call_record.start_time)
+            if isinstance(call_record, Meeting):
+                title = call_record.title
+            elif isinstance(call_record, MobileAppCall):
+                if call_record.status == 'Missed':
+                    title = f'Missed Call from {call_record.buyer_number}'
+                    analysis_status = call_record.status
+                elif call_record.status == 'Not Answered':
+                    title = f'{call_record.buyer_number} did not answer'
+                    analysis_status = call_record.status
+                elif call_record.status == 'Processing':
+                    start_time_local = call_record.start_time.astimezone(ZoneInfo("Asia/Kolkata"))
+                    if local_now - start_time_local > timedelta(minutes=2):
+                        analysis_status = 'Not Recorded'
+            else:
+                continue
             result.append({
-                "id": str(meeting.id),
-                "title": meeting.title,
-                "source": meeting.source.value,
-                "status": meeting.status.value,
-                "deal_id": str(meeting.deal_id),
-                "participants": meeting.participants,
-                "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
-                "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
-                "buyer_number": meeting.buyer_number,
-                "seller_number": meeting.seller_number,
+                "id": str(call_record.id),
+                "title": title,
+                "source": call_record.source.value if isinstance(call_record, Meeting) else MeetingSource.PHONE.value,
+                "deal_id": str(call_record.deal_id) if isinstance(call_record, Meeting) else None,
+                "participants": call_record.participants if isinstance(call_record, Meeting) else None,
+                "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
+                "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
+                "buyer_number": call_record.buyer_number,
+                "seller_number": call_record.seller_number,
                 "analysis_status": analysis_status,
                 "duration": duration,
-                "call_notes": meeting.call_notes,
-                "user_name": meeting.deal.user.name,
-                "user_email": meeting.deal.user.email
+                "call_notes": call_record.call_notes if isinstance(call_record, Meeting) else None,
+                "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else None,
+                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None
             })
 
         return jsonify(result), 200

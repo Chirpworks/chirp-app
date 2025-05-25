@@ -1,4 +1,6 @@
 import json
+from zoneinfo import ZoneInfo
+
 import logging
 import os
 import uuid
@@ -18,7 +20,7 @@ from app.models.meeting import ProcessingStatus
 from app.models.mobile_app_calls import MobileAppCall
 from app.service.aws.ecs_client import ECSClient
 from app.utils.call_recording_utils import upload_file_to_s3, download_exotel_file_from_url, get_audio_duration_seconds, \
-    normalize_phone_number
+    normalize_phone_number, calculate_call_status
 
 logging = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ def post_exotel_recording():
         logging.info(f"Received request to process exotel recording with details: {exotel_call_recording_details}")
 
         call_from = normalize_phone_number(call_from)
-        call_start_time = datetime.fromisoformat(call_start_time)
+        call_start_time = datetime.fromisoformat(call_start_time + "+00:00").replace(tzinfo=ZoneInfo("Asia/Kolkata"))
 
         # create meeting record
         # get user
@@ -117,8 +119,8 @@ def post_exotel_recording():
 
         logging.info(f"duration of recorded audio file is {duration_seconds}")
         call_end_time = call_start_time + timedelta(seconds=duration_seconds)
-        logging.info(f"call end_time set for this exotel call: {call_end_time}")
 
+        logging.info(f"Creating Exotel call record for user {user.email}")
         # No matching AppCall — just store this Exotel call temporarily
         exotel_call = ExotelCall(
             call_from=call_from,
@@ -137,7 +139,7 @@ def post_exotel_recording():
             .filter(and_(
                 MobileAppCall.seller_number == call_from,
                 MobileAppCall.start_time <= call_start_time,
-                MobileAppCall.end_time >= call_end_time
+                MobileAppCall.end_time >= call_end_time,
             ))
             .order_by(MobileAppCall.start_time.asc())
             .first()
@@ -172,17 +174,17 @@ def post_exotel_recording():
                     seller_number=call_from,
                     user_id=user.id,
                     status=DealStatus.OPEN,
-                    deal_history={
+                    history={
                         "events": [
-                            {"assignee": user.id, "timestamp": datetime.now()},
-                            {"status": DealStatus.OPEN.value, "timestamp": datetime.now()}
+                            {"assignee": str(user.id), "timestamp": str(datetime.now())},
+                            {"status": DealStatus.OPEN.value, "timestamp": str(datetime.now())}
                         ]
                     }
                 )
                 db.session.add(deal)
                 db.session.flush()
 
-            logging.info("Creating new meeting and job entry for reconciled call.")
+            logging.info(f"Creating new meeting and job entry for reconciled call for user {user.email}")
             # Create a Meeting and Job for this reconciled call
             meeting = Meeting(
                 id=matching_app_call.id,
@@ -269,22 +271,32 @@ def post_app_call_record():
                 logging.info(f"No user with phone number {seller_number} found")
                 return jsonify({"message": f"No user with phone number {seller_number} found"}), 404
 
-            call_type = CallDirection[call_type_str.upper()]  # e.g., 'incoming' → CallDirection.INCOMING
-            start_time = datetime.fromisoformat(start_time_str)
-            end_time = datetime.fromisoformat(end_time_str)
+            # call_type = CallDirection[call_type_str.upper()]  # e.g., 'incoming' → CallDirection.INCOMING
+            start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00")).replace(
+                tzinfo=ZoneInfo("Asia/Kolkata")
+            )
+            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")).replace(
+                tzinfo=ZoneInfo("Asia/Kolkata")
+            )
             # adding this time to enlarge the window for exotel call reconciliation
-            end_time = end_time + timedelta(seconds=3)
 
-            logging.info("Creating app call record")
+            call_status = calculate_call_status(call_type_str, duration)
+
+            if call_status == 'Processing':
+                end_time = end_time + timedelta(seconds=3)
+
+            logging.info(f"Creating app call record for user {user.email}")
             # 1. Create the mobile app call record
             mobile_call = MobileAppCall(
                 mobile_app_call_id=call_id,
                 buyer_number=buyer_number,
                 seller_number=seller_number,
-                call_type=call_type,
+                call_type=call_type_str,
                 start_time=start_time,
                 end_time=end_time,
-                duration=duration
+                duration=duration,
+                user_id=user.id,
+                status=call_status
             )
             db.session.add(mobile_call)
             db.session.commit()

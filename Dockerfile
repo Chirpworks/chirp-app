@@ -38,6 +38,7 @@ RUN pip install -r requirements.txt
 # Ensure GPU ONNX runtime is used
 RUN pip uninstall -y onnxruntime
 RUN pip install onnxruntime-gpu
+RUN pip install hf_xet
 
 # Optional: set Hugging Face cache directory
 ENV HF_HOME=/root/.cache/huggingface

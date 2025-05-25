@@ -92,7 +92,7 @@ def get_actions():
                 "reasoning": action.reasoning,
                 "signals": action.signals,
                 "type": action.type.value,
-                "created_at": action.created_at,
+                "created_at": action.created_at.isoformat() if action.created_at else None,
                 "meeting_id": action.meeting_id
             })
 
@@ -138,7 +138,7 @@ def get_action_by_id(action_id):
             "reasoning": action.reasoning,
             "signals": action.signals,
             "type": action.type.value,
-            "created_at": action.created_at,
+            "created_at": action.created_at.isoformat() if action.created_at else None,
             "meeting_id": action.meeting_id
         }
 

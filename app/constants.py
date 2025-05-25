@@ -63,3 +63,4 @@ class MeetingSource(Enum):
 class CallDirection(Enum):
     INCOMING = "incoming"
     OUTGOING = "outgoing"
+    MISSED = "missed"

@@ -12,7 +12,7 @@ def human_readable_duration(dt1, dt2):
     if hours:
         parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
     if minutes:
-        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+        parts.append(f"{minutes} min{'s' if minutes != 1 else ''}")
     if seconds:
         parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
 

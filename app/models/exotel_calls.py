@@ -6,7 +6,6 @@ from sqlalchemy import UUID
 from app import db
 
 from .user import User
-from ..constants import CallDirection
 
 
 # Deal model
