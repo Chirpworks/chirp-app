@@ -4,9 +4,10 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app import Meeting, db
+from app import Meeting, db, User
 from app.models.action import Action, ActionStatus, ActionType
 from app.models.deal import Deal
+from app.models.user import UserRole
 
 logging = logging.getLogger(__name__)
 
@@ -19,27 +20,48 @@ def get_actions():
     try:
         user_id = get_jwt_identity()
 
-        if not user_id:
-            logging.error("Failed to get action - Unauthorized")
-            return jsonify({"error": "User not found or unauthorized"}), 401
-
-        action_type = request.args.get("actionType")
-
         # Parse optional query params
         deal_id = request.args.get("deal_id")
         is_complete_str = request.args.get("is_complete")
         is_complete = None
+        action_type = request.args.get("actionType")
 
         if is_complete_str is not None:
             is_complete = is_complete_str.lower() == "true"
 
-        # Base query: actions joined through meetings and deals
-        query = (
-            Action.query
-            .join(Action.meeting)
-            .join(Meeting.deal)
-            .filter(Deal.user_id == user_id)
-        )
+        if not user_id:
+            logging.error("Failed to get action - Unauthorized")
+            return jsonify({"error": "User not found or unauthorized"}), 401
+
+        team_member_ids = request.args.getlist("team_member_id")
+        if team_member_ids:
+            user = User.query.filter_by(id=user_id).first()
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != UserRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                )
+            logging.info(f"Fetching actions data for users {team_member_ids}")
+
+            # Join through deals to fetch user's meetings
+            query = (
+                Action.query
+                .join(Action.meeting)
+                .join(Meeting.deal)
+                .filter(Deal.user_id.in_(team_member_ids))
+            )
+        else:
+            logging.info(f"Fetching actions data for user {user_id}")
+            # Base query: actions joined through meetings and deals
+            query = (
+                Action.query
+                .join(Action.meeting)
+                .join(Meeting.deal)
+                .filter(Deal.user_id == user_id)
+            )
 
         if deal_id:
             query = query.filter(Meeting.deal_id == deal_id)
@@ -87,19 +109,21 @@ def get_action_by_id(action_id):
     try:
         user_id = get_jwt_identity()
 
+        if not user_id:
+            logging.error("Failed to get action - Unauthorized")
+            return jsonify({"error": "User not found or unauthorized"}), 401
+
         # Join to verify ownership through deal
         action = (
             Action.query
             .join(Action.meeting)
             .join(Meeting.deal)
-            .filter(Action.id == action_id, Deal.user_id == user_id)
+            .filter(Action.id == action_id)
             .first()
         )
 
         if not action:
-            return jsonify({"error": "Action not found or unauthorized"}), 404
-        if not user_id:
-            return jsonify({"error": "User not found or unauthorized"}), 401
+            return jsonify({"error": "Action not found"}), 404
 
         is_complete = action.status == ActionStatus.COMPLETED
         result = {

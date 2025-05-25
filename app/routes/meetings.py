@@ -111,7 +111,6 @@ def get_meeting_history():
                 .filter(Deal.user_id.in_(team_member_ids))
                 .order_by(Meeting.start_time.desc())
             )
-
             mobile_app_calls_query = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id.in_(team_member_ids))
