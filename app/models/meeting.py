@@ -28,7 +28,7 @@ class Meeting(db.Model):
     status = db.Column(db.Enum(ProcessingStatus), default=ProcessingStatus.PROCESSING)
     source = db.Column(db.Enum(MeetingSource), nullable=False)
     participants = db.Column(db.JSON, nullable=True)
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    start_time = db.Column(db.DateTime, default=datetime.now())
     end_time = db.Column(db.DateTime, default=datetime.utcnow)
     summary = db.Column(db.JSON, nullable=True)
     transcription = db.Column(db.Text, nullable=True)
@@ -39,3 +39,4 @@ class Meeting(db.Model):
     actions = db.relationship('Action', back_populates='meeting', cascade='all, delete-orphan')
     deal_id = db.Column(UUID(as_uuid=True), db.ForeignKey('deals.id'), nullable=True)
     deal = db.relationship('Deal', back_populates='meetings')
+    direction = db.Column(db.String, nullable=True)

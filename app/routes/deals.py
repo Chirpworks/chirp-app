@@ -8,9 +8,10 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
 
 from app import Meeting, db, User
-from app.models.action import Action, ActionStatus
+from app.models.action import Action, ActionStatus, ActionType
 from app.models.deal import Deal
 from app.models.user import UserRole
+from app.utils.call_recording_utils import denormalize_phone_number
 
 logging = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ def get_deals():
                 .join(Deal, Meeting.deal_id == Deal.id)
                 .filter(Deal.id == deal.id)
                 .filter(Action.status == ActionStatus.PENDING)
+                .filter(Action.type == ActionType.CONTEXTUAL_ACTION)
                 .scalar()
             )
             last_contacted_on = (
@@ -76,8 +78,8 @@ def get_deals():
                 "lead_qualification": deal.lead_qualification,
                 "overview": deal.overview,
                 "key_stakeholders": deal.key_stakeholders,
-                "buyer_number": deal.buyer_number,
-                "seller_number": deal.seller_number,
+                "buyer_number": denormalize_phone_number(deal.buyer_number),
+                "seller_number": denormalize_phone_number(deal.seller_number),
                 "summary": deal.summary,
                 "num_pending_actions": num_pending_actions,
                 "last_contacted_on": last_contacted_on,
@@ -132,6 +134,7 @@ def get_deal_by_id(deal_id):
             .join(Deal, Meeting.deal_id == Deal.id)
             .filter(Deal.id == deal.id)
             .filter(Action.status == ActionStatus.PENDING)
+            .filter(Action.type == ActionType.CONTEXTUAL_ACTION)
             .scalar()
         )
         last_contacted_on = (
@@ -151,14 +154,14 @@ def get_deal_by_id(deal_id):
             "lead_qualification": deal.risks,
             "overview": deal.overview,
             "key_stakeholders": deal.key_stakeholders,
-            "buyer_number": deal.buyer_number,
-            "seller_number": deal.seller_number,
+            "buyer_number": denormalize_phone_number(deal.buyer_number),
+            "seller_number": denormalize_phone_number(deal.seller_number),
             "summary": deal.summary,
             "pain_points": deal.pain_points,
             "solutions": deal.solutions,
             "user_id": deal.user_id,
             "num_pending_actions": num_pending_actions,
-            "last_contacted_on": last_contacted_on,
+            "last_contacted_on": last_contacted_on.isoforamt() if last_contacted_on else None,
             "user_name": deal.user.name,
             "user_email": deal.user.email
         }

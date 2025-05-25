@@ -99,7 +99,7 @@ def post_exotel_recording():
         logging.info(f"Received request to process exotel recording with details: {exotel_call_recording_details}")
 
         call_from = normalize_phone_number(call_from)
-        call_start_time = datetime.fromisoformat(call_start_time + "+00:00").replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+        call_start_time = datetime.strptime(call_start_time, '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("Asia/Kolkata"))
 
         # create meeting record
         # get user
@@ -169,7 +169,7 @@ def post_exotel_recording():
             if not deal:
                 logging.info("Deal doesn't already exist. Creating new deal entry")
                 deal = Deal(
-                    name=f"Deal between {matching_app_call.buyer_number} and {call_from}",
+                    name=f"Deal between {matching_app_call.buyer_number} and {user.name}",
                     buyer_number=matching_app_call.buyer_number,
                     seller_number=call_from,
                     user_id=user.id,
@@ -191,7 +191,7 @@ def post_exotel_recording():
                 mobile_app_call_id=matching_app_call.mobile_app_call_id,
                 buyer_number=matching_app_call.buyer_number,
                 seller_number=call_from,
-                title=f"Meeting between {matching_app_call.buyer_number} and {call_from}",
+                title=f"Meeting between {matching_app_call.buyer_number} and {user.name}",
                 start_time=matching_app_call.start_time,
                 scheduled_at=matching_app_call.start_time,
                 status=ProcessingStatus.PROCESSING,
@@ -199,6 +199,7 @@ def post_exotel_recording():
                 source=MeetingSource.PHONE,
                 participants=[call_from, matching_app_call.buyer_number],
                 end_time=matching_app_call.end_time,
+                direction=matching_app_call.call_type
             )
             db.session.add(meeting)
             db.session.flush()
@@ -206,7 +207,8 @@ def post_exotel_recording():
             job = Job(
                 meeting_id=meeting.id,
                 status=JobStatus.INIT,
-                s3_audio_url=s3_url
+                s3_audio_url=s3_url,
+                start_time=call_start_time
             )
             db.session.add(job)
             db.session.flush()
@@ -271,18 +273,19 @@ def post_app_call_record():
                 logging.info(f"No user with phone number {seller_number} found")
                 return jsonify({"message": f"No user with phone number {seller_number} found"}), 404
 
+            buyer_number = normalize_phone_number(buyer_number)
+            seller_number = normalize_phone_number(seller_number)
+
             # call_type = CallDirection[call_type_str.upper()]  # e.g., 'incoming' → CallDirection.INCOMING
-            start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00")).replace(
-                tzinfo=ZoneInfo("Asia/Kolkata")
-            )
-            end_time = datetime.fromisoformat(end_time_str.replace("Z", "+00:00")).replace(
-                tzinfo=ZoneInfo("Asia/Kolkata")
-            )
-            # adding this time to enlarge the window for exotel call reconciliation
+            start_time_str = datetime.strptime(start_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
+            start_time = start_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            start_time_str = datetime.strptime(end_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
+            end_time = end_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
 
             call_status = calculate_call_status(call_type_str, duration)
 
-            if call_status == 'Processing':
+            if call_status == 'Processing' and duration != '0':
+                # adding this time to enlarge the window for exotel call reconciliation
                 end_time = end_time + timedelta(seconds=3)
 
             logging.info(f"Creating app call record for user {user.email}")
@@ -339,7 +342,7 @@ def post_app_call_record():
                 if not deal:
                     logging.info("Deal doesn't already exist. Creating new deal entry")
                     deal = Deal(
-                        name=f"Deal between {buyer_number} and {seller_number}",
+                        name=f"Deal between {buyer_number} and {user.name}",
                         buyer_number=buyer_number,
                         seller_number=seller_number,
                         user_id=user.id
@@ -354,7 +357,7 @@ def post_app_call_record():
                     mobile_app_call_id=call_id,
                     buyer_number=buyer_number,
                     seller_number=seller_number,
-                    title=f"Meeting between {buyer_number} and {seller_number}",
+                    title=f"Meeting between {buyer_number} and {user.name}",
                     start_time=start_time,
                     scheduled_at=start_time,
                     status=ProcessingStatus.INITIALIZED,
@@ -362,6 +365,7 @@ def post_app_call_record():
                     source=MeetingSource.PHONE,
                     participants=[seller_number, buyer_number],
                     end_time=end_time,
+                    direction=mobile_call.call_type
                 )
                 db.session.add(meeting)
                 db.session.flush()

@@ -1,4 +1,6 @@
 import json
+from zoneinfo import ZoneInfo
+
 import logging
 import os
 from datetime import datetime
@@ -129,7 +131,8 @@ class CallAnalysis:
                         reasoning=action_reasoning,
                         meeting_id=self.meeting.id,
                         type=ActionType.CONTEXTUAL_ACTION,
-                        signals=signals
+                        signals=signals,
+                        created_at=datetime.now(ZoneInfo("Asia/Kolkata"))
                     )
                     db.session.add(action)
 
@@ -150,7 +153,8 @@ class CallAnalysis:
                         reasoning=reasoning,
                         signals=signals,
                         meeting_id=self.meeting.id,
-                        type=ActionType.SUGGESTED_ACTION
+                        type=ActionType.SUGGESTED_ACTION,
+                        created_at=datetime.now(ZoneInfo("Asia/Kolkata"))
                     )
                     db.session.add(action)
             db.session.flush()
@@ -209,6 +213,11 @@ class CallAnalysis:
             self.meeting.summary = call_summary
 
             call_notes = self.descriptive_call_analysis.get("call_notes")
+            if speaker_roles != 'Not Specified':
+                call_notes_string = json.dumps(call_notes)
+                for key, value in speaker_roles.items():
+                    call_notes_string = call_notes_string.replace(key, value)
+                call_notes = json.loads(call_notes_string)
             self.meeting.call_notes = call_notes
 
             deal_title = self.descriptive_call_analysis.get("deal_title")

@@ -4,8 +4,12 @@ from flask import Blueprint, jsonify, request
 
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app import User, db
+from app import User, db, Meeting, Deal, MobileAppCall
+from app.constants import CallDirection
 from app.models.user import UserRole
+from sqlalchemy import func
+
+from app.utils.call_recording_utils import denormalize_phone_number
 
 logging = logging.getLogger(__name__)
 
@@ -33,15 +37,69 @@ def get_team():
             User.query
             .filter(User.manager_id == user.id)
         )
+        all_members_total_outgoing_calls = 0
+        all_members_total_incoming_calls = 0
+        all_members_unanswered_outgoing_calls = 0
+        all_members_unique_leads_engaged = 0
+        all_members_unique_leads_called_but_not_engaged = 0
 
-        result = []
+        team_members_list = []
         for team_member in team_members:
-            result.append({
+            total_outgoing_calls = (
+                Meeting.query
+                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.direction == CallDirection.OUTGOING.value)
+                .scalar()
+            )
+            total_incoming_calls = (
+                Meeting.query
+                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.direction == CallDirection.INCOMING.value)
+                .scalar()
+            )
+            unanswered_outgoing_calls = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == team_member.id)
+                .filter(MobileAppCall.status == 'Not Answered')
+                .scalar()
+            )
+            unique_leads_engaged = (
+                db.session.query(func.count(func.distinct(Meeting.buyer_number)))
+                .filter(Meeting.seller_number == team_member.phone)
+                .scalar()
+            )
+            unique_leads_called_but_not_engaged = (
+                db.session.query(func.count(func.ditinct(MobileAppCall.buyer_number)))
+                .filter(MobileAppCall.seller_number == team_member.phone)
+                .scalar()
+            )
+
+            all_members_total_outgoing_calls += total_outgoing_calls
+            all_members_total_incoming_calls += total_incoming_calls
+            all_members_unanswered_outgoing_calls += unanswered_outgoing_calls
+            all_members_unique_leads_engaged += unique_leads_engaged
+            all_members_unique_leads_called_but_not_engaged += unique_leads_called_but_not_engaged
+
+            team_members_list.append({
                 "name": team_member.name,
                 "email": team_member.email,
                 "id": team_member.id,
-                "phone": team_member.phone
+                "phone": denormalize_phone_number(team_member.phone),
+                "total_outgoing_calls": total_outgoing_calls,
+                "total_incoming_calls": total_incoming_calls,
+                "unanswered_outgoing_calls": unanswered_outgoing_calls,
+                "unique_leads_engaged": unique_leads_engaged,
+                "unique_leads_called": unique_leads_engaged + unique_leads_called_but_not_engaged
             })
+
+        result = {
+            "team_members": team_members,
+            "total_outgoing_calls": all_members_total_outgoing_calls,
+            "total_incoming_calls": all_members_total_incoming_calls,
+            "total_unanswered_outgoing_calls": all_members_unanswered_outgoing_calls,
+            "total_unique_leads_engaged": all_members_unique_leads_engaged,
+            "total_unique_leads_called": all_members_unique_leads_engaged + all_members_unique_leads_called_but_not_engaged
+        }
 
         return jsonify(result), 200
     except Exception as e:
@@ -60,7 +118,7 @@ def get_user():
             "id": str(user.id),
             "username": user.username,
             "email": user.email,
-            "phone": user.phone,
+            "phone": denormalize_phone_number(user.phone),
             "role": user.role.value,
             "last_week_performance_analysis": user.last_week_performance_analysis,
             "name": user.name,

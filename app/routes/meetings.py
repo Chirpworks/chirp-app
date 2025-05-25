@@ -16,6 +16,7 @@ from app.models.job import JobStatus
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.user import UserRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
+from app.utils.call_recording_utils import denormalize_phone_number
 from app.utils.utils import human_readable_duration
 
 meetings_bp = Blueprint("meetings", __name__)
@@ -147,7 +148,8 @@ def get_meeting_history():
         local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
         result = []
         for call_record in meetings:
-            title = f"Meeting between {call_record.buyer_number} and {call_record.seller_number}"
+            seller_name = User.query.filter_by(phone=call_record.seller_number).first().name
+            title = f"Meeting between {denormalize_phone_number(call_record.buyer_number)} and {seller_name}"
             analysis_status = 'Processing'
             if isinstance(call_record, Meeting):
                 job_status = call_record.job.status
@@ -164,14 +166,14 @@ def get_meeting_history():
                 title = call_record.title
             elif isinstance(call_record, MobileAppCall):
                 if call_record.status == 'Missed':
-                    title = f'Missed Call from {call_record.buyer_number}'
+                    title = f'Missed Call from {denormalize_phone_number(call_record.buyer_number)}'
                     analysis_status = call_record.status
                 elif call_record.status == 'Not Answered':
-                    title = f'{call_record.buyer_number} did not answer'
+                    title = f'{denormalize_phone_number(call_record.buyer_number)} did not answer'
                     analysis_status = call_record.status
                 elif call_record.status == 'Processing':
-                    start_time_local = call_record.start_time.astimezone(ZoneInfo("Asia/Kolkata"))
-                    if local_now - start_time_local > timedelta(minutes=2):
+                    start_time_local = call_record.start_time
+                    if local_now - start_time_local > timedelta(seconds=30):
                         analysis_status = 'Not Recorded'
             else:
                 continue
@@ -183,13 +185,14 @@ def get_meeting_history():
                 "participants": call_record.participants if isinstance(call_record, Meeting) else None,
                 "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
                 "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
-                "buyer_number": call_record.buyer_number,
-                "seller_number": call_record.seller_number,
+                "buyer_number": denormalize_phone_number(call_record.buyer_number),
+                "seller_number": denormalize_phone_number(call_record.seller_number),
                 "analysis_status": analysis_status,
                 "duration": duration,
                 "call_notes": call_record.call_notes if isinstance(call_record, Meeting) else None,
                 "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else None,
-                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None
+                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None,
+                "direction": call_record.direction
             })
 
         return jsonify(result), 200
@@ -243,7 +246,7 @@ def get_meeting_by_id(meeting_id):
             "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
             "status": meeting.status.value,
             "summary": meeting.summary,
-            "buyer_number": meeting.buyer_number,
+            "buyer_number": denormalize_phone_number(meeting.buyer_number),
             "call_notes": meeting.call_notes,
             "deal_id": meeting.deal_id,
             "analysis_status": analysis_status,

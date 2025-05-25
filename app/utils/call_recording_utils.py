@@ -69,6 +69,12 @@ def normalize_phone_number(phone_number):
     return phone_number
 
 
+def denormalize_phone_number(phone_number):
+    if len(phone_number) >= 10:
+        phone_number = '+91 ' + phone_number[len(phone_number)-10:]
+    return phone_number
+
+
 def calculate_call_status(call_type, duration):
     if call_type == 'missed':
         return 'Missed'
