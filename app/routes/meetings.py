@@ -1,3 +1,4 @@
+import traceback
 from datetime import datetime, timedelta
 from typing import List, Union
 from zoneinfo import ZoneInfo
@@ -9,7 +10,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import and_
 
 from app import User, Meeting, db, Job
-from app.constants import MeetingSource
+from app.constants import MeetingSource, CallDirection
 from app.models import meeting
 from app.models.deal import Deal
 from app.models.job import JobStatus
@@ -143,7 +144,12 @@ def get_meeting_history():
         meetings = meetings_query.all()
         mobile_app_calls = mobile_app_calls_query.all()
         meetings.extend(mobile_app_calls)
-        meetings = sorted(meetings, key=lambda x: x.start_time, reverse=True)
+        meetings = sorted(
+            meetings,
+            key=lambda x: x.start_time.replace(
+                tzinfo=ZoneInfo("Asia/Kolkata")) if x.start_time and x.start_time.tzinfo is None else x.start_time,
+            reverse=True
+        )
 
         local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
         result = []
@@ -151,6 +157,7 @@ def get_meeting_history():
             seller_name = User.query.filter_by(phone=call_record.seller_number).first().name
             title = f"Meeting between {denormalize_phone_number(call_record.buyer_number)} and {seller_name}"
             analysis_status = 'Processing'
+            direction = None
             if isinstance(call_record, Meeting):
                 job_status = call_record.job.status
                 if job_status in [JobStatus.INIT, JobStatus.IN_PROGRESS]:
@@ -161,18 +168,29 @@ def get_meeting_history():
                     analysis_status = 'Not Recorded'
             elif isinstance(call_record, MobileAppCall):
                 analysis_status = call_record.status
-            duration = human_readable_duration(call_record.end_time, call_record.start_time)
+            call_record_start_time = call_record.start_time
+            if call_record_start_time and call_record_start_time.tzinfo is None:
+                call_record_start_time = call_record_start_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            call_record_end_time = call_record.end_time
+            if call_record_end_time and call_record_end_time.tzinfo is None:
+                call_record_end_time = call_record_end_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            duration = human_readable_duration(call_record_end_time, call_record_start_time)
             if isinstance(call_record, Meeting):
                 title = call_record.title
+                direction = call_record.direction
             elif isinstance(call_record, MobileAppCall):
                 if call_record.status == 'Missed':
                     title = f'Missed Call from {denormalize_phone_number(call_record.buyer_number)}'
                     analysis_status = call_record.status
+                    direction = CallDirection.INCOMING.value
                 elif call_record.status == 'Not Answered':
                     title = f'{denormalize_phone_number(call_record.buyer_number)} did not answer'
                     analysis_status = call_record.status
+                    direction = CallDirection.OUTGOING.value
                 elif call_record.status == 'Processing':
                     start_time_local = call_record.start_time
+                    if start_time_local.tzinfo is None:
+                        start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
                     if local_now - start_time_local > timedelta(seconds=30):
                         analysis_status = 'Not Recorded'
             else:
@@ -192,13 +210,13 @@ def get_meeting_history():
                 "call_notes": call_record.call_notes if isinstance(call_record, Meeting) else None,
                 "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else None,
                 "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None,
-                "direction": call_record.direction
+                "direction": direction
             })
 
         return jsonify(result), 200
 
     except Exception as e:
-        logging.error(f"Failed to fetch call history with error {e}")
+        logging.error("Failed to fetch call history: %s", traceback.format_exc())
         return jsonify({"error": f"Failed to fetch call history: {str(e)}"}), 500
 
 

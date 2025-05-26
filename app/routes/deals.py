@@ -82,7 +82,7 @@ def get_deals():
                 "seller_number": denormalize_phone_number(deal.seller_number),
                 "summary": deal.summary,
                 "num_pending_actions": num_pending_actions,
-                "last_contacted_on": last_contacted_on,
+                "last_contacted_on": last_contacted_on.isoformat() if last_contacted_on else None,
                 "user_name": deal.user.name,
                 "user_email": deal.user.email
             })
@@ -161,7 +161,7 @@ def get_deal_by_id(deal_id):
             "solutions": deal.solutions,
             "user_id": deal.user_id,
             "num_pending_actions": num_pending_actions,
-            "last_contacted_on": last_contacted_on.isoforamt() if last_contacted_on else None,
+            "last_contacted_on": last_contacted_on.isoformat() if last_contacted_on else None,
             "user_name": deal.user.name,
             "user_email": deal.user.email
         }

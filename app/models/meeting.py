@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import UUID
 
@@ -24,12 +25,12 @@ class Meeting(db.Model):
     buyer_number = db.Column(db.String(15), nullable=False)
     seller_number = db.Column(db.String(15), nullable=False)
     title = db.Column(db.String(300), nullable=False)
-    scheduled_at = db.Column(db.DateTime, default=datetime.utcnow)
+    scheduled_at = db.Column(db.DateTime(timezone=True), default=datetime.now(ZoneInfo("Asia/Kolkata")))
     status = db.Column(db.Enum(ProcessingStatus), default=ProcessingStatus.PROCESSING)
     source = db.Column(db.Enum(MeetingSource), nullable=False)
     participants = db.Column(db.JSON, nullable=True)
-    start_time = db.Column(db.DateTime, default=datetime.now())
-    end_time = db.Column(db.DateTime, default=datetime.utcnow)
+    start_time = db.Column(db.DateTime(timezone=True), default=datetime.now(ZoneInfo("Asia/Kolkata")))
+    end_time = db.Column(db.DateTime(timezone=True), default=datetime.now(ZoneInfo("Asia/Kolkata")))
     summary = db.Column(db.JSON, nullable=True)
     transcription = db.Column(db.Text, nullable=True)
     diarization = db.Column(db.Text, nullable=True)

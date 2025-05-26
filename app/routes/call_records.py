@@ -1,4 +1,5 @@
 import json
+import traceback
 from zoneinfo import ZoneInfo
 
 import logging
@@ -20,7 +21,7 @@ from app.models.meeting import ProcessingStatus
 from app.models.mobile_app_calls import MobileAppCall
 from app.service.aws.ecs_client import ECSClient
 from app.utils.call_recording_utils import upload_file_to_s3, download_exotel_file_from_url, get_audio_duration_seconds, \
-    normalize_phone_number, calculate_call_status
+    normalize_phone_number, calculate_call_status, denormalize_phone_number
 
 logging = logging.getLogger(__name__)
 
@@ -169,7 +170,7 @@ def post_exotel_recording():
             if not deal:
                 logging.info("Deal doesn't already exist. Creating new deal entry")
                 deal = Deal(
-                    name=f"Deal between {matching_app_call.buyer_number} and {user.name}",
+                    name=f"Deal between {denormalize_phone_number(matching_app_call.buyer_number)} and {user.name}",
                     buyer_number=matching_app_call.buyer_number,
                     seller_number=call_from,
                     user_id=user.id,
@@ -191,7 +192,7 @@ def post_exotel_recording():
                 mobile_app_call_id=matching_app_call.mobile_app_call_id,
                 buyer_number=matching_app_call.buyer_number,
                 seller_number=call_from,
-                title=f"Meeting between {matching_app_call.buyer_number} and {user.name}",
+                title=f"Meeting between {denormalize_phone_number(matching_app_call.buyer_number)} and {user.name}",
                 start_time=matching_app_call.start_time,
                 scheduled_at=matching_app_call.start_time,
                 status=ProcessingStatus.PROCESSING,
@@ -244,7 +245,7 @@ def post_exotel_recording():
         return jsonify({"message": f"Exotel call record processed successfully."}), 200
 
     except Exception as e:
-        logging.error({"error": f"Failed to process Exotel recording: {str(e)}"})
+        logging.error(f"Failed to process Exotel recording: %s", traceback.format_exc())
         db.session.rollback()  # Rollback in case of any error
         return jsonify({"error": f"Failed to process Exotel recording: {str(e)}"}), 500
 
@@ -279,7 +280,7 @@ def post_app_call_record():
             # call_type = CallDirection[call_type_str.upper()]  # e.g., 'incoming' → CallDirection.INCOMING
             start_time_str = datetime.strptime(start_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
             start_time = start_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-            start_time_str = datetime.strptime(end_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
+            end_time_str = datetime.strptime(end_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
             end_time = end_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
 
             call_status = calculate_call_status(call_type_str, duration)
@@ -342,7 +343,7 @@ def post_app_call_record():
                 if not deal:
                     logging.info("Deal doesn't already exist. Creating new deal entry")
                     deal = Deal(
-                        name=f"Deal between {buyer_number} and {user.name}",
+                        name=f"Deal between {denormalize_phone_number(buyer_number)} and {user.name}",
                         buyer_number=buyer_number,
                         seller_number=seller_number,
                         user_id=user.id
@@ -357,7 +358,7 @@ def post_app_call_record():
                     mobile_app_call_id=call_id,
                     buyer_number=buyer_number,
                     seller_number=seller_number,
-                    title=f"Meeting between {buyer_number} and {user.name}",
+                    title=f"Meeting between {denormalize_phone_number(buyer_number)} and {user.name}",
                     start_time=start_time,
                     scheduled_at=start_time,
                     status=ProcessingStatus.INITIALIZED,
@@ -416,6 +417,6 @@ def post_app_call_record():
             {"message": f"Mobile app call records processed successfully."}
         ), 200
     except Exception as e:
-        logging.error({"error": f"Failed to process app call records: {str(e)}"})
+        logging.error("Failed to process app call records %s", traceback.format_exc())
         db.session.rollback()  # Rollback in case of any error
         return jsonify({"error": f"Failed to process app call record: {str(e)}"}), 500

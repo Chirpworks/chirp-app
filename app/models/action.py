@@ -30,7 +30,7 @@ class Action(db.Model):
     __tablename__ = 'actions'
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False)
     title = db.Column(db.String(300), nullable=False)
-    due_date = db.Column(db.DateTime, default=None, nullable=True)
+    due_date = db.Column(db.DateTime(timezone=True), default=None, nullable=True)
     status = db.Column(db.Enum(ActionStatus), default=ActionStatus.PENDING, nullable=False)
     type = db.Column(ENUM(ActionType, name="actiontype", values_callable=lambda x: [e.value for e in x]), default=ActionType.CONTEXTUAL_ACTION, nullable=True)
     description = db.Column(db.JSON, nullable=True)

@@ -12,6 +12,7 @@ from app.models.action import ActionType
 
 from app.models.meeting import Meeting, ProcessingStatus
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
+from app.utils.call_recording_utils import denormalize_phone_number
 
 # Load environment variables (for local dev or ECS fallback)
 load_dotenv()
@@ -93,7 +94,7 @@ class CallAnalysis:
 
             deal_stage = self.analytical_call_analysis.get("deal_stage")
             stage = deal_stage.get("deal_stage")
-            if stage == 'Not Specified':
+            if not stage or stage == 'Not Specified':
                 if not self.deal.stage:
                     self.deal.stage = 'Discovery & Lead Qualification'
             else:
@@ -210,6 +211,10 @@ class CallAnalysis:
             self.meeting.title = call_title
 
             call_summary = self.descriptive_call_analysis.get("call_summary")
+            call_summary_string = json.dumps(call_summary)
+            for key, value in speaker_roles.items():
+                call_summary_string = call_summary_string.replace(key, value)
+            call_summary = json.loads(call_summary_string)
             self.meeting.summary = call_summary
 
             call_notes = self.descriptive_call_analysis.get("call_notes")
@@ -221,7 +226,8 @@ class CallAnalysis:
             self.meeting.call_notes = call_notes
 
             deal_title = self.descriptive_call_analysis.get("deal_title")
-            if not self.deal.name or self.deal.name == 'Not Specified':
+            default_deal_title = f"Deal between {denormalize_phone_number(self.meeting.buyer_number)} and {self.user.name}"
+            if not self.deal.name or self.deal.name == default_deal_title or self.deal.name == 'Not Specified':
                 self.deal.name = deal_title
 
             deal_summary = self.descriptive_call_analysis.get("deal_summary")
