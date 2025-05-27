@@ -44,6 +44,10 @@ class OpenAIClient:
 
         # Step 3: Unescape quotes (\" → ")
         raw_response_string = raw_response_string.replace('\\"', '"')
+
+        # Step 4: Remove double '"' symbols
+        raw_response_string = raw_response_string.replace('""', '"')
+
         logger.info(f"raw response string: {raw_response_string}")
         # Step 4: Parse JSON
         try:

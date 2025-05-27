@@ -60,7 +60,7 @@ class CallAnalysis:
             deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            prompt_path = os.path.join(base_dir, "analytical_prompt_v1.txt")
+            prompt_path = os.path.join(base_dir, "analytical_prompt_v1.1.txt")
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
@@ -170,7 +170,7 @@ class CallAnalysis:
             deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            prompt_path = os.path.join(base_dir, "descriptive_prompt_v1.txt")
+            prompt_path = os.path.join(base_dir, "descriptive_prompt_v1.1.txt")
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
