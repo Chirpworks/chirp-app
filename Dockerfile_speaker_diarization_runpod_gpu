@@ -5,7 +5,7 @@ FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
-# 🧰 Install system dependencies
+# 🧰 Install system dependencies (including Aeneas prerequisites)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
@@ -13,7 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     libglib2.0-0 \
     python3.10 \
+    python3.10-dev \
     python3-pip \
+    default-jdk \
+    libxml2-dev \
     build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -24,13 +27,18 @@ RUN ln -sf /usr/bin/python3.10 /usr/bin/python && ln -sf /usr/bin/pip3 /usr/bin/
 RUN pip install --upgrade pip setuptools wheel
 
 # ⚙️ Install GPU-compatible PyTorch (with CUDA 11.8)
-RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 --extra-index-url https://download.pytorch.org/whl/cu118
+RUN pip install \
+    torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 \
+    --extra-index-url https://download.pytorch.org/whl/cu118
 
 # 🧠 Install WhisperX
 RUN pip install git+https://github.com/m-bain/whisperx.git
 
 # 🎙️ Install compatible version of PyAnnote (used for diarization)
 RUN pip install pyannote.audio==3.0.1
+
+# 🎓 Install Aeneas for forced alignment
+RUN pip install aeneas
 
 # 📦 Set workdir and copy application code
 WORKDIR /app
@@ -39,7 +47,7 @@ COPY app/ ./app/
 # 📦 Set Python path for internal imports
 ENV PYTHONPATH=/app
 
-# 📜 Install additional requirements
+# 📜 Install additional Python requirements
 COPY requirements_speaker_diarization.txt .
 RUN pip install -r requirements_speaker_diarization.txt
 
