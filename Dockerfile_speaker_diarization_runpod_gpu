@@ -17,11 +17,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     default-jdk \
     libxml2-dev \
-    libespeak-dev \
-    espeak \
-    pkg-config \
+    gfortran \                 # required by numpy.distutils
+    cmake \                    # sometimes needed by aeneas build
+    espeak-ng \                # espeak runtime
+    libespeak-ng-dev \         # the correct dev headers for -lespeak
+    pkg-config \               # helps discover libraries
     build-essential \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 🔗 Make python3.10 default
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python && ln -sf /usr/bin/pip3 /usr/bin/pip

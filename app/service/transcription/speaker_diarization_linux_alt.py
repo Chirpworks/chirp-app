@@ -199,6 +199,9 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
     segments_aligned, word_segments_aligned = whisperx.align(transcription["segments"], align_model, metadata, wav_path,
                                                              device=device)
 
+    if isinstance(word_segments_aligned, str):
+        word_segments_aligned = json.loads(word_segments_aligned)
+
     transcription_aligned = {
         "segments": segments_aligned,
         "word_segments": word_segments_aligned
