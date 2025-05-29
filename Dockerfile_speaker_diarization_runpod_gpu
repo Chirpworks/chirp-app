@@ -23,6 +23,15 @@ RUN python -m pip install --upgrade pip
 # Install GPU-compatible PyTorch and related packages
 RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 --extra-index-url https://download.pytorch.org/whl/cu118
 
+# Set working directory
+WORKDIR /app
+
+# Set Python path so app/ is importable
+ENV PYTHONPATH=/app
+
+# Copy application code
+COPY app/ ./app/
+
 # Install WhisperX from GitHub
 RUN pip install git+https://github.com/m-bain/whisperx.git
 
@@ -36,15 +45,6 @@ RUN pip install -r requirements_speaker_diarization.txt
 # Optional: install other Python packages you use
 COPY requirements.txt .
 RUN pip install -r requirements.txt
-
-# Set working directory
-WORKDIR /app
-
-# Set Python path so app/ is importable
-ENV PYTHONPATH=/app
-
-# Copy application code
-COPY app/ ./app/
 
 # Set default entrypoint for RunPod serverless execution
 ENTRYPOINT ["python", "app/serverless_handler.py"]
