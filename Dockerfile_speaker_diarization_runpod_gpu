@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     default-jdk \
     libxml2-dev \
+    libespeak-dev \
+    espeak \
+    pkg-config \
     build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
