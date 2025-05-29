@@ -9,3 +9,7 @@ soundfile
 nltk
 whisperx
 pyannote.audio
+torch
+torchvision
+librosa
+ffmpeg-python
