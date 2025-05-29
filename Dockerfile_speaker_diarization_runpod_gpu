@@ -1,50 +1,53 @@
-# Use GPU-compatible base image with cuDNN
-FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+# ✅ Use CUDA image with cuDNN runtime
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
 
-# Avoid interactive prompts during build
+# Prevent prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# 🧰 Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ffmpeg \
     libsndfile1 \
+    libgl1 \
+    libglib2.0-0 \
     python3.10 \
     python3-pip \
     build-essential \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Make python3.10 the default
-RUN ln -sf /usr/bin/python3.10 /usr/bin/python
+# 🔗 Make python3.10 default
+RUN ln -sf /usr/bin/python3.10 /usr/bin/python && ln -sf /usr/bin/pip3 /usr/bin/pip
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip
+# ⬆️ Upgrade pip and install base dependencies
+RUN pip install --upgrade pip setuptools wheel
 
-# Install GPU-compatible PyTorch and related packages
+# ⚙️ Install GPU-compatible PyTorch (with CUDA 11.8)
 RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 --extra-index-url https://download.pytorch.org/whl/cu118
 
-# Set working directory
-WORKDIR /app
-
-# Set Python path so app/ is importable
-ENV PYTHONPATH=/app
-
-# Copy application code
-COPY app/ ./app/
-
-# Install WhisperX from GitHub
+# 🧠 Install WhisperX
 RUN pip install git+https://github.com/m-bain/whisperx.git
 
-# Install compatible version of PyAnnote
+# 🎙️ Install compatible version of PyAnnote (used for diarization)
 RUN pip install pyannote.audio==3.0.1
 
-# Optional: install other Python packages you use
+# 📦 Set workdir and copy application code
+WORKDIR /app
+COPY app/ ./app/
+
+# 📦 Set Python path for internal imports
+ENV PYTHONPATH=/app
+
+# 📜 Install additional requirements
 COPY requirements_speaker_diarization.txt .
 RUN pip install -r requirements_speaker_diarization.txt
 
-# Optional: install other Python packages you use
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Set default entrypoint for RunPod serverless execution
+# ✅ Add Hugging Face token via environment variable at runtime if needed
+# ENV HF_TOKEN=your_huggingface_token_here
+
+# 🚀 Set default entrypoint (for RunPod or serverless runner)
 ENTRYPOINT ["python", "app/serverless_handler.py"]
