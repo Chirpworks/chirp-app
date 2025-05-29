@@ -19,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     gfortran \
     cmake \
-    espeak-ng \
-    libespeak-ng-dev \
+    espeak \
+    libespeak-dev \
     pkg-config \
     build-essential \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
