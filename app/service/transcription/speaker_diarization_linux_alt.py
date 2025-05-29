@@ -193,7 +193,13 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
 
     # Load alignment model
     align_model, metadata = whisperx.load_align_model(language_code=transcription["language"], device=device)
-    transcription_aligned = whisperx.align(transcription["segments"], align_model, metadata, wav_path, device=device)
+    segments_aligned, word_segments_aligned = whisperx.align(transcription["segments"], align_model, metadata, wav_path,
+                                                             device=device)
+
+    transcription_aligned = {
+        "segments": segments_aligned,
+        "word_segments": word_segments_aligned
+    }
 
     return transcription_aligned, transcription["language"]
 
