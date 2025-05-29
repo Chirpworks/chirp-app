@@ -37,9 +37,14 @@ RUN pip install -r requirements_speaker_diarization.txt
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Copy the full app source code
+# Set working directory
 WORKDIR /app
-COPY . .
+
+# Set Python path so app/ is importable
+ENV PYTHONPATH=/app
+
+# Copy application code
+COPY app/ ./app/
 
 # Set default entrypoint for RunPod serverless execution
 ENTRYPOINT ["python", "app/serverless_handler.py"]
