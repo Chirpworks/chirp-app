@@ -147,9 +147,12 @@ def process_audio(job_id, bucket, key):
         local_audio_path = convert_mp3_to_wav(mp3_path)
         logger.info(f"Audio file downloaded to {local_audio_path}")
 
-        transcription, language = transcribe_with_whisperx(local_audio_path)
+        transcription_aligned, language = transcribe_with_whisperx(local_audio_path)
+        logger.info(f"Type of transcription_aligned: {type(transcription_aligned)}")
+        logger.info(f"Type of transcription_aligned['word_segments']: {type(transcription_aligned['word_segments'])}")
+        logger.info(f"First item: {transcription_aligned['word_segments'][0]}")
         speaker_words = diarize_and_assign_speakers(
-            transcription, local_audio_path, device=device, hf_token="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"
+            transcription_aligned, local_audio_path, device=device, hf_token="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"
         )
         diarization = group_words_into_segments(speaker_words)
         for segment in diarization:
@@ -168,7 +171,7 @@ def process_audio(job_id, bucket, key):
         if job:
             meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
         if meeting:
-            meeting.transcription = json.dumps(transcription)
+            meeting.transcription = json.dumps(transcription_aligned)
             meeting.diarization = json.dumps(diarization)
             session.commit()
         else:
@@ -200,7 +203,6 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
         "segments": segments_aligned,
         "word_segments": word_segments_aligned
     }
-
     return transcription_aligned, transcription["language"]
 
 
