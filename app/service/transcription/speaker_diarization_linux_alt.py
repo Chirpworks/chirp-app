@@ -156,7 +156,12 @@ def process_audio(job_id, bucket, key):
             transcription_aligned, local_audio_path, device=device, hf_token="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"
         )
         logger.info(f"speaker_words: {speaker_words}")
-        diarization = group_words_into_segments(speaker_words)
+        # flatten the nested word lists into one list of word-dicts
+        flat_words = []
+        for seg in speaker_words.get("segments", []):
+            flat_words.extend(seg.get("words", []))
+        diarization = group_words_into_segments(flat_words)
+
         for segment in diarization:
             segment["language"] = language
 
