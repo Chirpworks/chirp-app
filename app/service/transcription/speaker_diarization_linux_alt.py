@@ -200,7 +200,15 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
                                                              device=device)
 
     if isinstance(word_segments_aligned, str):
-        word_segments_aligned = json.loads(word_segments_aligned)
+        word_segments_aligned = word_segments_aligned.strip()
+        if word_segments_aligned:
+            try:
+                word_segments_aligned = json.loads(word_segments_aligned)
+            except json.JSONDecodeError:
+            # fallback to empty list if parsing fails
+                word_segments_aligned = []
+        else:
+            word_segments_aligned = []
 
     transcription_aligned = {
         "segments": segments_aligned,
