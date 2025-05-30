@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import tempfile
+import traceback
 from urllib.parse import urlparse
 
 import torch
@@ -160,10 +161,11 @@ def process_audio(job_id, bucket, key):
             segment["language"] = language
 
     except Exception as e:
-        logger.error(f"Error processing job {job_id}: {e}")
+        # Log the root cause and mark the job failed,
+        # but let the caller decide whether to retry / notify.
+        logger.exception(f"[process_audio] job={job_id} failed: {e} trace: {traceback.format_exc()}")
         update_job_status(job_id, JobStatus.FAILURE)
-        logger.error(f"Error while transcribing audio file for job_id: {job_id}. Error: {e}")
-        raise e
+        return  # swallow the exception here
 
     # Update the meetings table with the transcript and timestamp
     try:
@@ -269,12 +271,13 @@ def run_diarization(job_id):
         logger.exception(f"Error in parsing S3 audio URL: {s3_url} for job {job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)
         exit(1)
+
+    # 1) Process the audio.  If it fails, we already marked the job FAILURE above,
+    # so we just return and *do not* notify Flask to start the next step.
     try:
-        logger.info(f"Processing job {job_id} for audio file {s3_url}")
         process_audio(job_id, bucket, key)
-    except Exception as e:
-        logger.error(f"Error in processing diarization for job {job_id}.")
-        update_job_status(job_id, JobStatus.FAILURE)
+    except Exception:
+        logger.exception(f"Failed to notify flask server to start analysis for job_ID: {job_id}")
 
     try:
         notify_flask_server(job_id)
