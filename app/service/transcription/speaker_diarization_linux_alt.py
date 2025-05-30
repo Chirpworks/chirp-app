@@ -148,9 +148,14 @@ def process_audio(job_id, bucket, key):
         logger.info(f"Audio file downloaded to {local_audio_path}")
 
         transcription_aligned, language = transcribe_with_whisperx(local_audio_path)
-        logger.info(f"Type of transcription_aligned: {type(transcription_aligned)}")
-        logger.info(f"Type of transcription_aligned['word_segments']: {type(transcription_aligned['word_segments'])}")
-        logger.info(f"First item: {transcription_aligned['word_segments'][0]}")
+        logger.info(f"trasnscription: {transcription_aligned}")
+        logger.info(f"language: {language}")
+        word_segs = transcription_aligned.get("word_segments", [])
+        logger.info(f"WhisperX returned {len(word_segs)} word_segments")
+        if word_segs:
+            logger.info(f"First word segment: {word_segs[0]}")
+        else:
+            logger.warning("No word_segments to log; skipping first-item debug")
         speaker_words = diarize_and_assign_speakers(
             transcription_aligned, local_audio_path, device=device, hf_token="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"
         )
@@ -193,12 +198,14 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
 
     # Transcribe
     transcription = model.transcribe(wav_path)
+    logger.info(f"transcription is {transcription}")
 
     # Load alignment model
     align_model, metadata = whisperx.load_align_model(language_code=transcription["language"], device=device)
     segments_aligned, word_segments_aligned = whisperx.align(transcription["segments"], align_model, metadata, wav_path,
                                                              device=device)
-
+    logger.info(f"Whisperx aligned segments: {segments_aligned}")
+    logger.info(f"word_segments_aligned is {word_segments_aligned}")
     if isinstance(word_segments_aligned, str):
         word_segments_aligned = word_segments_aligned.strip()
         if word_segments_aligned:
@@ -222,7 +229,13 @@ def diarize_and_assign_speakers(result_aligned, wav_path, device="cuda", hf_toke
     diarize_segments = diarize_model(wav_path)
 
     # Assign speakers to each word
-    speaker_aligned = whisperx.assign_word_speakers(diarize_segments, result_aligned["word_segments"])
+    word_segs = result_aligned.get("word_segments", [])
+
+    if not word_segs:
+        logger.warning("No word_segments: skipping speaker assignment")
+        speaker_aligned = []
+    else:
+        speaker_aligned = whisperx.assign_word_speakers(diarize_segments, word_segs)
     return speaker_aligned
 
 
