@@ -32,6 +32,7 @@ RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
 # ⬆️ Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 
+
 # ⚙️ Install GPU-compatible PyTorch (CUDA 11.8)
 RUN pip install \
     torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 \
