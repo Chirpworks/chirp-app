@@ -2,12 +2,10 @@
 
 from faster_whisper import WhisperModel
 
-# Instantiating WhisperModel(...) during build will:
-#   1) download the HF weights under /model_cache/hub/models--vasista22--whisper-hindi-large-v2/…
-#   2) convert them with CTranslate2, writing model.bin into that same snapshot folder.
-# We choose device='cuda' and compute_type='float32' so that the GPU-compatible CTranslate2 conversion runs.
+# Even though we ultimately want to run on GPU at runtime, the Docker build itself
+# has no GPU-visible driver. So we convert the HF weights on CPU here.
 WhisperModel(
     "vasista22/whisper-hindi-large-v2",
-    device="cuda",
-    compute_type="float32"
+    device="cpu",           # ← use CPU for conversion at build time
+    compute_type="float32"  # or "int8" if you want an 8-bit conversion
 )
