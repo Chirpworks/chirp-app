@@ -21,7 +21,7 @@ from app.models.job import JobStatus
 
 os.environ["HF_HOME"] = "/root/.cache/huggingface"
 
-WHISPER_MODEL = "large-v1"
+WHISPER_MODEL = "vasista22/whisper-hindi-large-v2"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -200,7 +200,9 @@ def transcribe_with_whisperx(wav_path, device="cuda"):
     model = whisperx.load_model(WHISPER_MODEL, device, compute_type="float16" if device == "cuda" else "float32")
 
     # Transcribe
-    transcription = model.transcribe(wav_path)
+    transcription = model.transcribe(
+        wav_path, temperature=0.0, best_of=1, beam_size=5, initial_prompt="This is a sales call."
+    )
     logger.info(f"transcription is {transcription}")
 
     # Load alignment model

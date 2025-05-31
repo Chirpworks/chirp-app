@@ -13,3 +13,4 @@ torch
 torchvision
 librosa
 ffmpeg-python
+openai-whisper
