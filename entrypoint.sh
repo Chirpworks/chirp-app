@@ -1,31 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-#
-# Step A: “Pre‐download+pre‐convert” the vasista22/whisper‐hindi‐large‐v2 model
-#         *only if* it is not already on disk.  We FORCE CTranslate2→GPU here.
-#
+# Ensure HF_HOME is defined exactly as in your Dockerfile:
+export HF_HOME=/model_cache
+export TRANSFORMERS_CACHE=$HF_HOME
 
-# If CTranslate2 has not yet generated a `model.bin` for this snapshot, do it now.
-# Faster‐Whisper will:
-#   1) download the HF PyTorch weights into $HF_HOME/hub/models--vasista22--whisper-hindi-large-v2/…
-#   2) run CTranslate2’s GPU converter and write `model.bin` into that same snapshot folder.
+#
+# 1) “If there is no model.bin yet, do a one‐time GPU conversion now.”
+#
 if ! ls "$HF_HOME/hub/models--vasista22--whisper-hindi-large-v2"/snapshots/*/model.bin >/dev/null 2>&1; then
+    echo ">>> No model.bin found; downloading + converting on GPU..."
     python3 - << 'EOF'
+import os
 from faster_whisper import WhisperModel
 
-# Instantiating WhisperModel(...) at runtime will:
-#   • download the HF weights into $HF_HOME/hub/models--vasista22--whisper-hindi-large-v2/…
-#   • convert them to CTranslate2 format on GPU (writing model.bin)
+# Set HF_HOME again inside Python (just in case):
+os.environ["HF_HOME"] = "/model_cache"
+
+# This call will:
+#   1) download the PyTorch weights to HF_HOME/hub/models--vasista22--whisper-hindi-large-v2/…
+#   2) run CTranslate2’s GPU converter → writing model.bin
 WhisperModel(
     "vasista22/whisper-hindi-large-v2",
     device="cuda",
     compute_type="float32"
 )
 EOF
+    echo ">>> Conversion complete. model.bin is in place."
+else
+    echo ">>> model.bin already exists. Skipping conversion."
 fi
 
 #
-# Step B: Once “model.bin” exists, we can start our serverless handler normally.
+# 2) Now that model.bin is guaranteed to exist, start your app:
 #
 exec python3 app/serverless_handler.py
