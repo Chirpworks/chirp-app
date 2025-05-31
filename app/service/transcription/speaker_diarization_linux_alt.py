@@ -51,22 +51,22 @@ model_cache_path = os.path.join(cache_dir, WHISPER_MODEL)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 logger.info(f"Using device: {device}")
 
-# Check if the model appears to be cached.
-if not os.path.exists(model_cache_path):
-    logger.info("Model not found in cache; downloading and caching the model...")
-    model = whisperx.load_model(WHISPER_MODEL, device=device, compute_type="float32")
-    # If the loaded model supports explicit saving, do so:
-    try:
-        model.save_pretrained(model_cache_path)
-        logger.info(f"Model saved to cache at {model_cache_path}")
-    except AttributeError:
-        # If there's no save_pretrained method, rely on the default Transformers caching.
-        logger.info("Model does not support explicit saving; relying on default caching.")
-else:
-    logger.info("Loading model from cache...")
-    model = whisperx.load_model(WHISPER_MODEL, device=device, compute_type="float32")
-
-logger.info(f"WhisperX {WHISPER_MODEL} model is loaded and ready.")
+# # Check if the model appears to be cached.
+# if not os.path.exists(model_cache_path):
+#     logger.info("Model not found in cache; downloading and caching the model...")
+#     model = whisper.load_model(WHISPER_MODEL, device=device)
+#     # If the loaded model supports explicit saving, do so:
+#     try:
+#         model.save_pretrained(model_cache_path)
+#         logger.info(f"Model saved to cache at {model_cache_path}")
+#     except AttributeError:
+#         # If there's no save_pretrained method, rely on the default Transformers caching.
+#         logger.info("Model does not support explicit saving; relying on default caching.")
+# else:
+#     logger.info("Loading model from cache...")
+#     model = whisperx.load_model(WHISPER_MODEL, device=device, compute_type="float32")
+#
+# logger.info(f"WhisperX {WHISPER_MODEL} model is loaded and ready.")
 
 
 def convert_mp3_to_wav(mp3_path):
