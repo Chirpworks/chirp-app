@@ -72,7 +72,7 @@ RUN pip install -r requirements.txt
 RUN rm -rf /model_cache/hub/models--vasista22--whisper-hindi-large-v2
 
 # 12) Copy our “predownload_whisper.py” into the image
-COPY predownload_whisper.py /tmp/predownload_whisper.py
+COPY predownload_whisper_hindi.py /tmp/predownload_whisper_hindi.py
 
 # 13) Run it (this will download the HF weights and produce model.bin under /model_cache)
 RUN python3 /tmp/predownload_whisper_hindi.py \
