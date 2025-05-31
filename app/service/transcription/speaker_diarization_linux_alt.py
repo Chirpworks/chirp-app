@@ -198,7 +198,7 @@ def process_audio(job_id, bucket, key):
 
 def transcribe_with_whisperx(wav_path, device="cuda"):
     # Load WhisperX model
-    model = whisper.load_model(WHISPER_MODEL, device, compute_type="float32" if device == "cuda" else "float32")
+    model = whisper.load_model(WHISPER_MODEL, device)
 
     # Transcribe
     transcription = model.transcribe(
