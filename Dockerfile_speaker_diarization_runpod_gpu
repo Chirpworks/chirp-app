@@ -71,21 +71,21 @@ RUN pip install -r requirements.txt
 # 11) Remove any half-baked snapshots of the Hindi model (if they exist)
 RUN rm -rf /model_cache/hub/models--vasista22--whisper-hindi-large-v2
 
-# 12) Pre‐download and pre‐convert 'vasista22/whisper-hindi-large-v2' via Faster‐Whisper/CTranslate2.
-#     By wrapping EVERYTHING in one double‐quoted bash -c, Docker will not split on the newline before 'from'.
-RUN bash -c "python3 - << 'EOF'
+# 12) Pre-download + pre-convert 'vasista22/whisper-hindi-large-v2' via Faster-Whisper/CTranslate2.
+#     By invoking python3 directly with a here-doc, Docker treats everything until EOF as shell input.
+RUN python3 - << 'EOF'
 from faster_whisper import WhisperModel
 
 # Instantiating WhisperModel(...) during build will:
-#   1) Download the HF weights under /model_cache/hub/models--vasista22--whisper-hindi-large-v2/…
-#   2) Convert them with CTranslate2, writing model.bin into that same snapshot folder.
-# We choose device='cuda' and compute_type='float32' so that the GPU‐compatible CTranslate2 conversion runs.
-_ = WhisperModel(
+#   1) download the HF weights under /model_cache/hub/models--vasista22--whisper-hindi-large-v2/…
+#   2) convert them with CTranslate2, writing model.bin into that same snapshot folder.
+# We choose device='cuda' and compute_type='float32' so the GPU-compatible CTranslate2 conversion runs.
+WhisperModel(
     'vasista22/whisper-hindi-large-v2',
     device='cuda',
     compute_type='float32'
 )
-EOF"
+EOF
 
 # 🚀 Default entrypoint for serverless runner
 ENTRYPOINT ["python", "app/serverless_handler.py"]
