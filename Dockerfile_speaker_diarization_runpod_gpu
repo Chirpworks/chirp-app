@@ -32,7 +32,6 @@ RUN ln -sf /usr/bin/python3.10 /usr/bin/python && \
 # ⬆️ Upgrade pip and setuptools
 RUN pip install --upgrade pip setuptools wheel
 
-
 # ⚙️ Install GPU-compatible PyTorch (CUDA 11.8)
 RUN pip install \
     torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchaudio==2.1.0 \
@@ -46,13 +45,6 @@ RUN pip install pyannote.audio==3.0.1
 
 # 🎓 Install Aeneas for forced alignment
 RUN pip install aeneas
-
-RUN pip install "ctranslate2[cuda11.8]"
-
-# ── Now that all Python packages are in place, set up our cache dirs in a known location ──
-# We want both Hugging Face and Transformers to cache under /model_cache
-ENV TRANSFORMERS_CACHE=/model_cache
-ENV HF_HOME=/model_cache
 
 # 📦 Copy your application code
 WORKDIR /app
@@ -68,16 +60,5 @@ RUN pip install -r requirements_speaker_diarization.txt
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# 11) Remove any half-baked snapshots of the Hindi model (if they exist)
-RUN rm -rf /model_cache/hub/models--vasista22--whisper-hindi-large-v2
-
-################################################################################
-# ─── 10) COPY & MAKE ENTRYPOINT EXECUTABLE ─────────────────────────────────────
-################################################################################
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
-################################################################################
-# ─── 11) FINALLY, SET OUR ENTRYPOINT ───────────────────────────────────────────
-################################################################################
-ENTRYPOINT ["/app/entrypoint.sh"]
+# 🚀 Default entrypoint for serverless runner
+ENTRYPOINT ["python", "app/serverless_handler.py"]
