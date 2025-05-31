@@ -47,6 +47,8 @@ RUN pip install pyannote.audio==3.0.1
 # 🎓 Install Aeneas for forced alignment
 RUN pip install aeneas
 
+RUN pip install "ctranslate2[cuda11.8]"
+
 # 📦 Copy your application code
 WORKDIR /app
 COPY app/ ./app/
@@ -60,6 +62,8 @@ RUN pip install -r requirements_speaker_diarization.txt
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+RUN rm -rf /root/.cache/huggingface/hub/models--vasista22--whisper-hindi-large-v2
 
 # 🚀 Default entrypoint for serverless runner
 ENTRYPOINT ["python", "app/serverless_handler.py"]
