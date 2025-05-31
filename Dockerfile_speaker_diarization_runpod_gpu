@@ -49,6 +49,11 @@ RUN pip install aeneas
 
 RUN pip install "ctranslate2[cuda11.8]"
 
+# ── Now that all Python packages are in place, set up our cache dirs in a known location ──
+# We want both Hugging Face and Transformers to cache under /model_cache
+ENV TRANSFORMERS_CACHE=/model_cache
+ENV HF_HOME=/model_cache
+
 # 📦 Copy your application code
 WORKDIR /app
 COPY app/ ./app/
@@ -63,7 +68,23 @@ RUN pip install -r requirements_speaker_diarization.txt
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-RUN rm -rf /root/.cache/huggingface/hub/models--vasista22--whisper-hindi-large-v2
+# 11) Remove any half-baked snapshots of the Hindi model (if they exist)
+RUN rm -rf /model_cache/hub/models--vasista22--whisper-hindi-large-v2
+
+# 12) Pre-download + pre-convert the vasista22/whisper-hindi-large-v2 model.
+#     We must call bash -c so Docker’s JSON parser sees a single string.
+RUN bash -c "python3 - << 'EOF'
+from faster_whisper import WhisperModel
+# Instantiating WhisperModel(...) during build will:
+#  1) download the HF weights into /model_cache/hub/models--vasista22--whisper-hindi-large-v2/...
+#  2) convert them via CTranslate2, writing *model.bin* in that same snapshot folder.
+# We choose device=\"cuda\" + compute_type=\"float32\" so the conversion is GPU-compatible.
+_ = WhisperModel(
+    'vasista22/whisper-hindi-large-v2',
+    device='cuda',
+    compute_type='float32'
+)
+EOF"
 
 # 🚀 Default entrypoint for serverless runner
 ENTRYPOINT ["python", "app/serverless_handler.py"]
