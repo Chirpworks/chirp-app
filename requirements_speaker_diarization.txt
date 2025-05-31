@@ -14,4 +14,4 @@ torchvision
 librosa
 ffmpeg-python
 openai-whisper
-ctranslate2-gpu
+ctranslate2[cuda11x]
