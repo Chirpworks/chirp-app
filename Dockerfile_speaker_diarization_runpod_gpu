@@ -71,12 +71,29 @@ RUN pip install -r requirements.txt
 # 11) Remove any half-baked snapshots of the Hindi model (if they exist)
 RUN rm -rf /model_cache/hub/models--vasista22--whisper-hindi-large-v2
 
-# 12) Copy our “predownload_whisper.py” into the image
-COPY predownload_whisper_hindi.py /tmp/predownload_whisper_hindi.py
-
-# 13) Run it (this will download the HF weights and produce model.bin under /model_cache)
-RUN python3 /tmp/predownload_whisper_hindi.py \
-    && rm /tmp/predownload_whisper_hindi.py
-
-# 🚀 Default entrypoint for serverless runner
-ENTRYPOINT ["python", "app/serverless_handler.py"]
+# At runtime, this ENTRYPOINT will:
+#   1) Instantiate WhisperModel('vasista22/whisper-hindi-large-v2', device='cuda', compute_type='float32')
+#      → that will (a) download the HF weights, (b) convert them to CTranslate2 format on GPU,
+#        writing model.bin under /model_cache/hub/models--vasista22--whisper-hindi-large-v2/…/
+#   2) Once conversion is finished, it immediately runs your serverless_handler.
+#
+# In plain terms:
+#   • Docker build (no GPU) → just builds all the Python packages
+#   • Docker run (with GPU)  → the first few seconds run a tiny Python snippet that does
+#                             faster-whisper’s GPU conversion. After that, your serverless
+#                             code starts normally.
+#
+# We use bash -lc so that the entire multi-line Python “<< 'EOF' … EOF” is seen as a single shell string.
+ENTRYPOINT ["bash", "-lc", "\
+python3 - << 'EOF'\n\
+from faster_whisper import WhisperModel\n\
+# Convert whisper-hindi-large-v2 into CTranslate2 format on GPU:\n\
+WhisperModel(\n\
+    'vasista22/whisper-hindi-large-v2',\n\
+    device='cuda',\n\
+    compute_type='float32'\n\
+)\n\
+EOF\n\
+&& \\\n\
+python3 app/serverless_handler.py \
+"]
