@@ -122,7 +122,7 @@ def get_audio_url(job_id):
 
 
 def split_audio(
-    wav_path: str, chunk_duration: int = 60
+    wav_path: str, chunk_duration: int = 30
 ) -> list[tuple[str, float]]:
     """
     Splits `wav_path` into multiple WAV chunks of length `chunk_duration` seconds,
@@ -278,6 +278,40 @@ def transcribe_and_diarize(audio_path: str):
     return aligned_with_speakers, diarize_df
 
 
+def group_words_by_speaker(aligned_result: dict) -> list[dict]:
+    merged = []
+    for segment in aligned_result.get("segments", []):
+        words = segment.get("words", [])
+        for w in words:
+            speaker = w.get("speaker", None)
+            if speaker is None:
+                continue
+            word_text = w.get("word", "").strip()
+            word_start = w.get("start", 0.0)
+            word_end = w.get("end", 0.0)
+
+            if not merged:
+                merged.append({
+                    "speaker": speaker,
+                    "start": word_start,
+                    "end": word_end,
+                    "text": word_text
+                })
+            else:
+                last_block = merged[-1]
+                if speaker == last_block["speaker"]:
+                    last_block["end"] = word_end
+                    last_block["text"] += " " + word_text
+                else:
+                    merged.append({
+                        "speaker": speaker,
+                        "start": word_start,
+                        "end": word_end,
+                        "text": word_text
+                    })
+    return merged
+
+
 def process_audio(job_id: str, bucket: str, key: str):
     """
     Main processing flow for a given job_id:
@@ -311,10 +345,14 @@ def process_audio(job_id: str, bucket: str, key: str):
             meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
         if meeting:
             # Store the full aligned transcript (with speaker tags) as JSON
-            meeting.transcript = json.dumps(aligned_with_speakers)
+            # (A) Store the full, word-level aligned output if needed:
+            meeting.transcript = json.dumps(aligned_with_speakers, ensure_ascii=False)
 
-            # Store the diarization DataFrame separately (as JSON records)
-            meeting.diarization = diarize_df.to_json(orient="records")
+            # (B) Build merged “speaker blocks” for diarization:
+            blocks = group_words_by_speaker(aligned_with_speakers)
+
+            # (C) Save those blocks as your diarization JSON:
+            meeting.diarization = json.dumps(blocks, ensure_ascii=False)
 
             session.commit()
             logger.info(f"Updated Meeting {meeting.id} with transcript & diarization.")
