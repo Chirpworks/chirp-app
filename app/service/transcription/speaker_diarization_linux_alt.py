@@ -194,7 +194,10 @@ def process_audio(job_id: str, bucket: str, key: str):
         aligned_with_speakers, diarize_df = transcribe_and_diarize(local_wav)
 
         # 4. Update Meeting record in DB
-        meeting = session.query(Meeting).filter(Meeting.job_id == job_id).first()
+        job = session.query(Job).filter_by(id=job_id).first()
+        meeting = None
+        if job:
+            meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
         if meeting:
             # Store the full aligned transcript (with speaker tags) as JSON
             meeting.transcript = json.dumps(aligned_with_speakers)
