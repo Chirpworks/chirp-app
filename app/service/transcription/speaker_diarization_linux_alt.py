@@ -192,6 +192,7 @@ def transcribe_in_chunks(
             logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
             # WhisperX auto‐detects language if not given
             transcription = whisperx_model.transcribe(chunk_path)
+            logger.info(transcription)
             lang = transcription.get("language", "en")
             if first_lang is None:
                 first_lang = lang
@@ -228,7 +229,7 @@ def transcribe_in_chunks(
         all_segments.sort(key=lambda s: s["start"])
 
         combined_result = {
-            "language": first_lang or "en",
+            "language": "en",
             "segments": all_segments,
         }
         return combined_result
@@ -252,6 +253,7 @@ def transcribe_and_diarize(audio_path: str):
     """
     # ─── (1) Chunked transcription ──────────────────────────
     combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=60)
+    logger.info(f"combined_aligned: {combined_aligned}")
 
     # ─── (2) Pure diarization on full audio ──────────────────
     logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
