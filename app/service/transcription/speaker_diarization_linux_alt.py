@@ -19,6 +19,7 @@ from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
 from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
+from transformers import pipeline
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
@@ -39,6 +40,17 @@ logger.addHandler(handler)
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
 whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
+
+try:
+    translator = pipeline(
+        "translation_hi_to_en",
+        model="Helsinki-NLP/opus-mt-hi-en",
+        device=0 if torch.cuda.is_available() else -1
+    )
+    logger.info("Loaded Hindi→English translation model (Helsinki‐NLP/opus‐mt‐hi‐en).")
+except Exception as e:
+    logger.exception("Could not load translation pipeline:", e)
+    translator = None
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -360,11 +372,21 @@ def process_audio(job_id: str, bucket: str, key: str):
             # (B) Build merged “speaker blocks” for diarization:
             blocks = group_words_by_speaker(aligned_with_speakers)
 
-            for block in blocks:
-                # block["text"] is a string like "विपक्ष ने कहा कि पदारंब्…"
-                dev_text = block["text"]
-                # Convert entire span into IAST (or SLP1) Latin:
-                block["text"] = transliterate(dev_text, DEVANAGARI, IAST)
+            if translator is not None:
+                for blk in blocks:
+                    hindi_segment = blk["text"]
+                    try:
+                        # The translator returns a list of dicts, e.g. [{"translation_text": "..."}]
+                        translation = translator(hindi_segment, max_length=512)
+                        blk["text"] = translation[0]["translation_text"]
+                    except Exception as e:
+                        # If something goes wrong (e.g. segment too long), fall back to an empty string
+                        logger.exception(f"Translation failed for segment: {hindi_segment!r}", e)
+                        blk["text_en"] = hindi_segment
+            else:
+                logger.warning("translator is None, skipping translation step.")
+                for blk in blocks:
+                    blk["text_en"] = ""
 
             # (C) Save those blocks as your diarization JSON:
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
