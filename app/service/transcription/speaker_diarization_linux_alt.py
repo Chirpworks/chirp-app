@@ -28,7 +28,7 @@ from app.models.job import JobStatus
 # ──────────────────────────────────────────────────────────────────────────────
 
 # (1) HuggingFace token (if your model is private or for “lazy” downloads at runtime)
-HF_TOKEN = os.getenv("HF_TOKEN", None)                      # ← NEW: for loading "vasista22/whisper-hindi-large-v2"
+HF_TOKEN = os.getenv("HF_TOKEN", "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")                      # ← NEW: for loading "vasista22/whisper-hindi-large-v2"
 if HF_TOKEN is None:
     logger = logging.getLogger(__name__)
     logger.warning("HF_TOKEN not set; loading will proceed anonymously if model is public.")
