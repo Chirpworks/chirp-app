@@ -41,3 +41,5 @@ class Meeting(db.Model):
     deal_id = db.Column(UUID(as_uuid=True), db.ForeignKey('deals.id'), nullable=True)
     deal = db.relationship('Deal', back_populates='meetings')
     direction = db.Column(db.String, nullable=True)
+    llm_analytical_response = db.Column(db.JSON, nullable=True)
+    llm_descriptive_response = db.Column(db.JSON, nullable=True)
