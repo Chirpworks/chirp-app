@@ -45,6 +45,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # S3 client
 s3_client = boto3.client("s3")
 
+engine = create_engine(DATABASE_URL)
+Session = sessionmaker(bind=engine)
+session = Session()
+
 
 # ─── UTILITY FUNCTIONS ────────────────────────────────────────────────────────
 
@@ -68,20 +72,20 @@ def notify_flask_server(job_id: str):
         logger.exception(f"Failed to notify Flask server for job_id={job_id}: {e}")
 
 
-def update_job_status(job_id: str, status):
+def update_job_status(job_id, status):
     """
-    Update the Job.status in the database.
+    Updates the job status in the jobs table.
     """
     try:
-        session = SessionLocal()
-        job = session.query(Job).filter(Job.id == job_id).first()
+        job = session.query(Job).filter_by(id=job_id).first()
         if job:
             job.status = status
             session.commit()
-            logger.info(f"Updated Job {job_id} status to {status}")
-        session.close()
-    except Exception as e:
-        logger.exception(f"Error updating job status for {job_id}: {e}")
+        else:
+            logger.error(f"Job {job_id} not found.")
+    except Exception as ex:
+        logger.exception(f"Error updating job status for job {job_id}: {ex}")
+        raise ex
 
 
 def convert_mp3_to_wav(mp3_path: str) -> str:
@@ -101,18 +105,15 @@ def convert_mp3_to_wav(mp3_path: str) -> str:
     return wav_path
 
 
-def get_audio_url(job_id: str) -> str:
+def get_audio_url(job_id):
     """
-    Look up the Meeting in the database to find its S3 key,
-    then build and return the "s3://bucket/key" URL.
+    Queries the database to get the S3 URL for the audio file for the given job_id.
     """
-    session = SessionLocal()
-    meeting = session.query(Meeting).filter(Meeting.job_id == job_id).first()
-    session.close()
-    if meeting and meeting.s3_key:
-        return f"s3://{S3_BUCKET}/{meeting.s3_key}"
+    job = session.query(Job).filter_by(id=job_id).first()
+    if job and job.s3_audio_url:
+        return job.s3_audio_url
     else:
-        raise ValueError(f"No audio found for job_id={job_id}")
+        raise ValueError(f"No audio URL found for job_id {job_id}")
 
 
 # ─── CORE TRANSCRIPTION + DIARIZATION ─────────────────────────────────────────
