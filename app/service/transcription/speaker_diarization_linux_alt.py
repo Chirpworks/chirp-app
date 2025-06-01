@@ -328,8 +328,8 @@ def process_audio(job_id: str, bucket: str, key: str):
 
 # ─── MAIN ENTRYPOINT ──────────────────────────────────────────────────────────
 
-def run_diarization():
-    job_id = os.getenv("JOB_ID")
+def run_diarization(job_id):
+    job_id = os.getenv("JOB_ID") or job_id
     if not job_id:
         logger.error("Missing required environment variable JOB_ID. Exiting.")
         exit(1)
