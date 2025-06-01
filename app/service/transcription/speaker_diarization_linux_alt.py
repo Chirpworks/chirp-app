@@ -225,7 +225,7 @@ def transcribe_with_whisper(havapath: str):
         detected_language = processor.tokenizer.decode([lang_id]).strip()
         if detected_language == "":
             # Fallback if decode didn’t yield a clean code
-            detected_language = "hi" if "hindi" in WHISPER_MODEL.lower() else "en"
+            detected_language = "en"
 
     logger.info(f"⮞ Detected language: {detected_language}  (prob={lang_probs[0,lang_id].item():.3f})")
 
