@@ -1,5 +1,3 @@
-# speaker_diarization_linux_alt.py
-
 import os
 import sys
 import json
@@ -8,60 +6,41 @@ import traceback
 from urllib.parse import urlparse
 
 import torch
-import torch.nn.functional as F
+import whisperx
 import subprocess
 import boto3
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 import logging
 from datetime import timedelta
 import requests
-import librosa
-
-from transformers import WhisperProcessor, WhisperForConditionalGeneration
-
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from whisperx.diarize import DiarizationPipeline
+
+# ——— NEW/HF imports ———
+from transformers import WhisperProcessor, WhisperForConditionalGeneration  # ← CHANGED
+# ————————————
 
 from app import Job, Meeting
 from app.models.job import JobStatus
 
-# ——————————————————————————————————————————
-# ENVIRONMENT & CACHE SETUP
-# ——————————————————————————————————————————
-
-os.environ["HF_HOME"] = "/root/.cache/huggingface"
-
-# If you need to pass a Hugging Face token at runtime for private models:
+# if you need an HF token for private models:
 HF_TOKEN = os.getenv("HF_TOKEN", None)
 
-# The model ID we want to use:
+# Use a shared cache directory for HF and Transformers
+cache_dir = os.getenv("TRANSFORMERS_CACHE", "/model_cache")
+os.environ["HF_HOME"] = cache_dir
+os.environ["TRANSFORMERS_CACHE"] = cache_dir
+
+# Which Whisper model to use:
 WHISPER_MODEL = "vasista22/whisper-hindi-large-v2"
 
-# Use a persistent volume for Transformers/HF caching:
-cache_dir = os.getenv("TRANSFORMERS_CACHE", "/model_cache")
-# Make sure HF_HOME also points to the same cache directory:
-os.environ["TRANSFORMERS_CACHE"] = cache_dir
-os.environ["HF_HOME"] = cache_dir
-
-# DEVICE
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
-# ——————————————————————————————————————————
-# LOGGER SETUP
-# ——————————————————————————————————————————
-
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.info(f"Using device: {device}")
 
-# ——————————————————————————————————————————
-# DATABASE & S3 CLIENT SETUP
-# ——————————————————————————————————————————
-
-# Environment variables provided at container‐runtime
+# Environment variable for JOB_ID (provided by ECS via container overrides)
 JOB_ID = os.environ.get("JOB_ID")
-DATABASE_URL = os.environ.get("DATABASE_URL")  # e.g. "postgresql://user:pass@host/db"
+DATABASE_URL = os.environ.get("DATABASE_URL")  # e.g., "postgresql://user:password@host/db"
 FLASK_API_URL = os.getenv("FLASK_API_URL")
 
 # Initialize AWS S3 client
@@ -72,12 +51,12 @@ engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# ——————————————————————————————————————————
-# LOAD HF WHISPER – PURE PYTORCH (NO CTRANSLATE2)
-# ——————————————————————————————————————————
+device = "cuda" if torch.cuda.is_available() else "cpu"
+logger.info(f"Using device: {device}")
 
+# ——— Load HF WhisperProcessor + WhisperForConditionalGeneration ———
+logger.info(f"Loading HF WhisperProcessor + WhisperForConditionalGeneration for '{WHISPER_MODEL}' on {device}…")  # ← CHANGED
 try:
-    logger.info(f"Loading HF WhisperProcessor + WhisperForConditionalGeneration for '{WHISPER_MODEL}' on {device}…")
     processor = WhisperProcessor.from_pretrained(
         WHISPER_MODEL,
         use_auth_token=HF_TOKEN,
@@ -88,36 +67,33 @@ try:
         use_auth_token=HF_TOKEN,
         cache_dir=cache_dir
     ).to(device)
-    # We will also reference model.config.language_codes (list of strings) for language‐id → code mapping.
+    # Patch in lang_to_id so detect_language() will work:
+    whisper_model.generation_config.lang_to_id = processor.tokenizer.lang2id  # ← CHANGED
+
+    # Build inverse mapping from ID → language code:
+    id2lang = {v: k for k, v in processor.tokenizer.lang2id.items()}  # ← CHANGED
     logger.info("HF Whisper model loaded successfully.")
 except Exception as e:
-    logger.exception(f"Error loading HF Whisper ({WHISPER_MODEL}): {e}")
+    logger.exception(f"Error loading HF Vasista Whisper model: {e}")
     sys.exit(1)
+# ——————————————————————————————————————————————————————————————
 
+def convert_mp3_to_wav(mp3_path):
+    wav_path = mp3_path.replace('.mp3', '.wav')
+    command = ['ffmpeg', '-y', '-i', mp3_path, '-ar', '16000', '-ac', '1', '-c:a', 'pcm_s16le', wav_path]
+    subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    return wav_path
 
-# ——————————————————————————————————————————
-# UTILITY FUNCTIONS
-# ——————————————————————————————————————————
-
-def format_timestamp(seconds: float) -> str:
+def format_timestamp(seconds):
     return str(timedelta(seconds=round(seconds)))
 
+def notify_flask_server(job_id):
+    url = f"{FLASK_API_URL}/api/analysis/trigger_analysis"
+    requests.post(url, json={"job_id": job_id})
 
-def parse_s3_url(s3_url: str):
+def update_job_status(job_id, status):
     """
-    Parses an S3 URL of the form s3://bucket/key and returns (bucket, key).
-    """
-    parsed = urlparse(s3_url)
-    if parsed.scheme != "s3":
-        raise ValueError(f"Invalid S3 URL: {s3_url}")
-    bucket = parsed.netloc
-    key = parsed.path.lstrip("/")
-    return bucket, key
-
-
-def update_job_status(job_id: str, status: JobStatus):
-    """
-    Updates the 'status' field of Job in the database.
+    Updates the job status in the jobs table.
     """
     try:
         job = session.query(Job).filter_by(id=job_id).first()
@@ -125,15 +101,29 @@ def update_job_status(job_id: str, status: JobStatus):
             job.status = status
             session.commit()
         else:
-            logger.error(f"Job {job_id} not found when trying to update status to {status}.")
+            logger.error(f"Job {job_id} not found.")
     except Exception as ex:
         logger.exception(f"Error updating job status for job {job_id}: {ex}")
         raise ex
 
-
-def get_audio_url(job_id: str) -> str:
+def parse_s3_url(s3_url):
     """
-    Queries the Job table to fetch the S3 URL for the audio file.
+    Parses an S3 URL in the form s3://bucket/key and returns (bucket, key).
+    """
+    try:
+        parsed = urlparse(s3_url)
+        if parsed.scheme != "s3":
+            raise ValueError("Invalid S3 URL")
+        bucket = parsed.netloc
+        key = parsed.path.lstrip('/')
+        return bucket, key
+    except Exception as e:
+        logger.error(f"Error parsing S3 url: {s3_url}")
+        raise e
+
+def get_audio_url(job_id):
+    """
+    Queries the database to get the S3 URL for the audio file for the given job_id.
     """
     job = session.query(Job).filter_by(id=job_id).first()
     if job and job.s3_audio_url:
@@ -141,229 +131,208 @@ def get_audio_url(job_id: str) -> str:
     else:
         raise ValueError(f"No audio URL found for job_id {job_id}")
 
-
-def convert_mp3_to_wav(mp3_path: str) -> str:
+def process_audio(job_id, bucket, key):
     """
-    Uses ffmpeg to convert a downloaded .mp3 into a 16 kHz, mono .wav.
-    """
-    wav_path = mp3_path.replace(".mp3", ".wav")
-    cmd = [
-        "ffmpeg", "-y", "-i", mp3_path,
-        "-ar", "16000",
-        "-ac", "1",
-        "-c:a", "pcm_s16le",
-        wav_path
-    ]
-    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    return wav_path
-
-
-def notify_flask_server(job_id: str):
-    """
-    Notify our Flask API that transcription+diarization is done.
-    """
-    url = f"{FLASK_API_URL}/api/analysis/trigger_analysis"
-    try:
-        requests.post(url, json={"job_id": job_id})
-    except Exception as e:
-        logger.exception(f"Unable to POST to Flask API at {url}: {e}")
-
-
-# ——————————————————————————————————————————
-# TRANSCRIPTION (PURE HF) + LANGUAGE DETECTION
-# ——————————————————————————————————————————
-
-def transcribe_with_whisper(wav_path: str):
-    """
-    1) Load the entire .wav file via librosa at 16 kHz.
-    2) Run HF WhisperForConditionalGeneration.detect_language(...) to pick the language.
-    3) Build the forced‐decoder prompt for transcription.
-    4) Generate full transcript in one shot.
-
-    Returns:
-        (transcription_text: str, language_code: str)
-    """
-    try:
-        # Load audio at 16 kHz, mono
-        wav, sr = librosa.load(wav_path, sr=16000)
-    except Exception as e:
-        logger.exception(f"Error loading audio for transcription: {e}")
-        raise
-
-    # Processor → input_features (shape: (1, num_frames))
-    inputs = processor(wav, sampling_rate=sr, return_tensors="pt").input_features.to(device)
-
-    # — Detect language logits (shape: (1, n_langs)) via the built‐in method
-    with torch.no_grad():
-        # This returns raw logits; we pick argmax over dimension –1
-        lang_logits = whisper_model.detect_language(inputs)
-    lang_id = torch.argmax(lang_logits, dim=-1).item()
-
-    # Map language ID → code via model.config.language_codes
-    try:
-        language = whisper_model.config.language_codes[lang_id]
-    except Exception:
-        # Fallback: if something goes wrong, default to English
-        language = "en"
-    logger.info(f"Detected language: {language}")
-
-    # — Build the forced‐decoder prompt for transcription in that language
-    forced_decoder_ids = processor.get_decoder_prompt_ids(language=language, task="transcribe")
-
-    # — Generate (beam search with up to 5 beams)
-    with torch.no_grad():
-        generated_ids = whisper_model.generate(
-            inputs,
-            forced_decoder_ids=forced_decoder_ids,
-            num_beams=5,
-            max_length=448,         # typical max_length for Whisper transcripts
-            early_stopping=True
-        )
-
-    # Decode back to text
-    transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
-    logger.info(f"Full transcript: {transcription[:100]}{'...' if len(transcription)>100 else ''}")
-
-    return transcription, language
-
-
-# ——————————————————————————————————————————
-# DIARIZATION (PYANNOTE)
-# ——————————————————————————————————————————
-
-def diarize_audio(wav_path: str, device="cuda", hf_token=None):
-    """
-    Run pyannote.audio's DiarizationPipeline over the entire .wav.
-    Returns the raw list of speaker segments.
-    """
-    diarization_pipeline = DiarizationPipeline(use_auth_token=hf_token, device=device)
-    try:
-        diarization = diarization_pipeline(wav_path)
-    except Exception as e:
-        logger.exception(f"Error running diarization pipeline: {e}")
-        raise
-    return diarization  # this is a pyannote Note:Segment-->{"start":..., "end":..., "speaker":...}
-
-
-# ——————————————————————————————————————————
-# MAIN AUDIO PROCESSING LOGIC
-# ——————————————————————————————————————————
-
-def process_audio(job_id: str, bucket: str, key: str):
-    """
-    1) Download the .mp3 from S3
-    2) Convert to .wav
-    3) Transcribe + detect language (entire file)
-    4) Diarize (entire file)
-    5) Write back to database: Meeting.transcription (full text) and Meeting.diarization (JSON‐serialized speaker segments)
+    Downloads the audio file from S3 using the URL retrieved from the database,
+    processes it using WhisperX for diarization, and updates the corresponding
+    meeting record with the transcript.
     """
     try:
         update_job_status(job_id, JobStatus.IN_PROGRESS)
 
-        logger.info(f"Fetching audio file from S3: s3://{bucket}/{key}")
+        logger.info(f"Fetching audio file from S3: bucket={bucket}, key={key}")
 
-        # Download to a temp .mp3 file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_mp3:
-            local_mp3_path = tmp_mp3.name
+        # Create a temporary file to store the audio
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            local_audio_path = tmp_file.name
 
-        s3_client.download_file(bucket, key, local_mp3_path)
-        logger.info(f"Downloaded MP3 to '{local_mp3_path}'")
+        logger.info(f"Downloading MP3 from S3: bucket={bucket}, key={key}")
+        mp3_path = local_audio_path.replace('.wav', '.mp3')
+        s3_client.download_file(bucket, key, mp3_path)
 
-        # Convert to WAV
-        local_wav_path = convert_mp3_to_wav(local_mp3_path)
-        logger.info(f"Converted to WAV: '{local_wav_path}'")
+        logger.info(f"Converting MP3 to WAV …")
+        local_audio_path = convert_mp3_to_wav(mp3_path)
+        logger.info(f"Audio file ready at '{local_audio_path}'")
 
-        # — Transcribe + detect language (one shot)
-        transcription_text, language = transcribe_with_whisper(local_wav_path)
-        logger.info(f"Transcription complete. Detected language='{language}'")
+        # Transcribe + detect language
+        transcription_text, language = transcribe_with_whisper(local_audio_path)
+        logger.info(f"Transcription (raw text): {transcription_text}")
+        logger.info(f"Detected language: {language}")
 
-        # — Diarize to get speaker‐level segments
-        diarization_segments = diarize_audio(local_wav_path, device=device, hf_token=HF_TOKEN)
-        logger.info(f"Diarization returned {len(diarization_segments)} segments.")
+        # Now run diarization and assign speakers
+        speaker_words = diarize_and_assign_speakers(
+            transcription_text, local_audio_path, device=device, hf_token=HF_TOKEN
+        )
+        logger.info(f"speaker_words: {speaker_words}")
+
+        # flatten the nested word lists into one list of word-dicts
+        flat_words = []
+        for seg in speaker_words.get("segments", []):
+            flat_words.extend(seg.get("words", []))
+        diarization = group_words_into_segments(flat_words)
+        for segment in diarization:
+            segment["language"] = language
 
     except Exception as e:
-        logger.exception(f"[process_audio] job={job_id} failed: {e}\n{traceback.format_exc()}")
+        # Log the root cause and mark the job failed,
+        # but let the caller decide whether to retry/notify.
+        logger.exception(f"[process_audio] job={job_id} failed: {e}\nTraceback: {traceback.format_exc()}")
         update_job_status(job_id, JobStatus.FAILURE)
-        return
+        return  # swallow the exception
 
-    # ——————————————————————————————————————————
-    # WRITE TRANSCRIPTION & DIARIZATION TO THE DATABASE
-    # ——————————————————————————————————————————
+    # Update the meetings table with the transcript and timestamp
     try:
-        job = session.query(Job).filter_by(id=job_id).first()
         meeting = None
+        job = session.query(Job).filter_by(id=job_id).first()
         if job:
             meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
-
         if meeting:
-            # Store full transcript as a single string
-            meeting.transcription = transcription_text
-            # Store speaker‐segments as JSON: each segment has start, end, speaker label
-            # We need to convert pyannote “Annotation” object to a plain list of dicts
-            plain_segments = []
-            for turn, _, speaker in diarization_segments.itertracks(yield_label=True):
-                plain_segments.append({
-                    "start": float(turn.start),  # convert to plain float
-                    "end": float(turn.end),
-                    "speaker": speaker
-                })
-            meeting.diarization = json.dumps(plain_segments)
+            meeting.transcription = transcription_text  # store raw text
+            meeting.diarization = json.dumps(diarization)
             session.commit()
-            logger.info(f"Updated meeting {meeting.id} with transcription + diarization.")
         else:
-            logger.error(f"Meeting record for job_id={job_id} not found.")
-            update_job_status(job_id, JobStatus.FAILURE)
-            return
+            logger.error(f"Meeting for job {job_id} not found.")
 
+        logger.info(f"Updated meeting {job_id} with transcript.")
         update_job_status(job_id, JobStatus.COMPLETED)
-
     except Exception as e:
-        logger.exception(f"Error writing results for job {job_id}: {e}")
+        logger.error(f"Error updating meeting/job status for job {job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)
-        return
+        raise
 
+def transcribe_with_whisper(wav_path: str):
+    """
+    Use the HF WhisperForConditionalGeneration model to:
+      1) detect language on the entire file
+      2) generate the transcription in that language
+    Returns (full_text: str, language_code: str).
+    """
+    # 1) Load audio via librosa at 16 kHz, mono
+    import librosa  # local import to avoid module‐startup overhead
+    wav, sr = librosa.load(wav_path, sr=16000)
 
-# ——————————————————————————————————————————
-# ENTRY POINT
-# ——————————————————————————————————————————
+    # 2) Preprocess into input features
+    inputs = processor(wav, sampling_rate=sr, return_tensors="pt").input_features.to(device)
 
-def run_diarization(job_id: str):
-    if not job_id:
-        logger.error("Missing JOB_ID environment variable. Exiting.")
-        sys.exit(1)
-
-    # 1) Look up the audio URL for this job
+    # 3) Detect language logits
+    #    (GenerationConfig.lang_to_id was patched at load time)
     try:
+        lang_logits = whisper_model.detect_language(inputs)  # ← CHANGED
+        lang_id = int(lang_logits.argmax(dim=-1))           # (batch_size=1 → scalar)
+        language_code = id2lang[lang_id]                    # ← CHANGED
+    except Exception as e:
+        # fallback if detect_language still fails
+        logger.warning(f"detect_language() failed: {e}. Defaulting to 'en'.")
+        language_code = "en"
+
+    # 4) Generate transcription in the detected language
+    #    We set forced_decoder_ids so that Whisper knows which language to produce
+    forced_decoder_ids = processor.get_decoder_prompt_ids(language=language_code, task="transcribe")
+    with torch.no_grad():
+        predicted_ids = whisper_model.generate(
+            inputs,
+            forced_decoder_ids=forced_decoder_ids,
+            max_length=448,
+            num_beams=5
+        )
+    transcription = processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+    return transcription, language_code
+
+def diarize_and_assign_speakers(transcript_text: str, wav_path: str, device="cuda", hf_token=None):
+    """
+    We no longer split the audio into tiny chunks.  Instead, run
+    PyAnnote on the full file to get speaker segments, then assign
+    each word (using WhisperX.align) to a speaker.
+    """
+    # 1) Diarize the raw audio with PyAnnote
+    diarize_model = DiarizationPipeline(use_auth_token=hf_token, device=device)
+    diarize_segments = diarize_model(wav_path)
+
+    # 2) Align transcript_text to word‐level with WhisperX
+    #    First, run WhisperX alignment on the entire audio + raw text
+    #    (WhisperX will internally force‐align each word).
+    #    Then, assign speakers to each word.
+    align_model, metadata = whisperx.load_align_model(language_code="en" if transcript_text == "" else None, device=device)
+    # WhisperX.align wants segments from WhisperX transcriber, but we only have raw text.
+    # So we cheat: pass a dummy segment list to get word‐level alignment out of WhisperX.
+    # (In practice, you can supply [{"start": 0, "end": duration, "text": transcript_text}], but
+    #  WhisperX will split on spaces to align each word anyway.)
+    duration = whisperx.audio.load_audio(wav_path)["sample_rate"] * whisperx.audio.load_audio(wav_path)["array"].shape[0]
+    # Actually just pass segments=[{"start": 0.0, "end": duration, "text": transcript_text}]
+    dummy_segments = [{"start": 0.0, "end": float(duration), "text": transcript_text}]
+    word_align = whisperx.align(dummy_segments, align_model, metadata, wav_path, device=device)
+
+    speaker_aligned = whisperx.assign_word_speakers(diarize_segments, word_align)
+    return speaker_aligned
+
+def group_words_into_segments(words, max_gap=1.0):
+    """
+    Given a flat list of {"start", "end", "word", "speaker"}, merge words
+    into continuous speaker‐specific segments.  Return a list of segments.
+    """
+    segments = []
+    if not words:
+        return segments
+
+    current = {
+        "start": words[0]["start"],
+        "end": words[0]["end"],
+        "text": words[0]["word"],
+        "speaker": words[0]["speaker"]
+    }
+
+    for i in range(1, len(words)):
+        word = words[i]
+        gap = word["start"] - current["end"]
+        if gap > max_gap or word["speaker"] != current["speaker"]:
+            segments.append(current)
+            current = {
+                "start": word["start"],
+                "end": word["end"],
+                "text": word["word"],
+                "speaker": word["speaker"]
+            }
+        else:
+            current["end"] = word["end"]
+            current["text"] += " " + word["word"]
+    segments.append(current)
+    return segments
+
+def run_diarization(job_id):
+    if not job_id:
+        logger.error("Missing required environment variable JOB_ID. Exiting.")
+        exit(1)
+
+    try:
+        logger.info(f"Fetching audio URL for job {job_id}")
         s3_url = get_audio_url(job_id)
         logger.info(f"Retrieved audio URL: {s3_url}")
     except Exception as e:
         logger.exception(f"Error retrieving audio URL for job {job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)
-        sys.exit(1)
+        exit(1)
 
-    # 2) Parse the S3 URL
     try:
+        logger.info(f"Parsing s3_audio_url: {s3_url}")
         bucket, key = parse_s3_url(s3_url)
-        logger.info(f"Parsed S3 URL → bucket='{bucket}', key='{key}'")
     except Exception as e:
-        logger.exception(f"Error parsing S3 URL '{s3_url}' for job {job_id}: {e}")
+        logger.exception(f"Error parsing S3 audio URL ({s3_url}) for job {job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)
-        sys.exit(1)
+        exit(1)
 
-    # 3) Process (download, transcribe, diarize, store)
+    # 1) Process the audio.  If it fails, we've already marked the job as FAILURE above,
+    #    so we swallow the exception here (it’s logged inside process_audio).
     try:
         process_audio(job_id, bucket, key)
     except Exception:
-        # process_audio already logs & sets FAILURE if it crashes
-        pass
+        logger.exception(f"Failed during process_audio for job_ID: {job_id}")
 
-    # 4) Notify Flask that we're done
+    # 2) Notify Flask to start the next step
     try:
         notify_flask_server(job_id)
-        logger.info(f"Notified Flask to start analysis for job_id={job_id}")
+        logger.info(f"Sent a message to the Flask server to start analysis for job_id: {job_id}")
     except Exception as e:
-        logger.exception(f"Failed to notify Flask server for job {job_id}: {e}")
-
+        logger.exception(f"Failed to notify Flask server to start analysis for job_ID: {job_id}: {e}")
 
 if __name__ == "__main__":
-    run_diarization(JOB_ID)
+    run_diarization()
