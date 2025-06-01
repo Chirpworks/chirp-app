@@ -340,6 +340,25 @@ def is_hindi(text: str) -> bool:
     return bool(re.search(r'[\u0900-\u097F]', text))
 
 
+# The regex/splitter from above:
+_HINDI_RUN = re.compile(r'[\u0900-\u097F]+')
+
+
+def translate_mixed_text(text: str) -> str:
+    parts = _HINDI_RUN.split(text)
+    out_parts = []
+    for part in parts:
+        if _HINDI_RUN.fullmatch(part):
+            try:
+                translation = translator(part, max_length=512)
+                out_parts.append(translation[0]["translation_text"])
+            except Exception:
+                out_parts.append(part)
+        else:
+            out_parts.append(part)
+    return "".join(out_parts)
+
+
 def process_audio(job_id: str, bucket: str, key: str):
     """
     Main processing flow for a given job_id:
@@ -381,22 +400,13 @@ def process_audio(job_id: str, bucket: str, key: str):
 
             if translator is not None:
                 for blk in blocks:
-                    original_text = blk["text"]
-                    if is_hindi(original_text):
-                        try:
-                            # The translator returns a list of dicts, e.g. [{"translation_text": "..."}]
-                            translation = translator(original_text, max_length=512)
-                            blk["text"] = translation[0]["translation_text"]
-                        except Exception as e:
-                            # If something goes wrong (e.g. segment too long), fall back to an empty string
-                            logger.exception(f"Translation failed for segment: {original_text!r}", e)
-                            blk["text"] = original_text
-                    else:
-                        blk["text"] = original_text
+                    original = blk["text"]  # e.g. could be "Hello साथी मित्रों नमस्ते"
+                    # translate only the Hindi runs; leave English as-is
+                    blk["text"] = translate_mixed_text(original)
             else:
-                logger.warning("translator is None, skipping translation step.")
                 for blk in blocks:
-                    blk["text_en"] = ""
+                    # no translator available → just copy original
+                    blk["text"] = blk["text"]
 
             # (C) Save those blocks as your diarization JSON:
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
