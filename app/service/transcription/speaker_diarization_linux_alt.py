@@ -400,15 +400,15 @@ def process_audio(job_id: str, bucket: str, key: str):
             # (B) Build merged “speaker blocks” for diarization:
             blocks = group_words_by_speaker(aligned_with_speakers)
 
-            if translator is not None:
-                for blk in blocks:
-                    original = blk["text"]  # e.g. could be "Hello साथी मित्रों नमस्ते"
-                    # translate only the Hindi runs; leave English as-is
-                    blk["text"] = translate_mixed_text(original)
-            else:
-                for blk in blocks:
-                    # no translator available → just copy original
-                    blk["text"] = blk["text"]
+            # if translator is not None:
+            #     for blk in blocks:
+            #         original = blk["text"]  # e.g. could be "Hello साथी मित्रों नमस्ते"
+            #         # translate only the Hindi runs; leave English as-is
+            #         blk["text"] = translate_mixed_text(original)
+            # else:
+            #     for blk in blocks:
+            #         # no translator available → just copy original
+            #         blk["text"] = blk["text"]
 
             # (C) Save those blocks as your diarization JSON:
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
