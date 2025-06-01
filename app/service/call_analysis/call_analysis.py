@@ -60,7 +60,7 @@ class CallAnalysis:
             deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            prompt_path = os.path.join(base_dir, "analytical_prompt_v1.1.txt")
+            prompt_path = os.path.join(base_dir, "analytical_prompt_v1_1.txt")
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
@@ -170,7 +170,7 @@ class CallAnalysis:
             deal_meetings = sorted(deal_meetings, key=lambda x: x.start_time)
 
             base_dir = os.path.dirname(os.path.abspath(__file__))
-            prompt_path = os.path.join(base_dir, "descriptive_prompt_v1.1.txt")
+            prompt_path = os.path.join(base_dir, "descriptive_prompt_v1_1.txt")
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
@@ -212,8 +212,9 @@ class CallAnalysis:
 
             call_summary = self.descriptive_call_analysis.get("call_summary")
             call_summary_string = json.dumps(call_summary)
-            for key, value in speaker_roles.items():
-                call_summary_string = call_summary_string.replace(key, value)
+            if speaker_roles != 'Not Specified':
+                for key, value in speaker_roles.items():
+                    call_summary_string = call_summary_string.replace(key, value)
             call_summary = json.loads(call_summary_string)
             self.meeting.summary = call_summary
 
@@ -227,8 +228,9 @@ class CallAnalysis:
 
             deal_title = self.descriptive_call_analysis.get("deal_title")
             default_deal_title = f"Deal between {denormalize_phone_number(self.meeting.buyer_number)} and {self.user.name}"
-            if not self.deal.name or self.deal.name == default_deal_title or self.deal.name == 'Not Specified':
-                self.deal.name = deal_title
+            if not self.deal.name or self.deal.name == default_deal_title:
+                if deal_title != 'Not Specified':
+                    self.deal.name = deal_title
 
             deal_summary = self.descriptive_call_analysis.get("deal_summary")
             self.deal.overview = deal_summary.get("deal_overview")
@@ -237,5 +239,5 @@ class CallAnalysis:
 
             db.session.flush()
         except Exception as e:
-            logging.info(f"Failed to run predictive analysis with error {e}")
+            logging.info(f"Failed to run descriptive analysis with error {e}")
             raise e

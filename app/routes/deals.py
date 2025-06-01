@@ -151,7 +151,7 @@ def get_deal_by_id(deal_id):
             "stage_reasoning": deal.stage_reasoning,
             "focus_areas": deal.focus_areas,
             "risks": deal.risks,
-            "lead_qualification": deal.risks,
+            "lead_qualification": deal.lead_qualification,
             "overview": deal.overview,
             "key_stakeholders": deal.key_stakeholders,
             "buyer_number": denormalize_phone_number(deal.buyer_number),
