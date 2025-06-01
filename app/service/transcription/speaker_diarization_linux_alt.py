@@ -20,7 +20,7 @@ from sqlalchemy.orm import sessionmaker
 from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
-from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
+# from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
 from transformers import pipeline
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
@@ -346,6 +346,7 @@ _HINDI_RUN = re.compile(r'[\u0900-\u097F]+')
 
 def translate_mixed_text(text: str) -> str:
     parts = _HINDI_RUN.split(text)
+    logger.info(f"parts: {parts}")
     out_parts = []
     for part in parts:
         if _HINDI_RUN.fullmatch(part):
