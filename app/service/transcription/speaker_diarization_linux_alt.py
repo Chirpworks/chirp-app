@@ -345,6 +345,7 @@ _HINDI_RUN = re.compile(r'[\u0900-\u097F]+')
 
 
 def translate_mixed_text(text: str) -> str:
+    logger.info(f"translation text: {text}")
     parts = _HINDI_RUN.split(text)
     logger.info(f"parts: {parts}")
     out_parts = []
