@@ -16,3 +16,4 @@ ffmpeg-python
 openai-whisper
 ctranslate2[cuda11x]
 librosa
+indic-transliteration

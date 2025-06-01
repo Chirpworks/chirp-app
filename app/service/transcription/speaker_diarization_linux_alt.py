@@ -18,6 +18,8 @@ from sqlalchemy.orm import sessionmaker
 from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
+from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
+
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
@@ -262,7 +264,7 @@ def transcribe_and_diarize(audio_path: str):
         use_auth_token=HF_TOKEN,
         device=DEVICE,
     )
-    diarize_segments = diarizer(audio_path)
+    diarize_segments = diarizer(audio_path, min_speakers=2)
     # diarize_df columns: ["segment", "label", "speaker", "start", "end"]
 
     # ─── (3) Merge transcription with speaker labels ─────────
@@ -270,6 +272,13 @@ def transcribe_and_diarize(audio_path: str):
     aligned_with_speakers = assign_word_speakers(
         diarize_segments, combined_aligned, fill_nearest=False
     )
+
+    for seg in aligned_with_speakers["segments"]:
+        for w in seg.get("words", []):
+            orig = w["word"]  # e.g. "विपक्ष"
+            # Transliterate from Devanagari to plain ASCII IAST:
+            w["word"] = transliterate(orig, DEVANAGARI, IAST)
+
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
     logger.info("Finished DiarizationPipeline")
@@ -350,6 +359,12 @@ def process_audio(job_id: str, bucket: str, key: str):
 
             # (B) Build merged “speaker blocks” for diarization:
             blocks = group_words_by_speaker(aligned_with_speakers)
+
+            for block in blocks:
+                # block["text"] is a string like "विपक्ष ने कहा कि पदारंब्…"
+                dev_text = block["text"]
+                # Convert entire span into IAST (or SLP1) Latin:
+                block["text"] = transliterate(dev_text, DEVANAGARI, SLP1)
 
             # (C) Save those blocks as your diarization JSON:
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
