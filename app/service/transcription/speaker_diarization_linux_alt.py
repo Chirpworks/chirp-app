@@ -1,5 +1,7 @@
 import json
 import os
+import re
+
 import logging
 import subprocess
 import tempfile
@@ -285,11 +287,11 @@ def transcribe_and_diarize(audio_path: str):
         diarize_segments, combined_aligned, fill_nearest=False
     )
 
-    for seg in aligned_with_speakers["segments"]:
-        for w in seg.get("words", []):
-            orig = w["word"]  # e.g. "विपक्ष"
-            # Transliterate from Devanagari to plain ASCII IAST:
-            w["word"] = transliterate(orig, DEVANAGARI, IAST)
+    # for seg in aligned_with_speakers["segments"]:
+    #     for w in seg.get("words", []):
+    #         orig = w["word"]  # e.g. "विपक्ष"
+    #         # Transliterate from Devanagari to plain ASCII IAST:
+    #         w["word"] = transliterate(orig, DEVANAGARI, IAST)
 
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
@@ -333,6 +335,11 @@ def group_words_by_speaker(aligned_result: dict) -> list[dict]:
     return merged
 
 
+# 1) Heuristic approach (fast, no extra dependencies)
+def is_hindi(text: str) -> bool:
+    return bool(re.search(r'[\u0900-\u097F]', text))
+
+
 def process_audio(job_id: str, bucket: str, key: str):
     """
     Main processing flow for a given job_id:
@@ -374,15 +381,18 @@ def process_audio(job_id: str, bucket: str, key: str):
 
             if translator is not None:
                 for blk in blocks:
-                    hindi_segment = blk["text"]
-                    try:
-                        # The translator returns a list of dicts, e.g. [{"translation_text": "..."}]
-                        translation = translator(hindi_segment, max_length=512)
-                        blk["text"] = translation[0]["translation_text"]
-                    except Exception as e:
-                        # If something goes wrong (e.g. segment too long), fall back to an empty string
-                        logger.exception(f"Translation failed for segment: {hindi_segment!r}", e)
-                        blk["text_en"] = hindi_segment
+                    original_text = blk["text"]
+                    if is_hindi(original_text):
+                        try:
+                            # The translator returns a list of dicts, e.g. [{"translation_text": "..."}]
+                            translation = translator(original_text, max_length=512)
+                            blk["text"] = translation[0]["translation_text"]
+                        except Exception as e:
+                            # If something goes wrong (e.g. segment too long), fall back to an empty string
+                            logger.exception(f"Translation failed for segment: {original_text!r}", e)
+                            blk["text"] = original_text
+                    else:
+                        blk["text"] = original_text
             else:
                 logger.warning("translator is None, skipping translation step.")
                 for blk in blocks:
