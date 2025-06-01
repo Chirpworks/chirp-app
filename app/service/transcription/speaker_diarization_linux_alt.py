@@ -215,7 +215,7 @@ def transcribe_with_whisper(havapath: str):
 
     # 3) Language detection
     with torch.no_grad():
-        lang_logits = whisper_model.predict_language(inputs)  # (batch_size=1, n_langs)
+        lang_logits = whisper_model.detect_language(inputs)  # (batch_size=1, n_langs)
         lang_probs = torch.softmax(lang_logits, dim=-1)
         lang_id = torch.argmax(lang_probs, dim=-1).item()
         # The tokenizer’s vocab: id→token string (e.g. "en", "hi", ...)
