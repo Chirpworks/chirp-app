@@ -3,6 +3,7 @@ import os
 import logging
 import subprocess
 import tempfile
+import shutil
 from datetime import timedelta
 from urllib.parse import urlparse
 
@@ -14,14 +15,13 @@ from whisperx.diarize import DiarizationPipeline, assign_word_speakers
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app import Job, Meeting  # Adjust import paths as needed
-from app.models.job import JobStatus
+from app import Job, Meeting, JobStatus  # Adjust import paths as needed
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
 FLASK_API_URL = os.getenv("FLASK_API_URL")
-HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")  # Hugging Face token for PyAnnote models
+HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")  # Hugging Face token for PyAnnote
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Configure logging
@@ -35,7 +35,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisperx_model = whisperx.load_model("large-v3", device=DEVICE)
+whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -45,16 +45,12 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 # S3 client
 s3_client = boto3.client("s3")
 
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
-
 
 # ─── UTILITY FUNCTIONS ────────────────────────────────────────────────────────
 
 def format_timestamp(seconds: float) -> str:
     """
-    Format a float‐second timestamp as "HH:MM:SS".
+    Format a float-second timestamp as "HH:MM:SS".
     """
     return str(timedelta(seconds=round(seconds)))
 
@@ -72,97 +68,214 @@ def notify_flask_server(job_id: str):
         logger.exception(f"Failed to notify Flask server for job_id={job_id}: {e}")
 
 
-def update_job_status(job_id, status):
+def update_job_status(job_id: str, status: str):
     """
-    Updates the job status in the jobs table.
+    Update the Job.status in the database.
     """
     try:
-        job = session.query(Job).filter_by(id=job_id).first()
+        session = SessionLocal()
+        job = session.query(Job).filter(Job.id == job_id).first()
         if job:
             job.status = status
             session.commit()
-        else:
-            logger.error(f"Job {job_id} not found.")
-    except Exception as ex:
-        logger.exception(f"Error updating job status for job {job_id}: {ex}")
-        raise ex
+            logger.info(f"Updated Job {job_id} status to {status}")
+        session.close()
+    except Exception as e:
+        logger.exception(f"Error updating job status for {job_id}: {e}")
 
 
 def convert_mp3_to_wav(mp3_path: str) -> str:
     """
-    Use ffmpeg to convert an MP3 file to WAV (16kHz) for WhisperX.
+    Use ffmpeg to convert an MP3 file to WAV (16kHz mono) for WhisperX.
     Returns the new WAV file path.
     """
     wav_path = mp3_path.replace(".mp3", ".wav")
     command = [
         "ffmpeg",
         "-y",
-        "-i", mp3_path,
-        "-ar", "16000",  # WhisperX expects 16 kHz
+        "-i",
+        mp3_path,
+        "-ar",
+        "16000",  # WhisperX expects 16 kHz
+        "-ac",
+        "1",      # mono audio
         wav_path,
     ]
     subprocess.run(command, check=True)
     return wav_path
 
 
-def get_audio_url(job_id):
+def get_audio_url(job_id: str) -> str:
     """
-    Queries the database to get the S3 URL for the audio file for the given job_id.
+    Look up the Meeting in the database to find its S3 key,
+    then build and return the "s3://bucket/key" URL.
     """
-    job = session.query(Job).filter_by(id=job_id).first()
-    if job and job.s3_audio_url:
-        return job.s3_audio_url
+    session = SessionLocal()
+    # The Meeting model uses 'meeting_id' as a foreign key to Job.id
+    job = session.query(Job).filter(Job.id == job_id).first()
+    meeting = None
+    if job:
+        meeting = session.query(Meeting).filter(Meeting.id == job.meeting_id).first()
+    session.close()
+
+    if meeting and meeting.s3_key:
+        return f"s3://{S3_BUCKET}/{meeting.s3_key}"
     else:
-        raise ValueError(f"No audio URL found for job_id {job_id}")
+        raise ValueError(f"No audio found for job_id={job_id}")
 
 
-# ─── CORE TRANSCRIPTION + DIARIZATION ─────────────────────────────────────────
+def split_audio(
+    wav_path: str, chunk_duration: int = 60
+) -> list[tuple[str, float]]:
+    """
+    Splits `wav_path` into multiple WAV chunks of length `chunk_duration` seconds,
+    using ffmpeg. Returns a list of tuples: (chunk_path, start_offset_seconds).
+
+    - Each chunk is re‐encoded to 16kHz mono to ensure WhisperX compatibility.
+    - Filenames follow: <tempdir>/chunk_<index>.wav, where index starts at 0.
+    """
+    tmp_dir = tempfile.mkdtemp(prefix="audio_chunks_")
+    # e.g., /tmp/audio_chunks_abcd1234
+    # Use ffmpeg's segment muxer to split by time
+    chunk_pattern = os.path.join(tmp_dir, "chunk_%04d.wav")
+
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        wav_path,
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        "-f",
+        "segment",
+        "-segment_time",
+        str(chunk_duration),
+        "-reset_timestamps",
+        "1",
+        chunk_pattern,
+    ]
+    logger.info(f"Splitting audio into {chunk_duration}s chunks: {' '.join(ffmpeg_cmd)}")
+    subprocess.run(ffmpeg_cmd, check=True)
+
+    # After splitting, collect all chunk files
+    chunk_files = sorted(
+        f for f in os.listdir(tmp_dir) if f.startswith("chunk_") and f.endswith(".wav")
+    )
+    result = []
+    for filename in chunk_files:
+        # Parse index from filename "chunk_0000.wav" → index 0
+        index_str = filename.replace("chunk_", "").replace(".wav", "")
+        index = int(index_str)
+        offset = index * chunk_duration
+        result.append((os.path.join(tmp_dir, filename), float(offset)))
+
+    return result  # e.g. [("/tmp/.../chunk_0000.wav", 0.0), ("/tmp/.../chunk_0001.wav", 60.0), ...]
+
+
+def transcribe_in_chunks(
+    wav_path: str, chunk_duration: int = 60
+) -> dict:
+    """
+    1. Split `wav_path` into fixed‐length chunks (via split_audio).
+    2. For each chunk, run WhisperX transcription + forced alignment.
+    3. Shift each segment's timestamps by the chunk's start offset.
+    4. Concatenate all segments into a single `combined_result`.
+    Returns:
+      { "language": <first_chunk_lang>, "segments": [ <all shifted segments> ] }
+    """
+    logger.info("Splitting input audio for chunked transcription")
+    chunks = split_audio(wav_path, chunk_duration=chunk_duration)
+    all_segments = []
+    first_lang = None
+
+    try:
+        for (chunk_path, offset) in chunks:
+            logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
+            # WhisperX auto‐detects language if not given
+            transcription = whisperx_model.transcribe(chunk_path)
+            lang = transcription.get("language", "en")
+            if first_lang is None:
+                first_lang = lang
+            logger.info(f"Detected language for chunk: {lang}")
+
+            # Forced alignment for this chunk
+            model_a, metadata = whisperx.load_align_model(
+                language_code=lang, device=DEVICE
+            )
+            aligned = whisperx.align(
+                transcription["segments"], model_a, metadata, chunk_path, DEVICE
+            )
+            # aligned["segments"] is a list of segment dicts with "start", "end", "words" etc.
+
+            # Shift timestamps by offset
+            for seg in aligned["segments"]:
+                seg["start"] += offset
+                seg["end"] += offset
+                if "words" in seg:
+                    for word in seg["words"]:
+                        if "start" in word and "end" in word:
+                            word["start"] += offset
+                            word["end"] += offset
+                # Collect into our combined list
+                all_segments.append(seg)
+
+            # Clean up this chunk file
+            try:
+                os.remove(chunk_path)
+            except Exception:
+                pass
+
+        # Sort combined segments by start time
+        all_segments.sort(key=lambda s: s["start"])
+
+        combined_result = {
+            "language": first_lang or "en",
+            "segments": all_segments,
+        }
+        return combined_result
+
+    finally:
+        # Clean up the chunk directory
+        chunk_dir = os.path.dirname(chunks[0][0]) if chunks else None
+        if chunk_dir and os.path.isdir(chunk_dir):
+            shutil.rmtree(chunk_dir, ignore_errors=True)
+
 
 def transcribe_and_diarize(audio_path: str):
     """
-    1. Run WhisperX transcription + forced alignment -> `aligned_result`.
-    2. Instantiate WhisperX’s DiarizationPipeline -> `diarize_df` (DataFrame).
-    3. Call assign_word_speakers(...) to merge words with speaker labels.
+    New pipeline:
+      1. Transcribe entire audio in chunks -> combined_aligned.
+      2. Run WhisperX's DiarizationPipeline on the full audio -> diarize_df.
+      3. Merge combined_aligned with diarize_df -> aligned_with_speakers.
     Returns:
-      - `aligned_with_speakers`: dict (aligned transcript, each word tagged with "speaker")
-      - `diarize_df`: pandas.DataFrame of speaker segments
+      - aligned_with_speakers (dict: segments with per-word "speaker")
+      - diarize_df (DataFrame of pure diarization segments)
     """
-    # ─── (A) Transcription + Alignment ─────────────────────
-    logger.info("Running WhisperX transcription (auto‐detect language)")
-    # If you omit `language=…`, WhisperX auto-detects the language.
-    transcription = whisperx_model.transcribe(audio_path)
-    detected_lang = transcription.get("language", "en")
-    logger.info(f"Detected language = {detected_lang}")
+    # ─── (1) Chunked transcription ──────────────────────────
+    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=60)
 
-    # Forced alignment step
-    model_a, metadata = whisperx.load_align_model(
-        language_code=detected_lang, device=DEVICE
-    )
-    aligned_result = whisperx.align(
-        transcription["segments"], model_a, metadata, audio_path, DEVICE
-    )
-    # aligned_result is a dict with keys "segments" (each segment has "words": [{"word", "start", "end"}, …])
-
-    # ─── (B) Diarization Pipeline ─────────────────────────
-    logger.info("Running DiarizationPipeline on audio")
+    # ─── (2) Pure diarization on full audio ──────────────────
+    logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
     diarizer = DiarizationPipeline(
-        model_name="pyannote/speaker-diarization-3.1",  # adjust version as needed
+        model_name="pyannote/speaker-diarization-3.1",
         use_auth_token=HF_TOKEN,
         device=DEVICE,
     )
     diarize_df = diarizer(audio_path)
     # diarize_df columns: ["segment", "label", "speaker", "start", "end"]
 
-    # ─── (C) Merge word‐timestamps with speaker segments ───
-    logger.info("Assigning speaker labels to each word in the transcription")
+    # ─── (3) Merge transcription with speaker labels ─────────
+    logger.info("Assigning speaker labels to each word in combined transcript")
     aligned_with_speakers = assign_word_speakers(
-        diarize_df,
-        aligned_result,
-        fill_nearest=False
+        diarize_df, combined_aligned, fill_nearest=False
     )
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
-
+    logger.info("Finished DiarizationPipeline")
+    logger.info(f"aligned_with_speakers: {aligned_with_speakers}")
+    logger.info(f"diarize_df: {diarize_df}")
     return aligned_with_speakers, diarize_df
 
 
@@ -171,7 +284,7 @@ def process_audio(job_id: str, bucket: str, key: str):
     Main processing flow for a given job_id:
       1. Download MP3 from S3
       2. Convert to WAV
-      3. Run transcription + diarization
+      3. Run chunked transcription + full-audio diarization
       4. Store results back in the DB
       5. Update job status
     """
@@ -190,10 +303,10 @@ def process_audio(job_id: str, bucket: str, key: str):
         # 2. Convert to WAV
         local_wav = convert_mp3_to_wav(mp3_temp)
 
-        # 3. Transcribe + Diarize
+        # 3 & 4. Transcribe in chunks + Diarize
         aligned_with_speakers, diarize_df = transcribe_and_diarize(local_wav)
 
-        # 4. Update Meeting record in DB
+        # 5. Update Meeting record in DB
         job = session.query(Job).filter_by(id=job_id).first()
         meeting = None
         if job:
@@ -202,11 +315,11 @@ def process_audio(job_id: str, bucket: str, key: str):
             # Store the full aligned transcript (with speaker tags) as JSON
             meeting.transcript = json.dumps(aligned_with_speakers)
 
-            # Optionally, store the diarization DataFrame separately (as JSON records)
+            # Store the diarization DataFrame separately (as JSON records)
             meeting.diarization = diarize_df.to_json(orient="records")
 
             session.commit()
-            logger.info(f"Updated Meeting {job_id} with transcript & diarization.")
+            logger.info(f"Updated Meeting {meeting.id} with transcript & diarization.")
             update_job_status(job_id, JobStatus.COMPLETED)
         else:
             logger.error(f"Meeting record not found for job_id={job_id}")
@@ -221,8 +334,8 @@ def process_audio(job_id: str, bucket: str, key: str):
 
 # ─── MAIN ENTRYPOINT ──────────────────────────────────────────────────────────
 
-def run_diarization(job_id):
-    job_id = os.getenv("JOB_ID") or job_id
+def run_diarization():
+    job_id = os.getenv("JOB_ID")
     if not job_id:
         logger.error("Missing required environment variable JOB_ID. Exiting.")
         exit(1)
@@ -238,7 +351,7 @@ def run_diarization(job_id):
         update_job_status(job_id, JobStatus.FAILURE)
         exit(1)
 
-    # 5. Notify Flask server to trigger downstream analysis
+    # Notify Flask server to trigger downstream analysis
     try:
         notify_flask_server(job_id)
     except Exception:
