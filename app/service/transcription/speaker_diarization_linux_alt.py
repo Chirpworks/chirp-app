@@ -264,7 +264,7 @@ def transcribe_and_diarize(audio_path: str):
         use_auth_token=HF_TOKEN,
         device=DEVICE,
     )
-    diarize_segments = diarizer(audio_path, min_speakers=2)
+    diarize_segments = diarizer(audio_path, num_speakers=2)
     # diarize_df columns: ["segment", "label", "speaker", "start", "end"]
 
     # ─── (3) Merge transcription with speaker labels ─────────
@@ -364,7 +364,7 @@ def process_audio(job_id: str, bucket: str, key: str):
                 # block["text"] is a string like "विपक्ष ने कहा कि पदारंब्…"
                 dev_text = block["text"]
                 # Convert entire span into IAST (or SLP1) Latin:
-                block["text"] = transliterate(dev_text, DEVANAGARI, SLP1)
+                block["text"] = transliterate(dev_text, DEVANAGARI, IAST)
 
             # (C) Save those blocks as your diarization JSON:
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
