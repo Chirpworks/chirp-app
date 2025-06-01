@@ -262,20 +262,20 @@ def transcribe_and_diarize(audio_path: str):
         use_auth_token=HF_TOKEN,
         device=DEVICE,
     )
-    diarize_df = diarizer(audio_path)
+    diarize_segments = diarizer(audio_path)
     # diarize_df columns: ["segment", "label", "speaker", "start", "end"]
 
     # ─── (3) Merge transcription with speaker labels ─────────
     logger.info("Assigning speaker labels to each word in combined transcript")
     aligned_with_speakers = assign_word_speakers(
-        diarize_df, combined_aligned, fill_nearest=False
+        diarize_segments, combined_aligned, fill_nearest=False
     )
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
     logger.info("Finished DiarizationPipeline")
     logger.info(f"aligned_with_speakers: {aligned_with_speakers}")
-    logger.info(f"diarize_df: {diarize_df}")
-    return aligned_with_speakers, diarize_df
+    logger.info(f"diarize_df: {diarize_segments}")
+    return aligned_with_speakers, diarize_segments
 
 
 def group_words_by_speaker(aligned_result: dict) -> list[dict]:
