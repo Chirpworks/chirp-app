@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import tempfile
@@ -67,24 +68,19 @@ try:
         cache_dir=cache_dir
     ).to(device)
 
-    # ── BUILD LANGUAGE ↔ ID MAPPINGS ─────────────────────────────────────────────────────
-    # In recent HF versions, `WhisperTokenizer.lang2id` or `lang_code_to_id` are gone.
-    # Instead, we take `processor.tokenizer.lang_token_to_id` and strip off "<| |>".
-    #
-    # Example mapping that lives inside `lang_token_to_id`:
-    #    { "<|en|>": 50358,  "<|hi|>": 50359,  … }
-    #
-    # We want: lang2id = { "en": 50358,  "hi": 50359, … }
-    #          id2lang = { 50358: "en", 50359: "hi", … }
-    #
-    lang_token_to_id = processor.tokenizer.lang_token_to_id      # ← NEW
-    lang2id = { token.strip("<|>"): idx for token, idx in lang_token_to_id.items() }  # ← NEW
-    id2lang = { idx: token.strip("<|>") for token, idx in lang_token_to_id.items() }   # ← NEW
+    # ── BUILD LANGUAGE ↔ ID MAPPINGS ──────────────────────────────────────────────
+    # Instead of `lang_token_to_id = processor.tokenizer.lang_token_to_id` (which no longer exists),
+    # we scan the full vocab for tokens like "<|en|>" and "<|hi|>" and strip them to "en" and "hi".
+    vocab = processor.tokenizer.get_vocab()
+    pattern = re.compile(r"^<\|[a-z]{2}\|>$")  # two‐letter codes; adjust if you need 3‐letter codes
+    lang_token_to_id = {tok: idx for tok, idx in vocab.items() if pattern.match(tok)}
+    lang2id = {tok.strip("<|>"): idx for tok, idx in lang_token_to_id.items()}
+    id2lang = {idx: tok.strip("<|>") for tok, idx in lang_token_to_id.items()}
 
-    # Finally, we must inform the model’s generation_config of our lang2id mapping,
-    # so that `model.detect_language()` works correctly under the hood.
-    whisper_model.generation_config.lang_to_id = lang2id      # ← NEW
-    whisper_model.generation_config.id_to_lang = id2lang      # ← NEW
+    whisper_model.generation_config.lang_to_id = lang2id
+    whisper_model.generation_config.id_to_lang = id2lang
+
+    logger.info("HF Whisper model loaded successfully.")
 
     logger.info(f"HF Whisper model loaded successfully.")
 except Exception as e:
