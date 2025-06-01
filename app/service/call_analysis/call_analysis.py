@@ -202,7 +202,7 @@ class CallAnalysis:
                 logging.error(f"Failed to run descriptive analysis as OpenAI returned empty response")
                 return
 
-            self.meeting.descriptive_call_analysis = self.descriptive_call_analysis
+            self.meeting.llm_descriptive_response = self.descriptive_call_analysis
 
             speaker_roles = self.descriptive_call_analysis.get("speaker_roles")
             if speaker_roles != 'Not Specified':
