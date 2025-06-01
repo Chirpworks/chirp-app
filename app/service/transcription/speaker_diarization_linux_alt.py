@@ -35,7 +35,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
+whisperx_model = whisperx.load_model("large-v3", device=DEVICE)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -217,8 +217,8 @@ def process_audio(job_id: str, bucket: str, key: str):
 
 # ─── MAIN ENTRYPOINT ──────────────────────────────────────────────────────────
 
-def run_diarization():
-    job_id = os.getenv("JOB_ID")
+def run_diarization(job_id):
+    job_id = os.getenv("JOB_ID") or job_id
     if not job_id:
         logger.error("Missing required environment variable JOB_ID. Exiting.")
         exit(1)
