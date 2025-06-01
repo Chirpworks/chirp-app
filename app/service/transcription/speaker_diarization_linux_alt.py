@@ -68,10 +68,14 @@ try:
         cache_dir=cache_dir
     ).to(device)
     # Patch in lang_to_id so detect_language() will work:
-    whisper_model.generation_config.lang_to_id = processor.tokenizer.lang2id  # ← CHANGED
+    # fetch the mapping from the model’s config
+    lang2id = whisper_model.config.lang2id
 
-    # Build inverse mapping from ID → language code:
-    id2lang = {v: k for k, v in processor.tokenizer.lang2id.items()}  # ← CHANGED
+    # feed it into the generation_config so detect_language() works
+    whisper_model.generation_config.lang_to_id = lang2id
+
+    # if you need the reverse map (ID → code), you can do:
+    id2lang = {v: k for k, v in lang2id.items()}
     logger.info("HF Whisper model loaded successfully.")
 except Exception as e:
     logger.exception(f"Error loading HF Vasista Whisper model: {e}")
