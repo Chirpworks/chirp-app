@@ -112,11 +112,13 @@ As a sales leader use your external knowledge of consumer psychology and an unde
 
 **Example Output:**
 {
-  "risks": {
-    "risk": "Client is hesitant about making a switch",
-    "risk_signal": "Client repeatedly asked about the complexity of transition",
-    "risk_reasoning": "This suggests underlying fear of disruption or effort involved"
-  }
+  "risks": [
+    {
+        "risk": "Client is hesitant about making a switch",
+        "risk_signal": "Client repeatedly asked about the complexity of transition",
+        "risk_reasoning": "This suggests underlying fear of disruption or effort involved"
+    }
+  ]
 }
 
 If there are no risks evident or data is insufficient:
