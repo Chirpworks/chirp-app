@@ -414,10 +414,10 @@ def process_audio(job_id: str, bucket: str, key: str):
 
             # (C) Save those blocks as your diarization JSON:
             openai_client = OpenAIClient()
-            diairization = openai_client.polish_with_gpt(blocks)
-            logger.info(f"open ai returned diarization: {diairization}")
-            logger.info(f"Diarization data type = {type(diairization)}")
-            meeting.diarization = json.dumps(blocks, ensure_ascii=False)
+            diarization = openai_client.polish_with_gpt(blocks)
+            logger.info(f"open ai returned diarization: {diarization}")
+            logger.info(f"Diarization data type = {type(diarization)}")
+            meeting.diarization = diarization
 
             session.commit()
             logger.info(f"Updated Meeting {meeting.id} with transcript & diarization.")

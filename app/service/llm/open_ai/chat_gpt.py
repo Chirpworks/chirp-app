@@ -86,8 +86,8 @@ class OpenAIClient:
             {
                 "role": "user",
                 "content": f"Please transliterate this in smooth English. If the sentence feels like it doesn't make "
-                           f"complete sense then feel free to add minimal padding or change the text minimally for it "
-                           f"to make logical sense. Make sure to return the response as a JSON seralizable string that "
+                           f"complete sense then feel free to add words or change the text minimally for it "
+                           f"to make logical sense. Make sure to return the response as a JSON serializable string that "
                            f"matches the input:\n\n\"{diarization}\" \n\n Please return exactly a JSON array of "
                            f"objects, e.g.: {sample_string}\n\n Use double quotes for every key and string value. Do "
                            f"not include any `np.float64(...)` wrappers; use plain numbers. Do not wrap the output in "
