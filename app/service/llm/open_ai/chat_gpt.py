@@ -62,18 +62,40 @@ class OpenAIClient:
         """
         Send `diarization` (a string) to GPT-3.5/4 to get a more fluent paraphrase.
         """
+        sample_string = "[\
+              {\
+                \"speaker\": \"SPEAKER_01\",\
+                \"start\": 0.723,\
+                \"end\": 5.913,\
+                \"text\": \"Hey Kunal, how are you doing?\"\
+              },\
+              {\
+                \"speaker\": \"SPEAKER_00\",\
+                \"start\": 7.657,\
+                \"end\": 8.960,\
+                \"text\": \"Hey Vidur, I'm doing good...\"\
+              },\
+            ]\
+        "
         prompt = [
             {
                 "role": "system",
-                "content": "You are a professional transliterator. Reformulate the given text such that any language other than English is transliterated into correct, fluent Latin script."
+                "content": "You are a professional transliterator. Reformulate the given text such that any language "
+                           "other than English is transliterated into correct, fluent Latin script."
             },
             {
                 "role": "user",
-                "content": f"Please transliterate this in smooth English. Make sure to return the response as a JSON seralizable string that matches the input:\n\n\"{diarization}\""
+                "content": f"Please transliterate this in smooth English. If the sentence feels like it doesn't make "
+                           f"complete sense then feel free to add minimal padding or change the text minimally for it "
+                           f"to make logical sense. Make sure to return the response as a JSON seralizable string that "
+                           f"matches the input:\n\n\"{diarization}\" \n\n Please return exactly a JSON array of "
+                           f"objects, e.g.: {sample_string}\n\n Use double quotes for every key and string value. Do "
+                           f"not include any `np.float64(...)` wrappers; use plain numbers. Do not wrap the output in "
+                           f"backticks or markdown fences—just output raw JSON."
             }
         ]
         response = self.client.chat.completions.create(
-            model="gpt-3.5-turbo",  # or "gpt-4"
+            model="gpt-4.1-mini",  # or "gpt-4"
             messages=prompt,
             temperature=0.3,  # lower temperature means more conservative rewriting
             max_tokens=len(str(diarization).split()) * 2  # budget ~ 2× word count
