@@ -1,6 +1,5 @@
 import json
 import os
-import re
 
 import logging
 import subprocess
@@ -19,9 +18,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
-
-# from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
-from transformers import pipeline
 
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
 
@@ -44,17 +40,6 @@ logger.addHandler(handler)
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
 whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
-
-try:
-    translator = pipeline(
-        "translation_hi_to_en",
-        model="Helsinki-NLP/opus-mt-hi-en",
-        device=0 if torch.cuda.is_available() else -1
-    )
-    logger.info("Loaded Hindi→English translation model (Helsinki‐NLP/opus‐mt‐hi‐en).")
-except Exception as e:
-    logger.exception("Could not load translation pipeline:", e)
-    translator = None
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -271,7 +256,6 @@ def transcribe_and_diarize(audio_path: str):
     """
     # ─── (1) Chunked transcription ──────────────────────────
     combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
-    logger.info(f"combined_aligned: {combined_aligned}")
 
     # ─── (2) Pure diarization on full audio ──────────────────
     logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
@@ -281,7 +265,6 @@ def transcribe_and_diarize(audio_path: str):
         device=DEVICE,
     )
     diarize_segments = diarizer(audio_path, num_speakers=2)
-    # diarize_df columns: ["segment", "label", "speaker", "start", "end"]
 
     # ─── (3) Merge transcription with speaker labels ─────────
     logger.info("Assigning speaker labels to each word in combined transcript")
@@ -299,7 +282,6 @@ def transcribe_and_diarize(audio_path: str):
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
     logger.info("Finished DiarizationPipeline")
     logger.info(f"aligned_with_speakers: {aligned_with_speakers}")
-    logger.info(f"diarize_df: {diarize_segments}")
     return aligned_with_speakers, diarize_segments
 
 
@@ -335,32 +317,6 @@ def group_words_by_speaker(aligned_result: dict) -> list[dict]:
                         "text": word_text
                     })
     return merged
-
-
-# 1) Heuristic approach (fast, no extra dependencies)
-def is_hindi(text: str) -> bool:
-    return bool(re.search(r'[\u0900-\u097F]', text))
-
-
-# The regex/splitter from above:
-_HINDI_RUN = re.compile(r'[\u0900-\u097F]+')
-
-
-def translate_mixed_text(text: str) -> str:
-    logger.info(f"translation text: {text}")
-    parts = _HINDI_RUN.split(text)
-    logger.info(f"parts: {parts}")
-    out_parts = []
-    for part in parts:
-        if _HINDI_RUN.fullmatch(part):
-            try:
-                translation = translator(part, max_length=512)
-                out_parts.append(translation[0]["translation_text"])
-            except Exception:
-                out_parts.append(part)
-        else:
-            out_parts.append(part)
-    return "".join(out_parts)
 
 
 def process_audio(job_id: str, bucket: str, key: str):
@@ -402,21 +358,9 @@ def process_audio(job_id: str, bucket: str, key: str):
             # (B) Build merged “speaker blocks” for diarization:
             blocks = group_words_by_speaker(aligned_with_speakers)
 
-            # if translator is not None:
-            #     for blk in blocks:
-            #         original = blk["text"]  # e.g. could be "Hello साथी मित्रों नमस्ते"
-            #         # translate only the Hindi runs; leave English as-is
-            #         blk["text"] = translate_mixed_text(original)
-            # else:
-            #     for blk in blocks:
-            #         # no translator available → just copy original
-            #         blk["text"] = blk["text"]
-
             # (C) Save those blocks as your diarization JSON:
             openai_client = OpenAIClient()
             diarization = openai_client.polish_with_gpt(blocks)
-            logger.info(f"open ai returned diarization: {diarization}")
-            logger.info(f"Diarization data type = {type(diarization)}")
             meeting.diarization = diarization
 
             session.commit()
