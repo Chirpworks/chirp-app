@@ -101,7 +101,7 @@ class OpenAIClient:
             max_tokens=len(str(diarization).split()) * 2  # budget ~ 2× word count
         )
         logger.info(f"transliteration returned by GPT = {response.choices[0].message.content}")
-        return json.loads(response.choices[0].message.content.strip())
+        return response.choices[0].message.content.strip()
 
 
 # Example Usage
