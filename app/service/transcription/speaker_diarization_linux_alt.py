@@ -23,6 +23,8 @@ from app.models.job import JobStatus
 # from indic_transliteration.sanscript import transliterate, DEVANAGARI, IAST, SLP1
 from transformers import pipeline
 
+from app.service.llm.open_ai.chat_gpt import OpenAIClient
+
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
 S3_BUCKET = os.getenv("S3_BUCKET_NAME")
@@ -268,7 +270,7 @@ def transcribe_and_diarize(audio_path: str):
       - diarize_df (DataFrame of pure diarization segments)
     """
     # ─── (1) Chunked transcription ──────────────────────────
-    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=25)
+    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
     logger.info(f"combined_aligned: {combined_aligned}")
 
     # ─── (2) Pure diarization on full audio ──────────────────
@@ -411,6 +413,10 @@ def process_audio(job_id: str, bucket: str, key: str):
             #         blk["text"] = blk["text"]
 
             # (C) Save those blocks as your diarization JSON:
+            openai_client = OpenAIClient()
+            diairization = openai_client.polish_with_gpt(blocks)
+            logger.info(f"open ai returned diarization: {diairization}")
+            logger.info(f"Diarization data type = {type(diairization)}")
             meeting.diarization = json.dumps(blocks, ensure_ascii=False)
 
             session.commit()

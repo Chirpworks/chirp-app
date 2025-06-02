@@ -58,6 +58,29 @@ class OpenAIClient:
             logger.error("Failed to parse response JSON from OpenAI:", e)
             return None
 
+    def polish_with_gpt(self, diarization) -> str:
+        """
+        Send `diarization` (a string) to GPT-3.5/4 to get a more fluent paraphrase.
+        """
+        prompt = [
+            {
+                "role": "system",
+                "content": "You are a professional transliterator. Reformulate the given text such that any language other than English is transliterated into correct, fluent Latin script."
+            },
+            {
+                "role": "user",
+                "content": f"Please transliterate this in smooth English. Make sure to return the response as a JSON seralizable string that matches the input:\n\n\"{diarization}\""
+            }
+        ]
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",  # or "gpt-4"
+            messages=prompt,
+            temperature=0.3,  # lower temperature means more conservative rewriting
+            max_tokens=len(diarization.split()) * 2  # budget ~ 2× word count
+        )
+        logger.info(f"transliteration returned by GPT = {response.choices[0].message['content']}")
+        return response.choices[0].message["content"].strip()
+
 
 # Example Usage
 if __name__ == "__main__":
