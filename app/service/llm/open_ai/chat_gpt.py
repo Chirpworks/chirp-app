@@ -76,7 +76,7 @@ class OpenAIClient:
             model="gpt-3.5-turbo",  # or "gpt-4"
             messages=prompt,
             temperature=0.3,  # lower temperature means more conservative rewriting
-            max_tokens=len(diarization.split()) * 2  # budget ~ 2× word count
+            max_tokens=len(str(diarization).split()) * 2  # budget ~ 2× word count
         )
         logger.info(f"transliteration returned by GPT = {response.choices[0].message['content']}")
         return response.choices[0].message["content"].strip()
