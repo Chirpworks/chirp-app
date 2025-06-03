@@ -15,7 +15,8 @@ You are an expert sales leader mentoring another executive to convert a new clie
 9. Cover all points, but keep the sentences short, easy to understand and clear.
 10. Output only valid JSON structures — no explanations, summaries, or commentary.
 11. Complete the tasks in the order they have been asked. Use the outputs from lower order tasks to make better decisions in higher order tasks.
-12. When quoting the transcript, enclose the statement in signle quote mark ('statement') instead of double quote marks ("statement")
+12. When quoting the transcript, enclose the statement in single quote mark ('statement') instead of double quote marks ("statement")
+13. Use the description to identify the product being spoken about. Do not use the description to make any assumptions about prior interactions.
 
 ---
 
@@ -128,7 +129,7 @@ If there are no risks evident or data is insufficient:
 
 ## Task 5 – Capture Action Items for the Seller
 **Instructions**
-1. Only use the call trasncript of the latest call to identify action items for the call. Do not use summaries of previous calls for this task. 
+1. Only use the call transcript of the latest call to identify action items for the call. Do not use summaries of previous calls for this task.
 2. Extract all action items mentioned or implied during the call. Ensure that no action item is missed out.
 3. If the buyer is supposed to complete a task, then create an action item on the seller to follow up with the buyer about it.
 4. "action_description" needs to be clear and comprehensive. Cover questions like what needs to be done, why, and for whom.
