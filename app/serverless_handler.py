@@ -4,7 +4,7 @@ import runpod
 import traceback
 
 # Your diarization function
-from service.transcription.speaker_diarization_linux_alt import run_diarization
+from service.transcription.speaker_diarization_linux import run_diarization
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
