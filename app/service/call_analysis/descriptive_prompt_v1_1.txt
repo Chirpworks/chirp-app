@@ -126,7 +126,7 @@ If roles cannot be clearly determined from the transcript, use:
 3. Explicitly call out any changes in deal dynamics such as change in requrirements, point of contact for buyer, seller etc.
 4. Anyone who reads this should know exactly what has happened in the deal so far.
 5. Keep language concise, structured, and professional.
-6. Use maximum 10 bullet points in the "deal)_summary"
+6. Use maximum 10 bullet points in the "deal_summary"
 7. In deal_problem_discovery create bullet points based on the different pain points the user may have. Group these problems logically. Try to determine the uderlying cause and effect of the problem. What is the underlying frustration? What is the trigger that is making the buyer consider switching?
 8. Keep Max points in the deal_problem_discovery to 5
 9. In deal_proposed_solution identify how the seller positioned the product to solve the buyer's problems? What USPs were highlighted? What buyer issues were addressed?
