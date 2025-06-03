@@ -64,21 +64,21 @@ class CallAnalysis:
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
-                prompt_text = prompt_text.replace("<seller_name>", self.user.name)
-                prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
-                if self.agency.name:
-                    prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-                else:
-                    prompt_text = prompt_text.replace("<agency_name>", '')
-                if self.agency.description:
-                    prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
-                else:
-                    prompt_text = prompt_text.replace("<agency_description>", '')
+                seller_name = str(self.user.name) if self.user.name else ''
+                call_date = str(self.meeting.start_time.date()) if self.meeting.start_time.date() else ''
+                agency_name = str(self.agency.name) if self.agency.name else ''
+                agency_description = str(self.agency.description) if self.agency.description else ''
+                prompt_text = prompt_text.replace("<seller_name>", seller_name)
+                prompt_text = prompt_text.replace("<call_date>", call_date)
+                prompt_text = prompt_text.replace("<agency_name>", agency_name)
+                prompt_text = prompt_text.replace("<agency_description>", agency_description)
 
                 if len(deal_meetings) > 1:
                     text = self.get_previous_calls_context(deal_meetings[:-1])
-                    prompt_text = prompt_text.replace("<additional_context>", text)
-                prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
+                    if text:
+                        prompt_text = prompt_text.replace("<additional_context>", text)
+                if self.meeting.diarization:
+                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.diarization))
 
             if not prompt_text:
                 logging.error("Analytical prompt text not found. Failed to generate analysis")
@@ -176,21 +176,21 @@ class CallAnalysis:
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
-                prompt_text = prompt_text.replace("<seller_name>", self.user.name)
-                prompt_text = prompt_text.replace("<call_date>", str(self.meeting.start_time.date()))
-                if self.agency.name:
-                    prompt_text = prompt_text.replace("<agency_name>", self.agency.name)
-                else:
-                    prompt_text = prompt_text.replace("<agency_name>", '')
-                if self.agency.description:
-                    prompt_text = prompt_text.replace("<agency_description>", self.agency.description)
-                else:
-                    prompt_text = prompt_text.replace("<agency_description>", '')
+                seller_name = str(self.user.name) if self.user.name else ''
+                call_date = str(self.meeting.start_time.date()) if self.meeting.start_time.date() else ''
+                agency_name = str(self.agency.name) if self.agency.name else ''
+                agency_description = str(self.agency.description) if self.agency.description else ''
+                prompt_text = prompt_text.replace("<seller_name>", seller_name)
+                prompt_text = prompt_text.replace("<call_date>", call_date)
+                prompt_text = prompt_text.replace("<agency_name>", agency_name)
+                prompt_text = prompt_text.replace("<agency_description>", agency_description)
 
                 if len(deal_meetings) > 1:
                     text = self.get_previous_calls_context(deal_meetings[:-1])
-                    prompt_text = prompt_text.replace("<additional_context>", text)
-                prompt_text = prompt_text.replace("<call_transcript>", self.meeting.diarization)
+                    if text:
+                        prompt_text = prompt_text.replace("<additional_context>", str(text))
+                if self.meeting.diarization:
+                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.diarization))
 
             if not prompt_text:
                 logging.error("Descriptive Prompt text not generated. Failed to generate analysis")
@@ -208,7 +208,8 @@ class CallAnalysis:
             if speaker_roles != 'Not Specified':
                 diarization = self.meeting.diarization
                 for key, value in speaker_roles.items():
-                    diarization = diarization.replace(key, value)
+                    if value and diarization:
+                        diarization = diarization.replace(key, value)
                 self.meeting.diarization = diarization
 
             call_title = self.descriptive_call_analysis.get("call_title")
@@ -218,7 +219,8 @@ class CallAnalysis:
             call_summary_string = json.dumps(call_summary)
             if speaker_roles != 'Not Specified':
                 for key, value in speaker_roles.items():
-                    call_summary_string = call_summary_string.replace(key, value)
+                    if value and call_summary_string:
+                        call_summary_string = call_summary_string.replace(key, value)
             call_summary = json.loads(call_summary_string)
             self.meeting.summary = call_summary
 
@@ -226,7 +228,8 @@ class CallAnalysis:
             if speaker_roles != 'Not Specified':
                 call_notes_string = json.dumps(call_notes)
                 for key, value in speaker_roles.items():
-                    call_notes_string = call_notes_string.replace(key, value)
+                    if value and call_notes_string:
+                        call_notes_string = call_notes_string.replace(key, value)
                 call_notes = json.loads(call_notes_string)
             self.meeting.call_notes = call_notes
 

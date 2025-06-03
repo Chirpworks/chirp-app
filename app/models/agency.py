@@ -13,7 +13,7 @@ class Agency(db.Model):
     name = db.Column(db.String(300), nullable=False)
     users = db.relationship('User', back_populates='agency', cascade='all, delete-orphan')
     products = db.Column(db.JSON, nullable=True)
-    description = db.Column(db.String(300), nullable=True)
+    description = db.Column(db.Text, nullable=True)
 
     def __init__(self, name):
         self.name = name
