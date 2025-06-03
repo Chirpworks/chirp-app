@@ -194,7 +194,16 @@ def transcribe_in_chunks(
         for (chunk_path, offset) in chunks:
             logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
             # WhisperX auto‐detects language if not given
-            transcription = whisperx_model.transcribe(chunk_path)
+            initial_prompt = (
+                "This is a recorded sales conversation between a salesperson and a prospective client. "
+                "Speakers will speak in English, Hindi, or a mix of both. "
+                "Transcribe exactly as spoken, including every Hindi phrase and English sentence, "
+                "and include timestamps for each word."
+            )
+            transcription = whisperx_model.transcribe(
+                chunk_path,
+                initial_prompt=initial_prompt
+            )
             logger.info(transcription)
             lang = transcription.get("language", "en")
             if first_lang is None:
