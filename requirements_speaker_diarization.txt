@@ -9,3 +9,12 @@ soundfile
 nltk
 whisperx
 pyannote.audio
+torch
+torchvision
+librosa
+ffmpeg-python
+openai-whisper
+ctranslate2[cuda11x]
+librosa
+indic-transliteration
+sentencepiece
