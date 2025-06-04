@@ -207,6 +207,8 @@ def transcribe_in_chunks(
             )
             logger.info(transcription)
             lang = transcription.get("language", "en")
+            if lang != 'en':
+                lang = 'hi'
             if first_lang is None:
                 first_lang = lang
             logger.info(f"Detected language for chunk: {lang}")
