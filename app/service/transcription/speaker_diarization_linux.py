@@ -39,7 +39,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisperx_model = whisperx.load_model("large-v1", device=DEVICE)
+whisperx_model = whisperx.load_model("openai/whisper-large-v1", device=DEVICE, use_faster_whisper=False)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"

@@ -1,4 +1,5 @@
 import json
+import traceback
 from zoneinfo import ZoneInfo
 
 import logging
@@ -162,7 +163,7 @@ class CallAnalysis:
                     db.session.add(action)
             db.session.flush()
         except Exception as e:
-            logging.error(f"Failed to run analytical analysis with error {e}")
+            logging.error(f"Failed to run analytical analysis with error {e}: {traceback.format_exc()}")
             raise e
 
     def process_descriptive_prompt(self):
@@ -176,20 +177,24 @@ class CallAnalysis:
 
             with open(prompt_path, "r") as f:
                 prompt_text = f.read()
+                if not prompt_text:
+                    logging.error("No descriptive prompt loaded")
+                    raise Exception("No descriptive prompt found. Check file.")
                 seller_name = str(self.user.name) if self.user.name else ''
                 call_date = str(self.meeting.start_time.date()) if self.meeting.start_time.date() else ''
                 agency_name = str(self.agency.name) if self.agency.name else ''
                 agency_description = str(self.agency.description) if self.agency.description else ''
-                prompt_text = prompt_text.replace("<seller_name>", seller_name)
-                prompt_text = prompt_text.replace("<call_date>", call_date)
-                prompt_text = prompt_text.replace("<agency_name>", agency_name)
-                prompt_text = prompt_text.replace("<agency_description>", agency_description)
+                if prompt_text:
+                    prompt_text = prompt_text.replace("<seller_name>", seller_name)
+                    prompt_text = prompt_text.replace("<call_date>", call_date)
+                    prompt_text = prompt_text.replace("<agency_name>", agency_name)
+                    prompt_text = prompt_text.replace("<agency_description>", agency_description)
 
                 if len(deal_meetings) > 1:
                     text = self.get_previous_calls_context(deal_meetings[:-1])
-                    if text:
+                    if text and prompt_text:
                         prompt_text = prompt_text.replace("<additional_context>", str(text))
-                if self.meeting.diarization:
+                if self.meeting.diarization and prompt_text:
                     prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.diarization))
 
             if not prompt_text:
@@ -208,7 +213,7 @@ class CallAnalysis:
             if speaker_roles != 'Not Specified':
                 diarization = self.meeting.diarization
                 for key, value in speaker_roles.items():
-                    if value and diarization:
+                    if key and value and diarization:
                         diarization = diarization.replace(key, value)
                 self.meeting.diarization = diarization
 
@@ -219,7 +224,7 @@ class CallAnalysis:
             call_summary_string = json.dumps(call_summary)
             if speaker_roles != 'Not Specified':
                 for key, value in speaker_roles.items():
-                    if value and call_summary_string:
+                    if key and value and call_summary_string:
                         call_summary_string = call_summary_string.replace(key, value)
             call_summary = json.loads(call_summary_string)
             self.meeting.summary = call_summary
@@ -228,7 +233,7 @@ class CallAnalysis:
             if speaker_roles != 'Not Specified':
                 call_notes_string = json.dumps(call_notes)
                 for key, value in speaker_roles.items():
-                    if value and call_notes_string:
+                    if key and value and call_notes_string:
                         call_notes_string = call_notes_string.replace(key, value)
                 call_notes = json.loads(call_notes_string)
             self.meeting.call_notes = call_notes
@@ -246,5 +251,5 @@ class CallAnalysis:
 
             db.session.flush()
         except Exception as e:
-            logging.info(f"Failed to run descriptive analysis with error {e}")
+            logging.info(f"Failed to run descriptive analysis with error {e}, {traceback.format_exc()}")
             raise e
