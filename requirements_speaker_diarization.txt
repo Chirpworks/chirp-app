@@ -1,4 +1,3 @@
-faster-whisper
 uvicorn
 pydantic
 Levenshtein
