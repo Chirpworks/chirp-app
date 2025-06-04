@@ -19,6 +19,8 @@ from sqlalchemy.orm import sessionmaker
 from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
+import whisper
+
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
@@ -39,7 +41,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisperx_model = whisperx.load_model("openai/whisper-large-v1", device=DEVICE)
+whisper_model = whisper.load_model("openai/whisper-large-v1", device=DEVICE)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -200,7 +202,7 @@ def transcribe_in_chunks(
                 "Transcribe exactly as spoken, including every Hindi phrase and English sentence, "
                 "and include timestamps for each word."
             )
-            transcription = whisperx_model.transcribe(
+            transcription = whisper_model.transcribe(
                 chunk_path,
                 initial_prompt=initial_prompt
             )
