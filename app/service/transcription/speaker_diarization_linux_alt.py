@@ -20,6 +20,7 @@ from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
+import whisper
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
@@ -39,7 +40,8 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
+whisper_model = whisper.load_model("large-v2", device=DEVICE)
+whisper_model.to(dtype=torch.float32)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -98,15 +100,13 @@ def convert_mp3_to_wav(mp3_path: str) -> str:
     Returns the new WAV file path.
     """
     wav_path = mp3_path.replace(".mp3", ".wav")
+    # 1) FFT-based noise reduction at –25 dB
+    # 2) EBU-R128 loudness normalize
+    # 3) resample to 16 kHz mono for WhisperX
     command = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        mp3_path,
-        "-ar",
-        "16000",  # WhisperX expects 16 kHz
-        "-ac",
-        "1",      # mono audio
+        "ffmpeg", "-y", "-i", mp3_path,
+        "-af", "afftdn=nf=-25,loudnorm",
+        "-ar", "16000", "-ac", "1",
         wav_path,
     ]
     subprocess.run(command, check=True)
@@ -174,6 +174,12 @@ def split_audio(
     return result  # e.g. [("/tmp/.../chunk_0000.wav", 0.0), ("/tmp/.../chunk_0001.wav", 60.0), ...]
 
 
+INITIAL_PROMPT = "You are transcribing a bilingual (Hindi and English) sales call between a company representative "\
+                 "and a customer. The conversation covers product introductions, feature explanations, pricing "\
+                 "discussions, negotiation, and objection handling. Accurately capture Hindi and English speech, "\
+                 "preserving product names, proper nouns, and technical terms."
+
+
 def transcribe_in_chunks(
     wav_path: str, chunk_duration: int = 60
 ) -> dict:
@@ -188,17 +194,33 @@ def transcribe_in_chunks(
     logger.info("Splitting input audio for chunked transcription")
     chunks = split_audio(wav_path, chunk_duration=chunk_duration)
     all_segments = []
-    first_lang = None
 
     try:
         for (chunk_path, offset) in chunks:
             logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
             # WhisperX auto‐detects language if not given
-            transcription = whisperx_model.transcribe(chunk_path)
+            transcription = whisper_model.transcribe(
+                chunk_path,
+                beam_size=5,  # explore top 5 beams
+                best_of=5,  # pick the best result out of 5 candidates
+                temperature=0.0,  # deterministic output
+                initial_prompt=INITIAL_PROMPT
+            )
+            # Strip prompt from output if emitted
+            raw_text = transcription.get("text", "")
+            prompt_txt = INITIAL_PROMPT.strip()
+            cleaned = raw_text.lstrip()
+
+            if cleaned.lower().startswith(prompt_txt.lower()):
+                cleaned = cleaned[len(prompt_txt):].lstrip(" \n\t:;,-")
+            transcription = {
+                "segments": transcription.get("segments", []),
+                "text": cleaned,
+                "language": transcription.get("language", "en")
+            }
+
             logger.info(transcription)
             lang = transcription.get("language", "en")
-            if first_lang is None:
-                first_lang = lang
             logger.info(f"Detected language for chunk: {lang}")
 
             # Forced alignment for this chunk
