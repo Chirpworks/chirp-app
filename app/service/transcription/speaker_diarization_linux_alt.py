@@ -40,7 +40,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisper_model = whisper.load_model("large-v3", device=DEVICE)
+whisper_model = whisper.load_model("large-v1", device=DEVICE)
 whisper_model.to(dtype=torch.float32)
 
 # Database setup (SQLAlchemy)
