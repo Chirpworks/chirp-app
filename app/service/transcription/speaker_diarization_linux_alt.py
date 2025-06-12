@@ -296,7 +296,7 @@ def transcribe_and_diarize(audio_path: str):
       - diarize_df (DataFrame of pure diarization segments)
     """
     # ─── (1) Chunked transcription ──────────────────────────
-    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
+    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=60)
 
     # ─── (2) Pure diarization on full audio ──────────────────
     logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
