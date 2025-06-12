@@ -40,7 +40,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisper_model = whisper.load_model("large-v1", device=DEVICE)
+whisper_model = whisper.load_model("large-v2", device=DEVICE)
 whisper_model.to(dtype=torch.float32)
 
 # Database setup (SQLAlchemy)
@@ -299,7 +299,7 @@ def transcribe_and_diarize(audio_path: str):
     combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=60)
 
     # ─── (2) Pure diarization on full audio ──────────────────
-    logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
+    logger.info("Running Diarization Pipeline on full audio for speaker segmentation")
     diarizer = DiarizationPipeline(
         model_name="pyannote/speaker-diarization-3.1",
         use_auth_token=HF_TOKEN,
@@ -321,7 +321,7 @@ def transcribe_and_diarize(audio_path: str):
 
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
-    logger.info("Finished DiarizationPipeline")
+    logger.info("Finished Diarization Pipeline")
     logger.info(f"aligned_with_speakers: {aligned_with_speakers}")
     return aligned_with_speakers, diarize_segments
 
