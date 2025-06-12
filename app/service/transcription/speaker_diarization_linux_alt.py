@@ -40,7 +40,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisper_model = whisper.load_model("large-v2", device=DEVICE)
+whisper_model = whisper.load_model("large-v3", device=DEVICE)
 whisper_model.to(dtype=torch.float32)
 
 # Database setup (SQLAlchemy)
@@ -199,6 +199,21 @@ def transcribe_in_chunks(
         for (chunk_path, offset) in chunks:
             logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
             # WhisperX auto‐detects language if not given
+            logger.info(f"Detecting language for chunk at offset {offset}s: {chunk_path}")
+            # Load audio and preprocess for language detection
+            audio = whisper.load_audio(chunk_path)
+            audio = whisper.pad_or_trim(audio)
+            mel = whisper.log_mel_spectrogram(audio).to(whisper_model.device)
+            # Detect language probabilities
+            _, probs = whisper_model.detect_language(mel)
+            # Pick top language; restrict to English or Hindi
+            detected = max(probs, key=probs.get)
+
+            if detected not in ("en", "hi"):
+                detected = "hi" if probs.get("hi", 0) > probs.get("en", 0) else "en"
+            lang = detected
+            logger.info(f"Using language '{lang}' for transcription and alignment")
+            # Transcribe with pure Whisper, forcing language
             transcription = whisper_model.transcribe(
                 chunk_path,
                 language='en',
