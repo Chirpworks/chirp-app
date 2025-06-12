@@ -201,6 +201,7 @@ def transcribe_in_chunks(
             # WhisperX auto‐detects language if not given
             transcription = whisper_model.transcribe(
                 chunk_path,
+                language='en',
                 beam_size=5,  # explore top 5 beams
                 best_of=5,  # pick the best result out of 5 candidates
                 temperature=0.0,  # deterministic output
