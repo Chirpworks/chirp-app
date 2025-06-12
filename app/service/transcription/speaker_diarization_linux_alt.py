@@ -212,7 +212,7 @@ def transcribe_in_chunks(
             if detected not in ("en", "hi"):
                 detected = "hi" if probs.get("hi", 0) > probs.get("en", 0) else "en"
             lang = detected
-            logger.info(f"Using language '{lang}' for chunk transcription and alignment")
+            logger.info(f"Using language '{lang}' for chunk transcription and alignment.")
             # Transcribe with pure Whisper, forcing language
             transcription = whisper_model.transcribe(
                 chunk_path,
