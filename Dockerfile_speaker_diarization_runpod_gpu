@@ -61,4 +61,4 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 # 🚀 Default entrypoint for serverless runner
-ENTRYPOINT ["python", "app/serverless_handler.py"]
+ENTRYPOINT ["python", "app/serverless_handler_beta.py"]
