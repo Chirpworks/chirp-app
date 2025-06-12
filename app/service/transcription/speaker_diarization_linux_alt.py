@@ -203,7 +203,10 @@ def transcribe_in_chunks(
             # Load audio and preprocess for language detection
             audio = whisper.load_audio(chunk_path)
             audio = whisper.pad_or_trim(audio)
-            mel = whisper.log_mel_spectrogram(audio).to(whisper_model.device)
+            mel = whisper.log_mel_spectrogram(
+                audio,
+                n_mels=whisper_model.dims.n_mels  # match model's expected mel bins
+            ).to(whisper_model.device)
             # Detect language probabilities
             _, probs = whisper_model.detect_language(mel)
             # Pick top language; restrict to English or Hindi
