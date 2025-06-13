@@ -117,11 +117,9 @@ class OpenAIClient:
         # Open the file in binary mode
         with open(audio_path, "rb") as audio_file:
             # Call the API
-            response = openai.Audio.transcribe(
-                model="gpt-4o-transcribe",
+            response = self.client.audio.transcriptions.create(
                 file=audio_file,
-                # optional: you can pass `temperature` or other Whisper params if supported
-                # temperature=0.0,
+                model="gpt-4o-transcribe"
             )
             logger.info(f"openai response: {response}")
 

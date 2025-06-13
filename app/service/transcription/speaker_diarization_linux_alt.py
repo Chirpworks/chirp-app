@@ -261,6 +261,7 @@ def transcribe_and_diarize(audio_path: str):
         logger.info(f"gpt_4o_transcription: {gpt_4o_transcription}")
     except Exception as e:
         logger.error(f"Error with 4o transcription: {e}")
+
     combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
 
     # ─── (2) Pure diarization on full audio ──────────────────
