@@ -2,6 +2,7 @@ import json
 import logging
 
 from openai import OpenAI
+import openai
 import os
 
 logger = logging.getLogger(__name__)
@@ -103,6 +104,30 @@ class OpenAIClient:
         logger.info(f"transliteration returned by GPT = {response.choices[0].message.content}")
         return response.choices[0].message.content.strip()
 
+    def transcribe_with_gpt4o(self, audio_path: str) -> str:
+        """
+        Transcribes an audio file using the gpt-4o-transcribe model.
+        Returns the transcript text.
+        """
+        # Ensure the file exists
+        if not os.path.isfile(audio_path):
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        openai.api_key = self.api_key
+        # Open the file in binary mode
+        with open(audio_path, "rb") as audio_file:
+            # Call the API
+            response = openai.Audio.transcribe(
+                model="gpt-4o-transcribe",
+                file=audio_file,
+                # optional: you can pass `temperature` or other Whisper params if supported
+                # temperature=0.0,
+            )
+            logger.info(f"openai response: {response}")
+
+        # The response has a "text" field with the transcript
+        transcript = response.get("text", "")
+        return transcript
 
 # Example Usage
 if __name__ == "__main__":

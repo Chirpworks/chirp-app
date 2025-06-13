@@ -255,6 +255,12 @@ def transcribe_and_diarize(audio_path: str):
       - diarize_df (DataFrame of pure diarization segments)
     """
     # ─── (1) Chunked transcription ──────────────────────────
+    try:
+        openai_client = OpenAIClient()
+        gpt_4o_transcription = openai_client.transcribe_with_gpt4o(audio_path)
+        logger.info(f"gpt_4o_transcription: {gpt_4o_transcription}")
+    except Exception as e:
+        logger.error(f"Error with 4o transcription: {e}")
     combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
 
     # ─── (2) Pure diarization on full audio ──────────────────
