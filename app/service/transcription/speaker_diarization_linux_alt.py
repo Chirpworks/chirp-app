@@ -333,7 +333,9 @@ def diarize_audio(audio_path: str, transcript_results) -> list:
     # Step 4: Match word segments to diarization labels
     logger.info("Aligning words with speaker segments...")
     speaker_segments = list(diarization.itertracks(yield_label=True))
-    words = transcript_results.get("word_segments", [])
+    segments = transcript_results.get("segments", [])
+    words = transcript_results.get("word_segments",
+                                   [w for seg in segments for w in seg.get("words", [])])
 
     if not words:
         logger.info("No word-level segments found in WhisperX output. Cannot align with diarization.")
@@ -468,7 +470,7 @@ def process_audio_pipeline(audio_path: str):
     transcript_text = ' '.join([seg['text'].strip() for seg in transcripts])
 
     # 3. Diarization and smoothing
-    raw_dia = diarize_audio(audio_path, transcripts)
+    raw_dia = diarize_audio(audio_path, result)
     logger.info(f"raw_dia: {raw_dia}")
 
     smooth_dia = reduce_diarization_loss(raw_dia)
