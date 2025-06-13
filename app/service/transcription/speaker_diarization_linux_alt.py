@@ -283,7 +283,7 @@ def process_audio(job_id: str, bucket: str, key: str):
             # Store the full aligned transcript (with speaker tags) as JSON
             # (A) Store the full, word-level aligned output if needed:
             meeting.transcript = json.dumps(transcript_text, ensure_ascii=False)
-            meeting.diarization = cleaned_diarization_segments
+            meeting.diarization = json.dumps(cleaned_diarization_segments)
 
             session.commit()
             logger.info(f"Updated Meeting {meeting.id} with transcript & diarization.")
@@ -388,8 +388,10 @@ def cleanup_with_gpt(assigned_segments: list, model: str = "gpt-4.1-mini") -> li
     payload = json.dumps(assigned_segments, ensure_ascii=False)
     system_msg = "You are an expert assistant cleaning up bilingual sales call transcripts."
     user_prompt = (
-        "Translate Hindi to English, preserve context, fix transcription errors, "
-        "and output a JSON array of segments with start, end, speaker, text.")
+        "Translate Hindi to English, approximate the meaning to the best of your ability based on the call context, "
+        "preserve context, fix transcription errors, "
+        "and output a JSON array of segments with start, end, speaker, text, "
+        "keeping the same ordering preserved as the input.")
     messages = [
         {"role": "system", "content": system_msg},
         {"role": "user", "content": user_prompt + "\nSegments:\n" + payload}
@@ -422,11 +424,16 @@ def process_audio_pipeline(audio_path: str):
     raw_dia = diarize_audio(audio_path)
     smooth_dia = reduce_diarization_loss(raw_dia)
 
+    logger.info(f"smooth_dia: {smooth_dia}")
+
     # 4. Assign speakers
     assigned = assign_speakers(transcripts, smooth_dia)
 
+    logger.info(f"assigned: {assigned}")
+
     # 5. Group contiguous by speaker
     grouped = group_words_by_speakers(assigned)
+    logger.info(f"grouped_segments: {grouped}")
 
     # 5. GPT-based cleanup
     final = cleanup_with_gpt(grouped)
