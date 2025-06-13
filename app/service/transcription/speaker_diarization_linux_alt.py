@@ -401,25 +401,23 @@ def cleanup_with_gpt(assigned_segments: list, model: str = "gpt-4.1-mini") -> li
 
 # ----------------- Full Pipeline -----------------
 
-def process_audio_pipeline(mp3_path: str):
+def process_audio_pipeline(audio_path: str):
     """
     1) Convert MP3 to denoised, normalized WAV
     2) Transcribe using your existing WhisperX pipeline
     3) Diarize, refine, assign speakers
     4) Clean up via GPT for translation & coherence
     """
-    # 1. Audio preprocess
-    wav = convert_mp3_to_wav(mp3_path)
 
     # 2. Transcription via WhisperX
-    result = transcribe_in_chunks(wav, chunk_duration=30)
+    result = transcribe_in_chunks(audio_path, chunk_duration=30)
     transcripts = result['segments']
 
     # Combine raw text from all chunks
     transcript_text = ' '.join([seg['text'].strip() for seg in transcripts])
 
     # 3. Diarization and smoothing
-    raw_dia = diarize_audio(wav)
+    raw_dia = diarize_audio(audio_path)
     smooth_dia = reduce_diarization_loss(raw_dia)
 
     # 4. Assign speakers
