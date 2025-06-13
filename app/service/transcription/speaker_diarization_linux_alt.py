@@ -20,7 +20,6 @@ from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
-import whisper
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 
@@ -40,8 +39,7 @@ logger.addHandler(handler)
 
 # Load WhisperX ASR model once at startup
 logger.info("Loading WhisperX ASR model...")
-whisper_model = whisper.load_model("large-v3", device=DEVICE)
-whisper_model.to(dtype=torch.float32)
+whisperx_model = whisperx.load_model("large-v2", device=DEVICE)
 
 # Database setup (SQLAlchemy)
 DATABASE_URL = os.getenv("DATABASE_URL")  # e.g. "postgresql://user:pass@host:port/dbname"
@@ -100,13 +98,15 @@ def convert_mp3_to_wav(mp3_path: str) -> str:
     Returns the new WAV file path.
     """
     wav_path = mp3_path.replace(".mp3", ".wav")
-    # 1) FFT-based noise reduction at –25 dB
-    # 2) EBU-R128 loudness normalize
-    # 3) resample to 16 kHz mono for WhisperX
     command = [
-        "ffmpeg", "-y", "-i", mp3_path,
-        "-af", "afftdn=nf=-25,loudnorm",
-        "-ar", "16000", "-ac", "1",
+        "ffmpeg",
+        "-y",
+        "-i",
+        mp3_path,
+        "-ar",
+        "16000",  # WhisperX expects 16 kHz
+        "-ac",
+        "1",      # mono audio
         wav_path,
     ]
     subprocess.run(command, check=True)
@@ -174,12 +174,6 @@ def split_audio(
     return result  # e.g. [("/tmp/.../chunk_0000.wav", 0.0), ("/tmp/.../chunk_0001.wav", 60.0), ...]
 
 
-INITIAL_PROMPT = "You are transcribing a bilingual (Hindi and English) sales call between a company representative "\
-                 "and a customer. The conversation covers product introductions, feature explanations, pricing "\
-                 "discussions, negotiation, and objection handling. Accurately capture Hindi and English speech, "\
-                 "preserving product names, proper nouns, and technical terms."
-
-
 def transcribe_in_chunks(
     wav_path: str, chunk_duration: int = 60
 ) -> dict:
@@ -194,52 +188,17 @@ def transcribe_in_chunks(
     logger.info("Splitting input audio for chunked transcription")
     chunks = split_audio(wav_path, chunk_duration=chunk_duration)
     all_segments = []
+    first_lang = None
 
     try:
         for (chunk_path, offset) in chunks:
             logger.info(f"Transcribing chunk at offset {offset}s: {chunk_path}")
             # WhisperX auto‐detects language if not given
-            logger.info(f"Detecting language for chunk at offset {offset}s: {chunk_path}")
-            # Load audio and preprocess for language detection
-            audio = whisper.load_audio(chunk_path)
-            audio = whisper.pad_or_trim(audio)
-            mel = whisper.log_mel_spectrogram(
-                audio,
-                n_mels=whisper_model.dims.n_mels  # match model's expected mel bins
-            ).to(whisper_model.device)
-            # Detect language probabilities
-            _, probs = whisper_model.detect_language(mel)
-            # Pick top language; restrict to English or Hindi
-            detected = max(probs, key=probs.get)
-
-            if detected not in ("en", "hi"):
-                detected = "hi" if probs.get("hi", 0) > probs.get("en", 0) else "en"
-            lang = detected
-            logger.info(f"Using language '{lang}' for chunk transcription and alignment.")
-            # Transcribe with pure Whisper, forcing language
-            transcription = whisper_model.transcribe(
-                chunk_path,
-                language=detected,
-                beam_size=5,  # explore top 5 beams
-                best_of=5,  # pick the best result out of 5 candidates
-                temperature=0.0,  # deterministic output
-                initial_prompt=INITIAL_PROMPT
-            )
-            # Strip prompt from output if emitted
-            raw_text = transcription.get("text", "")
-            prompt_txt = INITIAL_PROMPT.strip()
-            cleaned = raw_text.lstrip()
-
-            if cleaned.lower().startswith(prompt_txt.lower()):
-                cleaned = cleaned[len(prompt_txt):].lstrip(" \n\t:;,-")
-            transcription = {
-                "segments": transcription.get("segments", []),
-                "text": cleaned,
-                "language": transcription.get("language", "en")
-            }
-
+            transcription = whisperx_model.transcribe(chunk_path)
             logger.info(transcription)
             lang = transcription.get("language", "en")
+            if first_lang is None:
+                first_lang = lang
             logger.info(f"Detected language for chunk: {lang}")
 
             # Forced alignment for this chunk
@@ -296,10 +255,10 @@ def transcribe_and_diarize(audio_path: str):
       - diarize_df (DataFrame of pure diarization segments)
     """
     # ─── (1) Chunked transcription ──────────────────────────
-    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=60)
+    combined_aligned = transcribe_in_chunks(audio_path, chunk_duration=30)
 
     # ─── (2) Pure diarization on full audio ──────────────────
-    logger.info("Running Diarization Pipeline on full audio for speaker segmentation")
+    logger.info("Running DiarizationPipeline on full audio for speaker segmentation")
     diarizer = DiarizationPipeline(
         model_name="pyannote/speaker-diarization-3.1",
         use_auth_token=HF_TOKEN,
@@ -321,7 +280,7 @@ def transcribe_and_diarize(audio_path: str):
 
     # Now aligned_with_speakers["segments"] has each segment dict plus "speaker",
     # and each word in aligned_with_speakers["segments"][i]["words"] also has "speaker".
-    logger.info("Finished Diarization Pipeline")
+    logger.info("Finished DiarizationPipeline")
     logger.info(f"aligned_with_speakers: {aligned_with_speakers}")
     return aligned_with_speakers, diarize_segments
 
@@ -401,7 +360,9 @@ def process_audio(job_id: str, bucket: str, key: str):
 
             # (C) Save those blocks as your diarization JSON:
             openai_client = OpenAIClient()
+            logger.info(blocks)
             diarization = openai_client.polish_with_gpt(blocks)
+            logger.info(f"diarization after polishing = {diarization}")
             meeting.diarization = diarization
 
             session.commit()
