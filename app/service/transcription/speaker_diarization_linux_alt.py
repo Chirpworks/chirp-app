@@ -257,8 +257,11 @@ def transcribe_and_diarize(audio_path: str):
     # ─── (1) Chunked transcription ──────────────────────────
     try:
         openai_client = OpenAIClient()
-        gpt_4o_transcription = openai_client.transcribe_with_gpt4o(audio_path)
+        gpt_4o_transcription = openai_client.transcribe_with_gpt4o(audio_path, "gpt-4o-transcribe")
         logger.info(f"gpt_4o_transcription: {gpt_4o_transcription}")
+
+        gpt_4o_mini_transcription = openai_client.transcribe_with_gpt4o(audio_path, "gpt-4o-mini-transcribe")
+        logger.info(f"gpt_4o_mini_transcription: {gpt_4o_mini_transcription}")
     except Exception as e:
         logger.error(f"Error with 4o transcription: {e}")
 

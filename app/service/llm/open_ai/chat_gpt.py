@@ -104,7 +104,7 @@ class OpenAIClient:
         logger.info(f"transliteration returned by GPT = {response.choices[0].message.content}")
         return response.choices[0].message.content.strip()
 
-    def transcribe_with_gpt4o(self, audio_path: str) -> str:
+    def transcribe_with_gpt4o(self, audio_path: str, model: str) -> str:
         """
         Transcribes an audio file using the gpt-4o-transcribe model.
         Returns the transcript text.
@@ -119,7 +119,10 @@ class OpenAIClient:
             # Call the API
             response = self.client.audio.transcriptions.create(
                 file=audio_file,
-                model="gpt-4o-transcribe"
+                model=model,
+                temperature=0.3,
+                prompt="This is a conversational sales call in a mix of Hindi and English. "
+                       "Please transcribe each utterance in its original language.",
             )
             logger.info(f"openai response: {response}")
 
