@@ -271,6 +271,8 @@ def process_audio(job_id: str, bucket: str, key: str):
 
         # 3 & 4. Transcribe in chunks + Diarize
         transcript_text, cleaned_diarization_segments = process_audio_pipeline(local_wav)
+        logger.info(f"Transcript: {transcript_text}")
+        logger.info(f"Cleaned diarization segments: {cleaned_diarization_segments}")
 
         # 5. Update Meeting record in DB
         job = session.query(Job).filter_by(id=job_id).first()
