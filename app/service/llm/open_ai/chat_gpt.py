@@ -120,9 +120,7 @@ class OpenAIClient:
             response = self.client.audio.transcriptions.create(
                 file=audio_file,
                 model=model,
-                temperature=0.3,
-                prompt="This is a conversational sales call in a mix of Hindi and English. "
-                       "Please transcribe each utterance in its original language.",
+                temperature=0.0,
             )
             logger.info(f"openai response: {response}")
 
