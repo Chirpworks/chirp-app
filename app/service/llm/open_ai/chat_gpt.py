@@ -127,7 +127,7 @@ class OpenAIClient:
             logger.info(f"openai response: {response}")
 
         # The response has a "text" field with the transcript
-        transcript = response.get("text", "")
+        transcript = response.text if hasattr(response, "text") else response.get("text", "")
         return transcript
 
 # Example Usage
