@@ -300,7 +300,7 @@ def diarize_audio(audio_path: str, model_name: str = "pyannote/speaker-diarizati
     """
     Runs speaker diarization and returns list of dicts: start, end, speaker.
     """
-    pipeline = Pipeline.from_pretrained(model_name)
+    pipeline = Pipeline.from_pretrained(model_name, use_auth_token=HF_TOKEN)
     diarization = pipeline(audio_path)
     result = []
     for turn, _, speaker in diarization.itertracks(yield_label=True):
