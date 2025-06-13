@@ -13,6 +13,8 @@ import requests
 import torch
 import whisperx
 # from whisperx.diarize import DiarizationPipeline, assign_word_speakers
+from pyannote.audio.pipelines.utils.hook import ProgressHook
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -298,20 +300,65 @@ def process_audio(job_id: str, bucket: str, key: str):
 
 # ----------------- Diarization -----------------
 
-def diarize_audio(audio_path: str, model_name: str = "pyannote/speaker-diarization") -> list:
+def diarize_audio(audio_path: str, transcript_results) -> list:
     """
     Runs speaker diarization and returns list of dicts: start, end, speaker.
     """
-    pipeline = Pipeline.from_pretrained(model_name, use_auth_token=HF_TOKEN)
-    diarization = pipeline(audio_path)
-    result = []
-    for turn, _, speaker in diarization.itertracks(yield_label=True):
-        result.append({
-            'start': turn.start,
-            'end': turn.end,
-            'speaker': speaker
-        })
-    return result
+    diarization_pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.0",
+        use_auth_token="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"
+    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    diarization_pipeline.to(torch.device(device))
+
+    # ✅ Load parameters from pretrained model
+    hyperparameters = {
+        "segmentation": {
+            "min_duration_off": 0.5  # 🔥 Prevents rapid speaker switching
+        },
+        "clustering": {
+            "method": "ward",  # 🔥 Better clustering approach
+            "min_cluster_size": 15  # 🔥 Avoids small noise clusters
+        }
+    }
+
+    # ✅ APPLY PARAMETER CHANGES (FIXES ERROR)
+    diarization_pipeline.instantiate(hyperparameters)  # 🔥 Minimum samples for a cluster
+
+    # ✅ Run diarization with precomputed embeddings for faster processing
+    with ProgressHook() as hook:
+        diarization = diarization_pipeline.apply({"uri": "audio", "audio": audio_path}, num_speakers=2,
+                                                 hook=hook)
+
+    # Step 4: Match word segments to diarization labels
+    logger.info("Aligning words with speaker segments...")
+    speaker_segments = list(diarization.itertracks(yield_label=True))
+    words = transcript_results.get("word_segments", [])
+
+    if not words:
+        logger.info("No word-level segments found in WhisperX output. Cannot align with diarization.")
+        return []
+
+    combined_output = []
+    for word_info in words:
+        word_start = word_info.get("start")
+        word_end = word_info.get("end")
+        word_text = word_info.get("word")
+
+        if word_start is None or word_end is None:
+            continue
+
+        for turn, _, speaker in speaker_segments:
+            if word_start >= turn.start and word_end <= turn.end:
+                combined_output.append({
+                    "speaker": speaker,
+                    "start": word_start,
+                    "end": word_end,
+                    "text": word_text
+                })
+                break
+
+    return combined_output
 
 # ----------------- Diarization Refinement -----------------
 
@@ -421,14 +468,14 @@ def process_audio_pipeline(audio_path: str):
     transcript_text = ' '.join([seg['text'].strip() for seg in transcripts])
 
     # 3. Diarization and smoothing
-    raw_dia = diarize_audio(audio_path)
-    smooth_dia = reduce_diarization_loss(raw_dia)
+    raw_dia = diarize_audio(audio_path, transcripts)
+    logger.info(f"raw_dia: {raw_dia}")
 
+    smooth_dia = reduce_diarization_loss(raw_dia)
     logger.info(f"smooth_dia: {smooth_dia}")
 
     # 4. Assign speakers
     assigned = assign_speakers(transcripts, smooth_dia)
-
     logger.info(f"assigned: {assigned}")
 
     # 5. Group contiguous by speaker
