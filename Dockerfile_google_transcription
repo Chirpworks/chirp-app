@@ -16,7 +16,7 @@ RUN apt-get update && \
 # 1) call Gemini API with file uploads
 # 2) interact with PostgreSQL via SQLAlchemy
 # 3) make HTTP requests back to your Flask backend
-COPY requirements_speaker_diarization.txt ./
+COPY requirements_speaker_diarization_gemini.txt ./
 RUN pip install --no-cache-dir -r requirements_speaker_diarization_gemini.txt
 
 # 📦 Copy your application code
