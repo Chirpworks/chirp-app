@@ -26,6 +26,9 @@ RUN pip install -r requirements.txt
 WORKDIR /app
 COPY app/ ./app/
 
+# 📦 Make your app/ importable
+ENV PYTHONPATH=/app
+
 # Ensure logs are streamed immediately
 ENV PYTHONUNBUFFERED=1
 
