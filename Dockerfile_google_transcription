@@ -1,0 +1,29 @@
+# Base image: minimal Python runtime
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for audio processing and PostgreSQL client
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ffmpeg \
+        gcc \
+        libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy and install only Python dependencies needed to:
+# 1) call Gemini API with file uploads
+# 2) interact with PostgreSQL via SQLAlchemy
+# 3) make HTTP requests back to your Flask backend
+COPY requirements_speaker_diarization.txt ./
+RUN pip install --no-cache-dir -r requirements_speaker_diarization_gemini.txt
+
+# 📦 Copy your application code
+WORKDIR /app
+COPY app/ ./app/
+
+# Ensure logs are streamed immediately
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "app/serverless_handler_gemini_transcription.py"]

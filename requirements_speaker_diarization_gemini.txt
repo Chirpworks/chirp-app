@@ -1,0 +1,7 @@
+requests
+# Google GenAI Python SDK for Gemini API
+google-genai
+SQLAlchemy
+psycopg2-binary
+python-dotenv
+ffmpeg-python
