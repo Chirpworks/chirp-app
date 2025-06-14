@@ -19,6 +19,9 @@ RUN apt-get update && \
 COPY requirements_speaker_diarization_gemini.txt ./
 RUN pip install --no-cache-dir -r requirements_speaker_diarization_gemini.txt
 
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
 # 📦 Copy your application code
 WORKDIR /app
 COPY app/ ./app/
