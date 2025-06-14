@@ -156,6 +156,7 @@ def transcribe_and_diarize(audio_file_path):
 
     transcription = response.text
     logger.info(f"Transcription: {transcription}")
+    transcription = transcription.split("```json")[1]
     transcription = transcription.strip("```json").strip("```")
     transcription = transcription.strip("'''json").strip("'''")
     logger.info(f"Transcription: {transcription}")
