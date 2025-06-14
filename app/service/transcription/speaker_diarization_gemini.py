@@ -154,14 +154,18 @@ def transcribe_and_diarize(audio_file_path):
                                             audio_file]
     )
 
-    transcription = response.text
-    logger.info(f"Transcription: {transcription}")
-    transcription = transcription.split("```json")[1]
-    transcription = transcription.strip("```json").strip("```")
-    transcription = transcription.strip("'''json").strip("'''")
-    logger.info(f"Transcription: {transcription}")
-    transcription = json.loads(transcription)
-    return transcription
+    response_text = response.text
+    logger.info(f"Transcription: {response_text}")
+    response_text = response_text.split("```json")[1]
+    response_text = response_text.strip("```json").strip("```")
+    response_text = response_text.strip("'''json").strip("'''")
+    logger.info(f"Transcription: {response_text}")
+    response_text = json.loads(response_text)
+    transcription = ''
+    for segment in response_text:
+        transcription += segment['text']
+    diarization = response_text
+    return transcription, diarization
 
 
 def run_diarization(job_id):
