@@ -1,4 +1,5 @@
 import json
+import traceback
 from datetime import datetime
 
 import logging
@@ -12,6 +13,7 @@ from app.models.action import Action, ActionStatus, ActionType
 from app.models.deal import Deal
 from app.models.user import UserRole
 from app.utils.call_recording_utils import denormalize_phone_number
+from app.utils.utils import compute_date_range
 
 logging = logging.getLogger(__name__)
 
@@ -25,23 +27,19 @@ def get_deals():
         user_id = get_jwt_identity()
 
         deal_id = request.args.get("dealId")
-        team_member_ids = request.args.getlist("team_member_id")
-        if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-
-            logging.info(f"Fetching call history for users {team_member_ids}")
+        user_ids = request.args.getlist("user_id")
+        time_frame = request.args.get("time_frame", type=str)
+        if user_ids:
+            for user_id in user_ids:
+                user = User.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"User with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "User not found or unauthorized"}), 404
+            logging.info(f"Fetching deals data for users {user_ids}")
 
             query = (
                 Deal.query
-                .filter(Deal.user_id.in_(team_member_ids))
+                .filter(Deal.user_id.in_(user_ids))
             )
         else:
             # Base query: actions joined through meetings and deals
@@ -52,6 +50,25 @@ def get_deals():
 
         if deal_id:
             query = query.filter(Deal.id == deal_id)
+
+        if time_frame:
+            try:
+                start_dt, end_dt = compute_date_range(time_frame)
+            except ValueError as ve:
+                return jsonify({"error": str(ve)}), 400
+
+            # only join deals that have at least one meeting in [start_dt, end_dt)
+            query = (
+                query
+                .join(Meeting, Deal.id == Meeting.deal_id)
+                .filter(
+                    Meeting.start_time >= start_dt,
+                    Meeting.start_time < end_dt,
+                )
+                # only distinct by the Deal primary key
+                .distinct(Deal.id)
+            )
+
         deals = query.all()
 
         # Prepare response
@@ -84,7 +101,8 @@ def get_deals():
                 "num_pending_actions": num_pending_actions,
                 "last_contacted_on": last_contacted_on.isoformat() if last_contacted_on else None,
                 "user_name": deal.user.name,
-                "user_email": deal.user.email
+                "user_email": deal.user.email,
+                "user_id": deal.user.id
             })
 
         result = sorted(result, key=lambda x: x["last_contacted_on"], reverse=True)
@@ -92,7 +110,7 @@ def get_deals():
         return jsonify(result), 200
 
     except Exception as e:
-        return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to fetch deals with error {e}: {traceback.format_exc()}"}), 500
 
 
 @deals_bp.route("/deal_details/<uuid:deal_id>", methods=["GET"])
@@ -169,7 +187,7 @@ def get_deal_by_id(deal_id):
         return jsonify(result), 200
 
     except Exception as e:
-        logging.error(f"Failed to fetch deal data: {e}")
+        logging.error(f"Failed to fetch deal data: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch deal: {str(e)}"}), 500
 
 
@@ -220,5 +238,5 @@ def change_deal_assignee():
         ), 201
 
     except Exception as e:
-        logging.error(f"Failed to update deal assignee: {e}")
+        logging.error(f"Failed to update deal assignee: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to update deal assignee: {str(e)}"}), 500

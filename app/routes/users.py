@@ -1,3 +1,5 @@
+import traceback
+
 import logging
 
 from flask import Blueprint, jsonify, request
@@ -10,13 +12,14 @@ from app.models.user import UserRole
 from sqlalchemy import func
 
 from app.utils.call_recording_utils import denormalize_phone_number
+from app.utils.utils import compute_date_range
 
 logging = logging.getLogger(__name__)
 
 user_bp = Blueprint("user", __name__)
 
 
-@user_bp.route("/get_team", methods=["GET"])
+@user_bp.route("/get_users", methods=["GET"])
 @jwt_required()
 def get_team():
     try:
@@ -27,84 +30,159 @@ def get_team():
             logging.error(f"User with id {user_id} not found")
             return jsonify({"error": "User not found"}), 404
 
-        if user.role != UserRole.MANAGER:
-            logging.error(
-                f"User with email {user.email} has assigned role {user.role.value}. User with manager role required"
-            )
-            return jsonify({"error": "Unauthorized Access. Login using a Manager Account."}), 401
-
-        team_members = (
+        users = (
             User.query
-            .filter(User.manager_id == user.id)
+            .filter(User.agency_id == user.agency_id)
         )
-        all_members_total_outgoing_calls = 0
-        all_members_total_incoming_calls = 0
-        all_members_unanswered_outgoing_calls = 0
-        all_members_unique_leads_engaged = 0
-        all_members_unique_leads_called_but_not_engaged = 0
 
         team_members_list = []
-        for team_member in team_members:
-            total_outgoing_calls = (
-                Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
-                .filter(Meeting.direction == CallDirection.OUTGOING.value)
-                .scalar()
-            )
-            total_incoming_calls = (
-                Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
-                .filter(Meeting.direction == CallDirection.INCOMING.value)
-                .scalar()
-            )
-            unanswered_outgoing_calls = (
-                MobileAppCall.query
-                .filter(MobileAppCall.user_id == team_member.id)
-                .filter(MobileAppCall.status == 'Not Answered')
-                .scalar()
-            )
-            unique_leads_engaged = (
-                db.session.query(func.count(func.distinct(Meeting.buyer_number)))
-                .filter(Meeting.seller_number == team_member.phone)
-                .scalar()
-            )
-            unique_leads_called_but_not_engaged = (
-                db.session.query(func.count(func.ditinct(MobileAppCall.buyer_number)))
-                .filter(MobileAppCall.seller_number == team_member.phone)
-                .scalar()
-            )
-
-            all_members_total_outgoing_calls += total_outgoing_calls
-            all_members_total_incoming_calls += total_incoming_calls
-            all_members_unanswered_outgoing_calls += unanswered_outgoing_calls
-            all_members_unique_leads_engaged += unique_leads_engaged
-            all_members_unique_leads_called_but_not_engaged += unique_leads_called_but_not_engaged
-
+        for team_member in users:
             team_members_list.append({
                 "name": team_member.name,
                 "email": team_member.email,
                 "id": team_member.id,
                 "phone": denormalize_phone_number(team_member.phone),
-                "total_outgoing_calls": total_outgoing_calls,
-                "total_incoming_calls": total_incoming_calls,
-                "unanswered_outgoing_calls": unanswered_outgoing_calls,
-                "unique_leads_engaged": unique_leads_engaged,
-                "unique_leads_called": unique_leads_engaged + unique_leads_called_but_not_engaged
             })
 
         result = {
-            "team_members": team_members,
-            "total_outgoing_calls": all_members_total_outgoing_calls,
-            "total_incoming_calls": all_members_total_incoming_calls,
-            "total_unanswered_outgoing_calls": all_members_unanswered_outgoing_calls,
-            "total_unique_leads_engaged": all_members_unique_leads_engaged,
-            "total_unique_leads_called": all_members_unique_leads_engaged + all_members_unique_leads_called_but_not_engaged
+            "users": team_members_list,
         }
 
         return jsonify(result), 200
     except Exception as e:
-        logging.error(f"Failed to fetch team members for manager {user.email}, {user_id=}, with error: {e}")
+        logging.error(f"Failed to get all users for user {user.email}, {user_id=}, "
+                      f"    with error trace: {traceback.format_exc()}")
         return jsonify(f"Failed to fetch team members for user {user_id=}, with error: {e}")
+
+
+@user_bp.route("/get_call_analytics", methods=["GET"])
+@jwt_required()
+def get_call_analytics():
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.filter_by(id=user_id).first()
+
+        if not user:
+            logging.error(f"User with id {user_id} not found")
+            return jsonify({"error": "User not found"}), 404
+
+        user_ids = request.args.getlist("user_id")
+        time_frame = request.args.get("time_frame", type=str)
+
+        # If time_frame was provided, compute (start_dt,end_dt) or return 400
+        if time_frame:
+            try:
+                start_dt, end_dt = compute_date_range(time_frame)
+            except ValueError as ve:
+                return jsonify({"error": str(ve)}), 400
+
+        if not user_ids:
+            return jsonify({"error": "Please select users for call analytics details"}), 400
+
+        # Ensure all requested users exist
+        for uid in user_ids:
+            if not User.query.get(uid):
+                logging.error(f"User with id {uid} not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+
+        # Gather team members
+        users = User.query.filter(User.id.in_(user_ids)).all()
+
+        # Initialize totals
+        totals = {
+            "total_outgoing_calls": 0,
+            "total_incoming_calls": 0,
+            "total_unanswered_outgoing_calls": 0,
+            "total_unique_leads_engaged": 0,
+            "total_unique_leads_called": 0,
+        }
+
+        team_members_list = []
+
+        for member in users:
+            # --- OUTGOING CALLS ---
+            oq = Meeting.query.filter(
+                Meeting.seller_number == member.phone,
+                Meeting.direction == CallDirection.OUTGOING.value,
+            )
+            if time_frame:
+                oq = oq.filter(Meeting.start_time >= start_dt,
+                               Meeting.start_time < end_dt)
+            total_out = oq.count()
+
+            # --- INCOMING CALLS ---
+            iq = Meeting.query.filter(
+                Meeting.seller_number == member.phone,
+                Meeting.direction == CallDirection.INCOMING.value,
+            )
+            if time_frame:
+                iq = iq.filter(Meeting.start_time >= start_dt,
+                               Meeting.start_time < end_dt)
+            total_in = iq.count()
+
+            # --- UNANSWERED OUTGOING (MobileAppCall) ---
+            uoq = MobileAppCall.query.filter(
+                MobileAppCall.user_id == member.id,
+                MobileAppCall.status == "Not Answered",
+            )
+            if time_frame:
+                uoq = uoq.filter(MobileAppCall.start_time >= start_dt,
+                                 MobileAppCall.start_time < end_dt)
+            unanswered = uoq.count()
+
+            # --- UNIQUE LEADS ENGAGED ---
+            uq_engaged_q = db.session.query(
+                func.count(func.distinct(Meeting.buyer_number))
+            ).filter(
+                Meeting.seller_number == member.phone
+            )
+            if time_frame:
+                uq_engaged_q = uq_engaged_q.filter(Meeting.start_time >= start_dt,
+                                                   Meeting.start_time < end_dt)
+            unique_engaged = uq_engaged_q.scalar() or 0
+
+            # --- UNIQUE LEADS CALLED BUT NOT ENGAGED ---
+            uq_not_eng_q = db.session.query(
+                func.count(func.distinct(MobileAppCall.buyer_number))
+            ).filter(
+                MobileAppCall.seller_number == member.phone
+            )
+            if time_frame:
+                uq_not_eng_q = uq_not_eng_q.filter(MobileAppCall.start_time >= start_dt,
+                                                   MobileAppCall.start_time < end_dt)
+            unique_not_engaged = uq_not_eng_q.scalar() or 0
+
+            # Accumulate totals
+            totals["total_outgoing_calls"] += total_out
+            totals["total_incoming_calls"] += total_in
+            totals["total_unanswered_outgoing_calls"] += unanswered
+            totals["total_unique_leads_engaged"] += unique_engaged
+            totals["total_unique_leads_called"] += (unique_engaged + unique_not_engaged)
+
+            # Per-member breakdown
+            team_members_list.append({
+                "name": member.name,
+                "email": member.email,
+                "id": member.id,
+                "phone": denormalize_phone_number(member.phone),
+                "total_outgoing_calls": total_out,
+                "total_incoming_calls": total_in,
+                "unanswered_outgoing_calls": unanswered,
+                "unique_leads_engaged": unique_engaged,
+                "unique_leads_called": unique_engaged + unique_not_engaged,
+            })
+
+        # Build final payload
+        result = {
+            "users": [m.name for m in users],
+            **totals
+        }
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        logging.error("Failed to fetch analytics data: %s", traceback.format_exc())
+        return jsonify({"error": f"Failed to fetch analytics data: {str(e)}"}), 500
 
 
 @user_bp.route("/get_user", methods=["GET"])
@@ -126,7 +204,7 @@ def get_user():
 
         return jsonify(result), 200
     except Exception as e:
-        logging.error(f"Failed to fetch user details: {e}")
+        logging.error(f"Failed to fetch user details: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch user details: {str(e)}"}), 500
 
 
@@ -159,5 +237,5 @@ def assign_manager():
         user.manager_id = manager.id
         db.session.commit()
     except Exception as e:
-        logging.error(f"Failed to set manager {manager_email} for user {user_email}: {str(e)}")
+        logging.error(f"Failed to set manager {manager_email} for user {user_email}: {str(traceback.format_exc())}")
         return jsonify({"error": f"Failed to set manager {manager_email} for user {user_email}: {str(e)}"})

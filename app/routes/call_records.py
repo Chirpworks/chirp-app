@@ -61,7 +61,7 @@ def post_recording():
             "ecs_task_response": task_response
         }), 200
     except Exception as e:
-        return {"error": f"failed to create account. Error - {e}"}
+        return {"error": f"failed to create account. Error - {traceback.format_exc()}"}
 
 
 @call_record_bp.route("/post_exotel_recording", methods=["GET"])
@@ -285,9 +285,10 @@ def post_app_call_record():
 
             call_status = calculate_call_status(call_type_str, duration)
 
-            if call_status == 'Processing' and duration != '0':
+            if call_status == 'Processing' and int(duration) != 0:
                 # adding this time to enlarge the window for exotel call reconciliation
                 end_time = end_time + timedelta(seconds=3)
+                start_time = start_time - timedelta(seconds=3)
 
             logging.info(f"Creating app call record for user {user.email}")
             # 1. Create the mobile app call record

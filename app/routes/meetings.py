@@ -18,7 +18,7 @@ from app.models.mobile_app_calls import MobileAppCall
 from app.models.user import UserRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
 from app.utils.call_recording_utils import denormalize_phone_number
-from app.utils.utils import human_readable_duration
+from app.utils.utils import human_readable_duration, compute_date_range
 
 meetings_bp = Blueprint("meetings", __name__)
 
@@ -93,29 +93,28 @@ def get_meeting_history():
         user_id = get_jwt_identity()
 
         deal_id = request.args.get("dealId")
-        team_member_ids = request.args.getlist("team_member_id")
-        if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
+        user_ids = request.args.getlist("user_id")
+        time_frame = request.args.get("time_frame", type=str)
 
-            logging.info(f"Fetching call history for users {team_member_ids}")
+        if user_ids:
+            for user_id in user_ids:
+                user = User.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"User with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "User not found or unauthorized"}), 404
+            logging.info(f"Fetching actions data for users {user_ids}")
+
+            logging.info(f"Fetching call history for users {user_ids}")
             # Join through deals to fetch user's meetings
             meetings_query = (
                 Meeting.query
                 .join(Meeting.deal)
-                .filter(Deal.user_id.in_(team_member_ids))
+                .filter(Deal.user_id.in_(user_ids))
                 .order_by(Meeting.start_time.desc())
             )
             mobile_app_calls_query = (
                 MobileAppCall.query
-                .filter(MobileAppCall.user_id.in_(team_member_ids))
+                .filter(MobileAppCall.user_id.in_(user_ids))
                 .order_by(MobileAppCall.start_time.desc())
             )
         else:
@@ -140,6 +139,21 @@ def get_meeting_history():
                     MobileAppCall.buyer_number == deal.buyer_number,
                     MobileAppCall.seller_number == deal.seller_number,
                 ))
+
+        if time_frame:
+            try:
+                start_dt, end_dt = compute_date_range(time_frame)
+            except ValueError as ve:
+                return jsonify({"error": str(ve)}), 400
+
+            meetings_query = meetings_query.filter(
+                Meeting.start_time >= start_dt,
+                Meeting.start_time < end_dt,
+            )
+            mobile_app_calls_query = mobile_app_calls_query.filter(
+                MobileAppCall.start_time >= start_dt,
+                MobileAppCall.start_time < end_dt,
+            )
 
         meetings = meetings_query.all()
         mobile_app_calls = mobile_app_calls_query.all()
@@ -208,9 +222,10 @@ def get_meeting_history():
                 "analysis_status": analysis_status,
                 "duration": duration,
                 "call_notes": call_record.call_notes if isinstance(call_record, Meeting) else None,
-                "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else None,
-                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None,
-                "direction": direction
+                "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else call_record.user.name,
+                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else call_record.user.email,
+                "direction": direction,
+                "user_id": call_record.deal.user.id if isinstance(call_record, Meeting) else call_record.user.id,
             })
 
         return jsonify(result), 200
@@ -321,7 +336,7 @@ def get_meeting_diarization_by_id(meeting_id):
         return jsonify(result), 200
 
     except Exception as e:
-        logging.error(f"Failed to fetch meeting diarization data: {e}")
+        logging.error(f"Failed to fetch meeting diarization data: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
 
 
@@ -400,4 +415,5 @@ def get_last_synced_call_id():
             return jsonify({"message": "No synced calls found", "last_synced_call_id": None}), 200
 
     except Exception as e:
+        logging.error(f"Failed to fetch last synced call id with error: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch last synced call id: {str(e)}"}), 500

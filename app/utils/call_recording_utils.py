@@ -78,13 +78,12 @@ def denormalize_phone_number(phone_number):
 def calculate_call_status(call_type, duration):
     if call_type == 'missed':
         return 'Missed'
-    elif call_type == 'incoming' and duration == '0':
-        return 'Missed'
-    elif call_type == 'outgoing' and duration == '0':
-        return 'Not Answered'
-    elif call_type == 'incoming' and int(duration) > 0:
-        return 'Processing'
-    elif call_type == 'outgoing' and int(duration) > 0:
+    elif int(duration) == 0:
+        if call_type == 'incoming':
+            return 'Missed'
+        elif call_type == 'outgoing':
+            return 'Not Answered'
+    elif int(duration) > 0:
         return 'Processing'
     else:
         return 'Processing'

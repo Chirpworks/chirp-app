@@ -188,7 +188,7 @@ def transcribe_in_chunks(
     logger.info("Splitting input audio for chunked transcription")
     chunks = split_audio(wav_path, chunk_duration=chunk_duration)
     all_segments = []
-    first_lang = None
+    lang = "en"
 
     try:
         for (chunk_path, offset) in chunks:
@@ -197,8 +197,6 @@ def transcribe_in_chunks(
             transcription = whisperx_model.transcribe(chunk_path)
             logger.info(transcription)
             lang = transcription.get("language", "en")
-            if first_lang is None:
-                first_lang = lang
             logger.info(f"Detected language for chunk: {lang}")
 
             # Forced alignment for this chunk
@@ -232,7 +230,7 @@ def transcribe_in_chunks(
         all_segments.sort(key=lambda s: s["start"])
 
         combined_result = {
-            "language": "en",
+            "language": lang,
             "segments": all_segments,
         }
         return combined_result
@@ -374,6 +372,198 @@ def process_audio(job_id: str, bucket: str, key: str):
         logger.exception(f"Error processing audio for job_id={job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)
 
+<<<<<<< Updated upstream
+=======
+# ----------------- Diarization -----------------
+
+def diarize_audio(audio_path: str, transcript_results) -> list:
+    """
+    Runs speaker diarization and returns list of dicts: start, end, speaker.
+    """
+    diarization_pipeline = Pipeline.from_pretrained(
+        "pyannote/speaker-diarization-3.0",
+        use_auth_token="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"
+    )
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    diarization_pipeline.to(torch.device(device))
+
+    # ✅ Load parameters from pretrained model
+    hyperparameters = {
+        "segmentation": {
+            "min_duration_off": 0.5  # 🔥 Prevents rapid speaker switching
+        },
+        "clustering": {
+            "method": "ward",  # 🔥 Better clustering approach
+            "min_cluster_size": 15  # 🔥 Avoids small noise clusters
+        }
+    }
+
+    # ✅ APPLY PARAMETER CHANGES (FIXES ERROR)
+    diarization_pipeline.instantiate(hyperparameters)  # 🔥 Minimum samples for a cluster
+
+    # ✅ Run diarization with precomputed embeddings for faster processing
+    with ProgressHook() as hook:
+        diarization = diarization_pipeline.apply({"uri": "audio", "audio": audio_path}, num_speakers=2,
+                                                 hook=hook)
+
+    # Step 4: Match word segments to diarization labels
+    logger.info("Aligning words with speaker segments...")
+    speaker_segments = list(diarization.itertracks(yield_label=True))
+    segments = transcript_results.get("segments", [])
+    words = transcript_results.get("word_segments",
+                                   [w for seg in segments for w in seg.get("words", [])])
+
+    if not words:
+        logger.info("No word-level segments found in WhisperX output. Cannot align with diarization.")
+        return []
+
+    combined_output = []
+    for word_info in words:
+        word_start = word_info.get("start")
+        word_end = word_info.get("end")
+        word_text = word_info.get("word")
+
+        if word_start is None or word_end is None:
+            continue
+
+        for turn, _, speaker in speaker_segments:
+            if word_start >= turn.start and word_end <= turn.end:
+                combined_output.append({
+                    "speaker": speaker,
+                    "start": word_start,
+                    "end": word_end,
+                    "text": word_text
+                })
+                break
+
+    return combined_output
+
+# ----------------- Diarization Refinement -----------------
+
+def reduce_diarization_loss(diarization: list, min_duration: float = 0.5) -> list:
+    """
+    Merge segments shorter than min_duration into neighbors and merge adjacent same-speaker.
+    """
+    diarization = sorted(diarization, key=lambda x: x['start'])
+    merged = []
+    for seg in diarization:
+        duration = seg['end'] - seg['start']
+        if duration < min_duration and merged:
+            merged[-1]['end'] = seg['end']
+        else:
+            merged.append(seg.copy())
+    cleaned = []
+    for seg in merged:
+        if cleaned and cleaned[-1]['speaker'] == seg['speaker'] and abs(seg['start'] - cleaned[-1]['end']) < 0.2:
+            cleaned[-1]['end'] = seg['end']
+        else:
+            cleaned.append(seg.copy())
+    return cleaned
+
+# ----------------- Speaker Assignment -----------------
+
+def assign_speakers(segments: list, diarization: list) -> list:
+    """
+    Assign speaker labels to transcription segments by maximum overlap.
+    """
+    assigned = []
+    for seg in segments:
+        best, max_ov = None, 0.0
+        for turn in diarization:
+            ov = max(0, min(seg['end'], turn['end']) - max(seg['start'], turn['start']))
+            if ov > max_ov:
+                max_ov, best = ov, turn['speaker']
+        assigned.append({**seg, 'speaker': best or 'Unknown'})
+    return assigned
+
+
+# ----------------- Grouping Words by Speaker -----------------
+
+def group_words_by_speakers(assigned_segments: list) -> list:
+    """
+    Groups contiguous segments by speaker into larger utterances.
+    Returns list of dicts: start, end, speaker, text.
+    """
+    grouped = []
+    for seg in assigned_segments:
+        if grouped and grouped[-1]['speaker'] == seg['speaker']:
+            grouped[-1]['end'] = seg['end']
+            grouped[-1]['text'] += ' ' + seg['text']
+        else:
+            grouped.append({
+                'start': seg['start'],
+                'end': seg['end'],
+                'speaker': seg['speaker'],
+                'text': seg['text']
+            })
+    return grouped
+
+# ----------------- GPT-based Cleanup -----------------
+
+def cleanup_with_gpt(assigned_segments: list, model: str = "gpt-4.1-mini") -> list:
+    """
+    Use GPT-4.1 to clean, translate Hindi->English, fix errors, return coherent JSON.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("Missing OPENAI_API_KEY for cleanup")
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+
+    payload = json.dumps(assigned_segments, ensure_ascii=False)
+    system_msg = "You are an expert assistant cleaning up bilingual sales call transcripts."
+    user_prompt = (
+        "Translate Hindi to English, approximate the meaning to the best of your ability based on the call context, "
+        "preserve context, fix transcription errors, "
+        "and output a JSON array of segments with start, end, speaker, text, "
+        "keeping the same ordering preserved as the input.")
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_prompt + "\nSegments:\n" + payload}
+    ]
+    resp = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=0.0
+    )
+    return json.loads(resp.choices[0].message.content)
+
+# ----------------- Full Pipeline -----------------
+
+def process_audio_pipeline(audio_path: str):
+    """
+    1) Convert MP3 to denoised, normalized WAV
+    2) Transcribe using your existing WhisperX pipeline
+    3) Diarize, refine, assign speakers
+    4) Clean up via GPT for translation & coherence
+    """
+
+    # 2. Transcription via WhisperX
+    aligned, result = transcribe_in_chunks(audio_path, chunk_duration=30)
+    transcripts = result['segments']
+
+    # Combine raw text from all chunks
+    transcript_text = ' '.join([seg['text'].strip() for seg in transcripts])
+
+    # 3. Diarization and smoothing
+    raw_dia = diarize_audio(audio_path, result)
+    logger.info(f"raw_dia: {raw_dia}")
+
+    smooth_dia = reduce_diarization_loss(raw_dia)
+    logger.info(f"smooth_dia: {smooth_dia}")
+
+    # 4. Assign speakers
+    assigned = assign_speakers(transcripts, smooth_dia)
+    logger.info(f"assigned: {assigned}")
+
+    # 5. Group contiguous by speaker
+    grouped = group_words_by_speakers(assigned)
+    logger.info(f"grouped_segments: {grouped}")
+
+    # 5. GPT-based cleanup
+    final = cleanup_with_gpt(grouped)
+    return transcript_text, final
+>>>>>>> Stashed changes
 
 # ─── MAIN ENTRYPOINT ──────────────────────────────────────────────────────────
 

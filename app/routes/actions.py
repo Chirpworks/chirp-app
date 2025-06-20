@@ -1,4 +1,6 @@
 import json
+import traceback
+
 import logging
 
 from flask import Blueprint, request, jsonify
@@ -8,6 +10,7 @@ from app import Meeting, db, User
 from app.models.action import Action, ActionStatus, ActionType
 from app.models.deal import Deal
 from app.models.user import UserRole
+from app.utils.utils import compute_date_range
 
 logging = logging.getLogger(__name__)
 
@@ -25,6 +28,7 @@ def get_actions():
         is_complete_str = request.args.get("is_complete")
         is_complete = None
         action_type = request.args.get("actionType")
+        time_frame = request.args.get("time_frame", type=str)
 
         if is_complete_str is not None:
             is_complete = is_complete_str.lower() == "true"
@@ -33,25 +37,21 @@ def get_actions():
             logging.error("Failed to get action - Unauthorized")
             return jsonify({"error": "User not found or unauthorized"}), 401
 
-        team_member_ids = request.args.getlist("team_member_id")
-        if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-            logging.info(f"Fetching actions data for users {team_member_ids}")
+        user_ids = request.args.getlist("user_id")
+        if user_ids:
+            for user_id in user_ids:
+                user = User.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"User with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "User not found or unauthorized"}), 404
+            logging.info(f"Fetching actions data for users {user_ids}")
 
             # Join through deals to fetch user's meetings
             query = (
                 Action.query
                 .join(Action.meeting)
                 .join(Meeting.deal)
-                .filter(Deal.user_id.in_(team_member_ids))
+                .filter(Deal.user_id.in_(user_ids))
             )
         else:
             logging.info(f"Fetching actions data for user {user_id}")
@@ -74,6 +74,17 @@ def get_actions():
         elif is_complete is False:
             query = query.filter(Action.status == ActionStatus.PENDING)
 
+        if time_frame:
+            try:
+                start_dt, end_dt = compute_date_range(time_frame)
+            except ValueError as ve:
+                return jsonify({"error": str(ve)}), 400
+
+            query = query.filter(
+                Action.created_at >= start_dt,
+                Action.created_at < end_dt,
+            )
+
         actions = query.all()
 
         # Prepare response
@@ -93,13 +104,16 @@ def get_actions():
                 "signals": action.signals,
                 "type": action.type.value,
                 "created_at": action.created_at.isoformat() if action.created_at else None,
-                "meeting_id": action.meeting_id
+                "meeting_id": action.meeting_id,
+                "user_name": action.meeting.deal.user.name,
+                "user_email": action.meeting.deal.user.email,
+                "user_id": action.meeting.deal.user.id
             })
 
         return jsonify(result), 200
 
     except Exception as e:
-        logging.info(f"Failed to fetch actions with error: {e}")
+        logging.info(f"Failed to fetch actions with error: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
 
 
@@ -145,7 +159,7 @@ def get_action_by_id(action_id):
         return jsonify(result), 200
 
     except Exception as e:
-        logging.error(f"Failed to fetch action details: {e}")
+        logging.error(f"Failed to fetch action details: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch action: {str(e)}"}), 500
 
 
@@ -197,7 +211,7 @@ def update_multiple_action_statuses():
         }), 200
 
     except Exception as e:
-        logging.error(f"Failed to change action status: {e}")
+        logging.error(f"Failed to change action status: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"error": f"Failed to update actions: {str(e)}"}), 500
 
@@ -237,6 +251,6 @@ def update_action_type():
         }), 200
 
     except Exception as e:
-        logging.error(f"Failed to change action type: {e}")
+        logging.error(f"Failed to change action type: {traceback.format_exc()}")
         db.session.rollback()
         return jsonify({"error": f"Failed to update action type: {str(e)}"}), 500
