@@ -5,7 +5,7 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 
-from app import Job, db, User, Meeting
+from app import Job, db, Seller, Meeting
 from app.constants import AWSConstants
 from app.models.job import JobStatus
 from app.service.aws.ecs_client import ECSClient

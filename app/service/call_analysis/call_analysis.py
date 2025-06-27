@@ -8,7 +8,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-from app import User, Agency, Deal, Action, db
+from app import Seller, Agency, Deal, Action, db
 from app.models.action import ActionType
 
 from app.models.meeting import Meeting, ProcessingStatus
@@ -41,13 +41,12 @@ class CallAnalysis:
     def analyze_meeting(self):
         try:
             seller_number = self.meeting.seller_number
-            self.user = User.query.filter_by(phone=seller_number).first()
+            self.user = Seller.query.filter_by(phone=seller_number).first()
             self.agency = Agency.query.filter_by(id=self.user.agency_id).first()
             self.deal = Deal.query.filter_by(id=self.meeting.deal_id).first()
 
             self.process_analytical_prompt()
             self.process_descriptive_prompt()
-            self.meeting.status = ProcessingStatus.COMPLETE
             db.session.commit()
             logging.info("Meeting has been analysed successfully")
         except Exception as e:

@@ -5,7 +5,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from app import db
-from app.models.user import User
+from app.models.seller import Seller
 from app.models.jwt_token_blocklist import TokenBlocklist
 from app.service.aws.s3_client import S3Client
 from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_user_claims
@@ -51,12 +51,12 @@ def signup():
             logging.error({'error': 'Invalid Agency Name'})
             return jsonify({'error': 'Invalid Agency Name'}), 400
 
-        logging.info("Checking if User already exists")
-        existing_user = User.query.filter((User.email == email) | (User.phone == phone)).first()
+        logging.info("Checking if Seller already exists")
+        existing_user = Seller.query.filter((Seller.email == email) | (Seller.phone == phone)).first()
         if existing_user:
-            logging.error({'error': 'User already exists'})
-            return jsonify({'error': 'User already exists'}), 400
-        logging.info(f"User doesn't exist. Creating new user with name {name} and email {email} and phone {phone}")
+            logging.error({'error': 'Seller already exists'})
+            return jsonify({'error': 'Seller already exists'}), 400
+        logging.info(f"Seller doesn't exist. Creating new user with name {name} and email {email} and phone {phone}")
 
         logging.info(f"generating secure otp")
         otp = generate_secure_otp(length=16)
@@ -65,7 +65,7 @@ def signup():
         phone = normalize_phone_number(phone)
 
         logging.info(f"Creating user")
-        new_user = User(email=email, password=otp, agency_id=agency_id, phone=phone, role=role, name=name)
+        new_user = Seller(email=email, password=otp, agency_id=agency_id, phone=phone, role=role, name=name)
 
         logging.info("Sending OTP via email")
         _ = send_otp_email(to_email=email, otp=otp)
@@ -75,7 +75,7 @@ def signup():
         db.session.commit()
 
         logging.info(f"Created new user successfully with email={email}, name={name}")
-        return jsonify({'message': 'User created successfully', 'name': name, 'user_id': str(new_user.id)}), 201
+        return jsonify({'message': 'Seller created successfully', 'name': name, 'user_id': str(new_user.id)}), 201
     except Exception as e:
         logging.error(f"Failed to complete signup with error {e}")
         return jsonify({'error': 'Signup Failed'}), 500
@@ -93,7 +93,7 @@ def login():
             logging.error({'error': 'Missing email or password'})
             return jsonify({'error': 'Missing email or password'}), 400
 
-        user = User.query.filter_by(email=email).first()
+        user = Seller.query.filter_by(email=email).first()
         if not user or not user.check_password(password):
             logging.error({'error': 'Invalid credentials'})
             return jsonify({'error': f'Invalid credentials for email: {email}'}), 401
@@ -111,7 +111,7 @@ def login():
 @jwt_required(refresh=True)  # Requires a valid refresh token
 def refresh():
     user_id = get_jwt_identity()  # Get user ID from refresh token
-    user = User.query.filter_by(id=user_id).first()
+    user = Seller.query.filter_by(id=user_id).first()
     user_claims = generate_user_claims(user)
     new_access_token = user.generate_access_token(expires_delta=timedelta(minutes=15), additional_claims=user_claims)
     refresh_token = user.generate_refresh_token()
@@ -137,10 +137,10 @@ def update_password():
         old_password = data.get('old_password')
         new_password = data.get('new_password')
 
-        user = User.query.filter_by(email=email).first()
+        user = Seller.query.filter_by(email=email).first()
         if not user:
-            logging.error({"error": f"User not found with email {email}"})
-            return jsonify({"message": "User not found"}), 404
+            logging.error({"error": f"Seller not found with email {email}"})
+            return jsonify({"message": "Seller not found"}), 404
 
         if not check_password_hash(user.password_hash, old_password):
             logging.error({"error": f"Old password incorrect for user with email {email}"})

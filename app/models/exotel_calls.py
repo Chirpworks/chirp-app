@@ -5,7 +5,7 @@ from sqlalchemy import UUID
 
 from app import db
 
-from .user import User
+from .seller import Seller
 
 
 # Deal model

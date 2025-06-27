@@ -4,10 +4,11 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app import Meeting, db, User
-from app.models.action import Action, ActionStatus, ActionType
+from app import Meeting, db, Seller
+from app.models.action import Action, ActionStatus
 from app.models.deal import Deal
-from app.models.user import UserRole
+
+from app.models.seller import SellerRole
 
 logging = logging.getLogger(__name__)
 
@@ -31,27 +32,23 @@ def get_actions():
 
         if not user_id:
             logging.error("Failed to get action - Unauthorized")
-            return jsonify({"error": "User not found or unauthorized"}), 401
+            return jsonify({"error": "Seller not found or unauthorized"}), 401
 
-        team_member_ids = request.args.getlist("team_member_id")
-        if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-            logging.info(f"Fetching actions data for users {team_member_ids}")
+        user_ids = request.args.getlist("user_id")
+        if user_ids:
+            for user_id in user_ids:
+                user = Seller.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"Seller with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "Seller not found or unauthorized"}), 404
+            logging.info(f"Fetching actions data for users {user_ids}")
 
             # Join through deals to fetch user's meetings
             query = (
                 Action.query
                 .join(Action.meeting)
                 .join(Meeting.deal)
-                .filter(Deal.user_id.in_(team_member_ids))
+                .filter(Deal.user_id.in_(user_ids))
             )
         else:
             logging.info(f"Fetching actions data for user {user_id}")
@@ -111,7 +108,7 @@ def get_action_by_id(action_id):
 
         if not user_id:
             logging.error("Failed to get action - Unauthorized")
-            return jsonify({"error": "User not found or unauthorized"}), 401
+            return jsonify({"error": "Seller not found or unauthorized"}), 401
 
         # Join to verify ownership through deal
         action = (
@@ -181,7 +178,7 @@ def update_multiple_action_statuses():
             return jsonify({"error": "No valid actions found for current user"}), 404
 
         if not user_id:
-            return jsonify({"error": "User not found or unauthorized"}), 401
+            return jsonify({"error": "Seller not found or unauthorized"}), 401
 
         updated_ids = []
         for action in actions:
@@ -200,43 +197,3 @@ def update_multiple_action_statuses():
         logging.error(f"Failed to change action status: {e}")
         db.session.rollback()
         return jsonify({"error": f"Failed to update actions: {str(e)}"}), 500
-
-
-@action_bp.route("/update_action_type", methods=["POST"])
-@jwt_required()
-def update_action_type():
-    try:
-        user_id = get_jwt_identity()
-        if not user_id:
-            return jsonify({"error": "User not found or unauthorized"}), 401
-
-        data = request.get_json()
-
-        action_id = data.get("action_id")
-        action_type = data.get("action_type")
-
-        if not action_id or not action_type:
-            return jsonify({"error": "Request must include 'action_id' and 'action_type'"}), 400
-
-        try:
-            new_type = ActionType[action_type.upper()]
-        except KeyError:
-            return jsonify({"error": "Invalid status. Must be 'suggested_action' or 'contextual_action'"}), 400
-
-        action = Action.query.filter(Action.id==action_id).first()
-        if not action:
-            return jsonify({"error": f"No valid action found for action_id: {action_id}"}), 404
-
-        action.type = new_type
-
-        db.session.commit()
-
-        return jsonify({
-            "message": f"Updated type for action {action_id}",
-            "new_type": new_type.value
-        }), 200
-
-    except Exception as e:
-        logging.error(f"Failed to change action type: {e}")
-        db.session.rollback()
-        return jsonify({"error": f"Failed to update action type: {str(e)}"}), 500

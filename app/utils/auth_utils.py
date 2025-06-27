@@ -6,7 +6,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 
-from app import User
+from app import Seller
 from app.constants import AWSConstants
 from app.service.aws.s3_client import S3Client
 
@@ -57,7 +57,7 @@ def add_agency_to_list(agency_id, agency_name):
     )
 
 
-def generate_user_claims(user: User):
+def generate_user_claims(user: Seller):
     user_claims = {
         "user_id": str(user.id),
         "user_name": user.name,

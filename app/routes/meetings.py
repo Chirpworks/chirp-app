@@ -9,13 +9,13 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from sqlalchemy import and_
 
-from app import User, Meeting, db, Job
+from app import Seller, Meeting, db, Job
 from app.constants import MeetingSource, CallDirection
 from app.models import meeting
 from app.models.deal import Deal
 from app.models.job import JobStatus
 from app.models.mobile_app_calls import MobileAppCall
-from app.models.user import UserRole
+from app.models.seller import SellerRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
 from app.utils.call_recording_utils import denormalize_phone_number
 from app.utils.utils import human_readable_duration
@@ -53,9 +53,9 @@ def create_meeting():
     #     if not title or not scheduled_at or not user_id:
     #         return jsonify({"error": "Missing required fields"}), 400
     #
-    #     user = User.query.get(user_id)
+    #     user = Seller.query.get(user_id)
     #     if not user:
-    #         return jsonify({"error": "User not found"}), 404
+    #         return jsonify({"error": "Seller not found"}), 404
     #
     #     new_meeting = Meeting(
     #         title=title,
@@ -95,15 +95,23 @@ def get_meeting_history():
         deal_id = request.args.get("dealId")
         team_member_ids = request.args.getlist("team_member_id")
         if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
+            user = Seller.query.filter_by(id=user_id).first()
             if not user:
                 logging.error("User not found; unauthorized")
                 return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
+            if user.role != SellerRole.MANAGER:
                 logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
                 return jsonify(
                     {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
                 )
+
+        if team_member_ids:
+            for user_id in team_member_ids:
+                user = Seller.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"Seller with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "Seller not found or unauthorized"}), 404
+            logging.info(f"Fetching actions data for users {team_member_ids}")
 
             logging.info(f"Fetching call history for users {team_member_ids}")
             # Join through deals to fetch user's meetings
@@ -154,7 +162,7 @@ def get_meeting_history():
         local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
         result = []
         for call_record in meetings:
-            seller_name = User.query.filter_by(phone=call_record.seller_number).first().name
+            seller_name = Seller.query.filter_by(phone=call_record.seller_number).first().name
             title = f"Meeting between {denormalize_phone_number(call_record.buyer_number)} and {seller_name}"
             analysis_status = 'Processing'
             direction = None
@@ -228,14 +236,14 @@ def get_meeting_by_id(meeting_id):
 
         team_member_id = request.args.get("team_member_id")
         if team_member_id:
-            user = User.query.filter_by(id=user_id).first()
+            user = Seller.query.filter_by(id=user_id).first()
             if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                logging.error("Seller not found; unauthorized")
+                return jsonify({"error": "Seller not found or unauthorized"}), 404
+            if user.role != SellerRole.MANAGER:
+                logging.info(f"Unauthorized Seller. 'team_member_id' query parameter is only applicable for a manager.")
                 return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                    {"error": "Unauthorized Seller: 'team_member_id' query parameter is only applicable for a manager"}
                 )
             logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
             user_id = team_member_id
@@ -288,14 +296,14 @@ def get_meeting_diarization_by_id(meeting_id):
 
         team_member_id = request.args.get("team_member_id")
         if team_member_id:
-            user = User.query.filter_by(id=user_id).first()
+            user = Seller.query.filter_by(id=user_id).first()
             if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                logging.error("Seller not found; unauthorized")
+                return jsonify({"error": "Seller not found or unauthorized"}), 404
+            if user.role != SellerRole.MANAGER:
+                logging.info(f"Unauthorized Seller. 'team_member_id' query parameter is only applicable for a manager.")
                 return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                    {"error": "Unauthorized Seller: 'team_member_id' query parameter is only applicable for a manager"}
                 )
             logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
             user_id = team_member_id
@@ -359,7 +367,7 @@ def get_last_synced_call_id():
         seller_number = request.args.get("sellerNumber")
         logging.info(f"getting last synced call id for phone: {seller_number}")
 
-        user = User.query.filter_by(phone=seller_number).first()
+        user = Seller.query.filter_by(phone=seller_number).first()
         if not user:
             logging.info(f"user not found for phone {seller_number}")
             return jsonify({"message": f"No user with phone number {seller_number} found"}), 404

@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 
 from app import db
 
-from .user import User
+from .seller import Seller
 
 
 class DealStatus(Enum):
@@ -35,7 +35,7 @@ class Deal(db.Model):
     pain_points = db.Column(db.JSON, nullable=True)
     solutions = db.Column(db.JSON, nullable=True)
     user_id = db.Column(UUID(as_uuid=True), db.ForeignKey('users.id'), nullable=False)
-    user = db.relationship('User', back_populates='deals')
+    user = db.relationship('Seller', back_populates='deals')
     meetings = db.relationship('Meeting', back_populates='deal', cascade='all, delete-orphan')
     history = db.Column(db.JSON, nullable=True)
     status = db.Column(ENUM(DealStatus, name="dealstatus", values_callable=lambda x: [e.value for e in x]), default=DealStatus.OPEN, nullable=True)

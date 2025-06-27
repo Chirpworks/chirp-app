@@ -1,4 +1,4 @@
-"""add manager relationship to User; deal_history column to deal
+"""add manager relationship to Seller; deal_history column to deal
 
 Revision ID: 5e985743a5fa
 Revises: bd12004582ce

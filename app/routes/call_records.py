@@ -12,7 +12,7 @@ import requests
 from flask import Blueprint, request, jsonify
 from sqlalchemy import and_
 
-from app import Job, db, User, Meeting
+from app import Job, db, Seller, Meeting
 from app.constants import AWSConstants, CallDirection, MeetingSource
 from app.models.deal import Deal, DealStatus
 from app.models.exotel_calls import ExotelCall
@@ -104,7 +104,7 @@ def post_exotel_recording():
 
         # create meeting record
         # get user
-        user = User.query.filter_by(phone=call_from).first()
+        user = Seller.query.filter_by(phone=call_from).first()
         if not user:
             logging.error({"error": f"No user found with phone number: {call_from}"})
             return jsonify({"error": f"No user found with phone number: {call_from}"}), 404
@@ -268,7 +268,7 @@ def post_app_call_record():
                 logging.error("all required fields were not sent in the request parameter")
                 return jsonify({"error": "Missing required fields"}), 400
 
-            user = User.query.filter_by(phone=seller_number).first()
+            user = Seller.query.filter_by(phone=seller_number).first()
 
             if not user:
                 logging.info(f"No user with phone number {seller_number} found")

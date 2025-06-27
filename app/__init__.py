@@ -8,7 +8,7 @@ from app.extensions import migrate, db, jwt
 from app.config import Config
 
 from app.models.agency import Agency
-from app.models.user import User
+from app.models.seller import Seller
 from app.models.job import Job
 from app.models.meeting import Meeting
 from app.models.deal import Deal

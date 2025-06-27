@@ -10,7 +10,7 @@ from sqlalchemy import UUID
 
 from app import db
 
-from .user import User
+from .seller import Seller
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
@@ -20,11 +20,6 @@ class ActionStatus(Enum):
     COMPLETED = "completed"
 
 
-class ActionType(Enum):
-    SUGGESTED_ACTION = "suggested_action"
-    CONTEXTUAL_ACTION = "contextual_action"
-
-
 # Meeting model
 class Action(db.Model):
     __tablename__ = 'actions'
@@ -32,10 +27,13 @@ class Action(db.Model):
     title = db.Column(db.String(300), nullable=False)
     due_date = db.Column(db.DateTime(timezone=True), default=None, nullable=True)
     status = db.Column(db.Enum(ActionStatus), default=ActionStatus.PENDING, nullable=False)
-    type = db.Column(ENUM(ActionType, name="actiontype", values_callable=lambda x: [e.value for e in x]), default=ActionType.CONTEXTUAL_ACTION, nullable=True)
     description = db.Column(db.JSON, nullable=True)
     reasoning = db.Column(db.Text, nullable=True)
     signals = db.Column(db.JSON, nullable=True)
     meeting_id = db.Column(UUID(as_uuid=True), db.ForeignKey('meetings.id'), nullable=False)
     meeting = db.relationship('Meeting', back_populates='actions')
+    buyer_id = db.Column(UUID(as_uuid=True), db.ForeignKey('buyers.id'), nullable=False)
+    buyer = db.relationship('Buyer', back_populates='actions')
+    seller_id = db.Column(UUID(as_uuid=True), db.ForeignKey('sellers.id'), nullable=False)
+    seller = db.relationship('Seller', back_populates='actions')
     created_at = db.Column(db.DateTime(timezone=True), default=datetime.now(ZoneInfo("Asia/Kolkata")), nullable=True)

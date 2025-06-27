@@ -7,10 +7,10 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from sqlalchemy import func
 
-from app import Meeting, db, User
-from app.models.action import Action, ActionStatus, ActionType
+from app import Meeting, db, Seller
+from app.models.action import Action, ActionStatus
 from app.models.deal import Deal
-from app.models.user import UserRole
+from app.models.seller import SellerRole
 from app.utils.call_recording_utils import denormalize_phone_number
 
 logging = logging.getLogger(__name__)
@@ -25,23 +25,19 @@ def get_deals():
         user_id = get_jwt_identity()
 
         deal_id = request.args.get("dealId")
-        team_member_ids = request.args.getlist("team_member_id")
-        if team_member_ids:
-            user = User.query.filter_by(id=user_id).first()
-            if not user:
-                logging.error("User not found; unauthorized")
-                return jsonify({"error": "User not found or unauthorized"}), 404
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-
-            logging.info(f"Fetching call history for users {team_member_ids}")
+        user_ids = request.args.getlist("user_id")
+        time_frame = request.args.get("time_frame", type=str)
+        if user_ids:
+            for user_id in user_ids:
+                user = Seller.query.filter_by(id=user_id).first()
+                if not user:
+                    logging.error(f"Seller with id {user_id} not found; unauthorized")
+                    return jsonify({"error": "Seller not found or unauthorized"}), 404
+            logging.info(f"Fetching deals data for users {user_ids}")
 
             query = (
                 Deal.query
-                .filter(Deal.user_id.in_(team_member_ids))
+                .filter(Deal.user_id.in_(user_ids))
             )
         else:
             # Base query: actions joined through meetings and deals
@@ -63,7 +59,6 @@ def get_deals():
                 .join(Deal, Meeting.deal_id == Deal.id)
                 .filter(Deal.id == deal.id)
                 .filter(Action.status == ActionStatus.PENDING)
-                .filter(Action.type == ActionType.CONTEXTUAL_ACTION)
                 .scalar()
             )
             last_contacted_on = (
@@ -100,17 +95,17 @@ def get_deals():
 def get_deal_by_id(deal_id):
     try:
         user_id = get_jwt_identity()
-        user = User.query.filter_by(id=user_id).first()
+        user = Seller.query.filter_by(id=user_id).first()
         if not user:
-            logging.error("User not found; unauthorized")
-            return jsonify({"error": "User not found or unauthorized"}), 404
+            logging.error("Seller not found; unauthorized")
+            return jsonify({"error": "Seller not found or unauthorized"}), 404
 
         team_member_id = request.args.get("team_member_id")
         if team_member_id:
-            if user.role != UserRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+            if user.role != SellerRole.MANAGER:
+                logging.info(f"Unauthorized Seller. 'team_member_id' query parameter is only applicable for a manager.")
                 return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                    {"error": "Unauthorized Seller: 'team_member_id' query parameter is only applicable for a manager"}
                 )
             logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
             user_id = team_member_id
@@ -134,7 +129,6 @@ def get_deal_by_id(deal_id):
             .join(Deal, Meeting.deal_id == Deal.id)
             .filter(Deal.id == deal.id)
             .filter(Action.status == ActionStatus.PENDING)
-            .filter(Action.type == ActionType.CONTEXTUAL_ACTION)
             .scalar()
         )
         last_contacted_on = (
@@ -179,10 +173,10 @@ def change_deal_assignee():
     try:
         data = request.get_json()
         user_id = get_jwt_identity()
-        user = User.query.filter_by(id=user_id).first()
+        user = Seller.query.filter_by(id=user_id).first()
         if not user:
-            logging.error("User not found; unauthorized")
-            return jsonify({"error": "User not found or unauthorized"}), 404
+            logging.error("Seller not found; unauthorized")
+            return jsonify({"error": "Seller not found or unauthorized"}), 404
 
         deal_id = data.get("deal_id", None)
         assignee_id = data.get("assignee_id", None)
@@ -196,10 +190,10 @@ def change_deal_assignee():
             logging.error(f"Deal with {deal_id=} not found")
             return jsonify({"error": f"Deal with {deal_id=} not found"}), 404
 
-        assignee = User.query.filter_by(id=assignee_id).first()
+        assignee = Seller.query.filter_by(id=assignee_id).first()
         if not assignee:
-            logging.error(f"User with {assignee=} not found")
-            return jsonify({"error": f"User with {assignee_id=} not found"}), 404
+            logging.error(f"Seller with {assignee=} not found")
+            return jsonify({"error": f"Seller with {assignee_id=} not found"}), 404
 
         deal.user_id = assignee_id
         deal_history = deal.history
