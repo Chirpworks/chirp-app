@@ -18,8 +18,8 @@ class ProductService(BaseService):
     model = Product
     
     @classmethod
-    def create_product(cls, name: str, agency_id: str, description: str = None, 
-                      features: Dict[str, Any] = None) -> Product:
+    def create_product(cls, name: str, agency_id: str, description: Optional[str] = None, 
+                      features: Optional[Dict[str, Any]] = None) -> Product:
         """
         Create a new product for an agency.
         
@@ -114,8 +114,8 @@ class ProductService(BaseService):
             raise
     
     @classmethod
-    def update_product_info(cls, product_id: str, name: str = None, description: str = None,
-                           features: Dict[str, Any] = None) -> Optional[Product]:
+    def update_product_info(cls, product_id: str, name: Optional[str] = None, description: Optional[str] = None,
+                           features: Optional[Dict[str, Any]] = None) -> Optional[Product]:
         """
         Update product information.
         
@@ -223,7 +223,7 @@ class ProductService(BaseService):
             raise
     
     @classmethod
-    def search_products(cls, query: str, agency_id: str = None) -> List[Product]:
+    def search_products(cls, query: str, agency_id: Optional[str] = None) -> List[Product]:
         """
         Search products by name or description, optionally filtered by agency.
         
@@ -258,8 +258,8 @@ class ProductService(BaseService):
             raise
     
     @classmethod
-    def get_products_by_feature(cls, feature_key: str, feature_value: Any = None, 
-                               agency_id: str = None) -> List[Product]:
+    def get_products_by_feature(cls, feature_key: str, feature_value: Optional[Any] = None, 
+                               agency_id: Optional[str] = None) -> List[Product]:
         """
         Get products that have a specific feature, optionally with a specific value.
         
@@ -300,7 +300,7 @@ class ProductService(BaseService):
             raise
     
     @classmethod
-    def get_product_statistics(cls, agency_id: str = None) -> Dict[str, Any]:
+    def get_product_statistics(cls, agency_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get product statistics for an agency or all agencies.
         
@@ -354,7 +354,7 @@ class ProductService(BaseService):
             raise
     
     @classmethod
-    def clone_product(cls, product_id: str, new_name: str = None, target_agency_id: str = None) -> Optional[Product]:
+    def clone_product(cls, product_id: str, new_name: Optional[str] = None, target_agency_id: Optional[str] = None) -> Optional[Product]:
         """
         Clone a product, optionally to a different agency.
         

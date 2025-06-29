@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 from openai import OpenAI
 import os
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class OpenAIClient:
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: Optional[str] = None):
         """Initialize the OpenAI client with an API key."""
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         if not self.api_key:
@@ -26,6 +27,9 @@ class OpenAIClient:
                 logger.info("OpenAI response was empty or failed")
                 raise Exception("OpenAI response was empty or failed")
             raw_response = response.choices[0].message.content
+            if raw_response is None:
+                logger.error("OpenAI response content was None")
+                return None
             content = self.clean_json_content(raw_response)
             return content
         except Exception as e:
@@ -96,12 +100,13 @@ class OpenAIClient:
         ]
         response = self.client.chat.completions.create(
             model="gpt-4.1-mini",  # or "gpt-4"
-            messages=prompt,
+            messages=prompt,  # type: ignore[arg-type]
             temperature=0.3,  # lower temperature means more conservative rewriting
             max_tokens=len(str(diarization).split()) * 2  # budget ~ 2× word count
         )
         logger.info(f"transliteration returned by GPT = {response.choices[0].message.content}")
-        return response.choices[0].message.content.strip()
+        content = response.choices[0].message.content
+        return content.strip() if content else ""
 
 
 # Example Usage

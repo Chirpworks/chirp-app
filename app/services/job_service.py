@@ -161,7 +161,7 @@ class JobService(BaseService):
             raise
     
     @classmethod
-    def mark_failed(cls, job_id: str, error_message: str = None) -> Optional[Job]:
+    def mark_failed(cls, job_id: str, error_message: Optional[str] = None) -> Optional[Job]:
         """
         Mark a job as failed with optional error message.
         
@@ -204,7 +204,7 @@ class JobService(BaseService):
             Updated Job instance or None if not found
         """
         try:
-            update_data = {'status': status}
+            update_data: Dict[str, Any] = {'status': status}
             
             # Set end_time for terminal states
             if status in [JobStatus.COMPLETED, JobStatus.FAILURE]:
@@ -246,7 +246,7 @@ class JobService(BaseService):
             raise
     
     @classmethod
-    def get_jobs_by_status(cls, status: JobStatus, limit: int = None) -> List[Job]:
+    def get_jobs_by_status(cls, status: JobStatus, limit: Optional[int] = None) -> List[Job]:
         """
         Get jobs by status with optional limit.
         
@@ -290,7 +290,7 @@ class JobService(BaseService):
             raise
     
     @classmethod
-    def get_job_statistics(cls, date_range: Dict[str, datetime] = None) -> Dict[str, Any]:
+    def get_job_statistics(cls, date_range: Optional[Dict[str, datetime]] = None) -> Dict[str, Any]:
         """
         Get job processing statistics.
         

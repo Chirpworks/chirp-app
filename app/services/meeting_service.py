@@ -103,7 +103,7 @@ class MeetingService(BaseService):
             raise
     
     @classmethod
-    def get_meetings_by_seller(cls, seller_id: str, filters: Dict[str, Any] = None) -> List[Meeting]:
+    def get_meetings_by_seller(cls, seller_id: str, filters: Optional[Dict[str, Any]] = None) -> List[Meeting]:
         """
         Get all meetings for a specific seller with optional filters.
         
@@ -165,7 +165,7 @@ class MeetingService(BaseService):
             raise
     
     @classmethod
-    def get_call_history(cls, user_id: str, team_member_ids: List[str] = None) -> List[Dict[str, Any]]:
+    def get_call_history(cls, user_id: str, team_member_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Get comprehensive call history for a user or team.
         
@@ -256,7 +256,15 @@ class MeetingService(BaseService):
             # Determine analysis status and direction
             analysis_status = 'Processing'
             direction = None
-            title = f"Meeting between {denormalize_phone_number(call_record.buyer_number)} and {seller_name}"
+            # Get buyer number based on record type
+            if isinstance(call_record, Meeting):
+                buyer_number = call_record.buyer.phone
+                seller_number = call_record.seller.phone
+            else:  # MobileAppCall
+                buyer_number = call_record.buyer_number
+                seller_number = call_record.seller_number
+            
+            title = f"Meeting between {denormalize_phone_number(buyer_number)} and {seller_name}"
             
             if isinstance(call_record, Meeting):
                 # Meeting record
@@ -276,10 +284,10 @@ class MeetingService(BaseService):
                 analysis_status = call_record.status
                 
                 if call_record.status == 'Missed':
-                    title = f'Missed Call from {denormalize_phone_number(call_record.buyer_number)}'
+                    title = f'Missed Call from {denormalize_phone_number(buyer_number)}'
                     direction = CallDirection.INCOMING.value
                 elif call_record.status == 'Not Answered':
-                    title = f'{denormalize_phone_number(call_record.buyer_number)} did not answer'
+                    title = f'{denormalize_phone_number(buyer_number)} did not answer'
                     direction = CallDirection.OUTGOING.value
                 elif call_record.status == 'Processing':
                     start_time_local = call_record.start_time
@@ -309,8 +317,8 @@ class MeetingService(BaseService):
                 "participants": getattr(call_record, 'participants', None),
                 "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
                 "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
-                "buyer_number": denormalize_phone_number(call_record.buyer_number),
-                "seller_number": denormalize_phone_number(call_record.seller_number),
+                "buyer_number": denormalize_phone_number(buyer_number),
+                "seller_number": denormalize_phone_number(seller_number),
                 "analysis_status": analysis_status,
                 "duration": duration,
                 "call_notes": getattr(call_record, 'call_notes', None),
@@ -375,7 +383,7 @@ class MeetingService(BaseService):
             raise
     
     @classmethod
-    def get_meeting_analytics(cls, user_id: str, date_range: Dict[str, datetime] = None) -> Dict[str, Any]:
+    def get_meeting_analytics(cls, user_id: str, date_range: Optional[Dict[str, datetime]] = None) -> Dict[str, Any]:
         """
         Get meeting analytics for a user.
         

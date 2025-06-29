@@ -21,7 +21,7 @@ class SellerService(BaseService):
     
     @classmethod
     def create_seller(cls, email: str, phone: str, password: str, agency_id: str, 
-                     name: str, role: str = None) -> Seller:
+                     name: str, role: Optional[str] = None) -> Seller:
         """
         Create a new seller with normalized data.
         

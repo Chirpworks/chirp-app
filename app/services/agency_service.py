@@ -20,7 +20,7 @@ class AgencyService(BaseService):
     model = Agency
     
     @classmethod
-    def create_agency(cls, name: str, description: str = None) -> Agency:
+    def create_agency(cls, name: str, description: Optional[str] = None) -> Agency:
         """
         Create a new agency.
         
@@ -124,7 +124,7 @@ class AgencyService(BaseService):
             raise
     
     @classmethod
-    def update_agency_info(cls, agency_id: str, name: str = None, description: str = None) -> Optional[Agency]:
+    def update_agency_info(cls, agency_id: str, name: Optional[str] = None, description: Optional[str] = None) -> Optional[Agency]:
         """
         Update agency information.
         
@@ -190,7 +190,7 @@ class AgencyService(BaseService):
             raise
     
     @classmethod
-    def get_agency_buyers(cls, agency_id: str, limit: int = None) -> List[Buyer]:
+    def get_agency_buyers(cls, agency_id: str, limit: Optional[int] = None) -> List[Buyer]:
         """
         Get buyers for an agency.
         
@@ -276,7 +276,7 @@ class AgencyService(BaseService):
             raise
     
     @classmethod
-    def get_agency_statistics(cls, agency_id: str = None) -> Dict[str, Any]:
+    def get_agency_statistics(cls, agency_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get agency statistics.
         
@@ -399,7 +399,8 @@ class AgencyService(BaseService):
             'id': str(buyer.id),
             'name': buyer.name,
             'phone': buyer.phone,
-            'company': buyer.company
+            'email': buyer.email,
+            'agency_name': buyer.agency.name
         }
     
     @classmethod

@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app import Meeting, db, Seller
-from app.models.action import Action, ActionStatus, ActionType
+from app.models.action import Action, ActionStatus
 from app.models.seller import SellerRole
 from app.utils.call_recording_utils import denormalize_phone_number
 from app.services import ActionService, SellerService

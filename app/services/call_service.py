@@ -40,13 +40,12 @@ class CallService(BaseService):
         try:
             normalized_phone = normalize_phone_number(call_from)
             
-            exotel_call = ExotelCall(
-                call_from=normalized_phone,
-                start_time=start_time,
-                end_time=end_time,
-                duration=duration,
-                call_recording_url=call_recording_url
-            )
+            exotel_call = ExotelCall()
+            exotel_call.call_from = normalized_phone
+            exotel_call.start_time = start_time
+            exotel_call.end_time = end_time
+            exotel_call.duration = duration
+            exotel_call.call_recording_url = call_recording_url
             
             db.session.add(exotel_call)
             db.session.flush()
@@ -85,17 +84,16 @@ class CallService(BaseService):
             # Calculate call status
             status = calculate_call_status(call_type, duration)
             
-            mobile_call = MobileAppCall(
-                mobile_app_call_id=mobile_app_call_id,
-                buyer_number=normalized_buyer,
-                seller_number=normalized_seller,
-                call_type=call_type,
-                start_time=start_time,
-                end_time=end_time,
-                duration=duration,
-                user_id=user_id,
-                status=status
-            )
+            mobile_call = MobileAppCall()
+            mobile_call.mobile_app_call_id = mobile_app_call_id
+            mobile_call.buyer_number = normalized_buyer
+            mobile_call.seller_number = normalized_seller
+            mobile_call.call_type = call_type
+            mobile_call.start_time = start_time
+            mobile_call.end_time = end_time
+            mobile_call.duration = duration
+            mobile_call.user_id = user_id
+            mobile_call.status = status
             
             db.session.add(mobile_call)
             db.session.flush()
@@ -224,7 +222,7 @@ class CallService(BaseService):
             raise
     
     @classmethod
-    def get_exotel_calls_by_seller(cls, seller_number: str, date_range: Dict[str, datetime] = None) -> List[ExotelCall]:
+    def get_exotel_calls_by_seller(cls, seller_number: str, date_range: Optional[Dict[str, datetime]] = None) -> List[ExotelCall]:
         """
         Get ExotelCall records for a specific seller.
         
@@ -257,7 +255,7 @@ class CallService(BaseService):
             raise
     
     @classmethod
-    def get_mobile_app_calls_by_user(cls, user_id: str, date_range: Dict[str, datetime] = None) -> List[MobileAppCall]:
+    def get_mobile_app_calls_by_user(cls, user_id: str, date_range: Optional[Dict[str, datetime]] = None) -> List[MobileAppCall]:
         """
         Get MobileAppCall records for a specific user.
         
@@ -288,7 +286,7 @@ class CallService(BaseService):
             raise
     
     @classmethod
-    def get_mobile_app_calls_by_seller_phone(cls, seller_number: str, date_range: Dict[str, datetime] = None) -> List[MobileAppCall]:
+    def get_mobile_app_calls_by_seller_phone(cls, seller_number: str, date_range: Optional[Dict[str, datetime]] = None) -> List[MobileAppCall]:
         """
         Get MobileAppCall records for a specific seller by phone number.
         
@@ -391,7 +389,7 @@ class CallService(BaseService):
             raise
     
     @classmethod
-    def get_call_statistics(cls, seller_number: str = None, date_range: Dict[str, datetime] = None) -> Dict[str, Any]:
+    def get_call_statistics(cls, seller_number: Optional[str] = None, date_range: Optional[Dict[str, datetime]] = None) -> Dict[str, Any]:
         """
         Get call statistics for a seller or all sellers.
         

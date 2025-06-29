@@ -31,10 +31,7 @@ def get_team():
             logging.error(f"Seller with id {user_id} not found")
             return jsonify({"error": "Seller not found"}), 404
 
-        users = (
-            Seller.query
-            .filter(Seller.agency_id == user.agency_id)
-        )
+        users = Seller.query.filter(Seller.agency_id == user.agency_id).all()  # type: ignore[attr-defined]
         all_members_total_outgoing_calls = 0
         all_members_total_incoming_calls = 0
         all_members_unanswered_outgoing_calls = 0
@@ -45,29 +42,29 @@ def get_team():
         for team_member in users:
             total_outgoing_calls = (
                 Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.seller_id == team_member.id)
                 .filter(Meeting.direction == CallDirection.OUTGOING.value)
-                .scalar()
+                .count()
             )
             total_incoming_calls = (
                 Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.seller_id == team_member.id)
                 .filter(Meeting.direction == CallDirection.INCOMING.value)
-                .scalar()
+                .count()
             )
             unanswered_outgoing_calls = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id == team_member.id)
                 .filter(MobileAppCall.status == 'Not Answered')
-                .scalar()
+                .count()
             )
             unique_leads_engaged = (
-                db.session.query(func.count(func.distinct(Meeting.buyer_number)))
-                .filter(Meeting.seller_number == team_member.phone)
+                db.session.query(func.count(func.distinct(Meeting.buyer_id)))
+                .filter(Meeting.seller_id == team_member.id)
                 .scalar()
             )
             unique_leads_called_but_not_engaged = (
-                db.session.query(func.count(func.ditinct(MobileAppCall.buyer_number)))
+                db.session.query(func.count(func.distinct(MobileAppCall.buyer_number)))
                 .filter(MobileAppCall.seller_number == team_member.phone)
                 .scalar()
             )
@@ -101,7 +98,8 @@ def get_team():
 
         return jsonify(result), 200
     except Exception as e:
-        logging.error(f"Failed to fetch team members for manager {user.email}, {user_id=}, with error: {e}")
+        user_email = user.email if user else "unknown"
+        logging.error(f"Failed to fetch team members for manager {user_email}, {user_id=}, with error: {e}")
         return jsonify(f"Failed to fetch team members for user {user_id=}, with error: {e}")
 
 
@@ -241,6 +239,9 @@ def get_user():
     try:
         user_id = get_jwt_identity()
         user = Seller.query.filter_by(id=user_id).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
 
         result = {
             "id": str(user.id),
@@ -286,6 +287,8 @@ def assign_manager():
 
         user.manager_id = manager.id
         db.session.commit()
+        
+        return jsonify({"message": "Manager assigned successfully"}), 200
     except Exception as e:
         logging.error(f"Failed to set manager {manager_email} for user {user_email}: {str(e)}")
         return jsonify({"error": f"Failed to set manager {manager_email} for user {user_email}: {str(e)}"})

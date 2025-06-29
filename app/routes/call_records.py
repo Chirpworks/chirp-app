@@ -99,6 +99,16 @@ def post_exotel_recording():
 
         logging.info(f"Received request to process exotel recording with details: {exotel_call_recording_details}")
 
+        # Validate required parameters
+        if not all([call_from, call_start_time, call_duration, call_recording_url]):
+            return jsonify({"error": "Missing required parameters"}), 400
+
+        # Type assertions after validation
+        assert call_from is not None
+        assert call_start_time is not None
+        assert call_duration is not None
+        assert call_recording_url is not None
+
         call_from = normalize_phone_number(call_from)
         call_start_time = datetime.strptime(call_start_time, '%Y-%m-%d %H:%M:%S').replace(tzinfo=ZoneInfo("Asia/Kolkata"))
 
@@ -147,10 +157,10 @@ def post_exotel_recording():
                 s3_key = f"recordings/exotel/{call_from}/{matching_app_call.id or exotel_call.id}.mp3"
                 bucket_name = AWSConstants.AUDIO_FILES_S3_BUCKET
                 s3_url = upload_file_to_s3(temp_file_path, bucket_name, s3_key)
-                if os.path.exists(temp_file_path):
+                if temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
             except Exception as e:
-                if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
                 logging.info(f"Failed to upload Exotel recording: {str(e)}")
                 return jsonify({"error": f"Failed to upload Exotel recording: {str(e)}"}), 500
@@ -160,34 +170,27 @@ def post_exotel_recording():
             # Find or create buyer using BuyerService
             buyer = BuyerService.find_or_create_buyer(matching_app_call.buyer_number, user.agency_id)
             
-            # Create a Meeting and Job for this reconciled call
-            meeting = Meeting(
-                id=matching_app_call.id,
-                mobile_app_call_id=matching_app_call.mobile_app_call_id,
-                buyer_number=matching_app_call.buyer_number,
-                seller_number=call_from,
-                title=f"Meeting between {denormalize_phone_number(matching_app_call.buyer_number)} and {user.name}",
-                start_time=matching_app_call.start_time,
-                scheduled_at=matching_app_call.start_time,
-                status=ProcessingStatus.PROCESSING,
+            # Create Meeting using MeetingService
+            meeting = MeetingService.create_meeting(
                 buyer_id=buyer.id,
                 seller_id=user.id,
-                source=MeetingSource.PHONE,
-                participants=[call_from, matching_app_call.buyer_number],
+                title=f"Meeting between {denormalize_phone_number(matching_app_call.buyer_number)} and {user.name}",
+                start_time=matching_app_call.start_time,
                 end_time=matching_app_call.end_time,
-                direction=matching_app_call.call_type
+                source=MeetingSource.PHONE,
+                direction=matching_app_call.call_type,
+                mobile_app_call_id=matching_app_call.mobile_app_call_id,
+                participants=[call_from, matching_app_call.buyer_number],
+                scheduled_at=matching_app_call.start_time,
+                status=ProcessingStatus.PROCESSING
             )
-            db.session.add(meeting)
-            db.session.flush()
-
-            job = Job(
+            
+            # Create Job using JobService
+            job = JobService.create_job(
                 meeting_id=meeting.id,
-                status=JobStatus.INIT,
                 s3_audio_url=s3_url,
                 start_time=call_start_time
             )
-            db.session.add(job)
-            db.session.flush()
 
             # Delete reconciled records using CallService
             CallService.delete_exotel_call(exotel_call)
@@ -206,6 +209,10 @@ def post_exotel_recording():
                 }
             }
             runpod_diarization_url = os.getenv("RUNPOD_DIARIZATION_URL")
+            if not runpod_diarization_url:
+                logging.error("RUNPOD_DIARIZATION_URL environment variable not set")
+                return jsonify({"error": "Diarization service not configured"}), 500
+            
             response = requests.post(
                 runpod_diarization_url, headers=headers, data=json.dumps(payload)
             )
@@ -266,7 +273,7 @@ def post_app_call_record():
 
             logging.info(f"Creating app call record for user {user.email}")
             # 1. Create the mobile app call record
-            mobile_call = MobileAppCall(
+            mobile_call = CallService.create_mobile_app_call(
                 mobile_app_call_id=call_id,
                 buyer_number=buyer_number,
                 seller_number=seller_number,
@@ -274,11 +281,9 @@ def post_app_call_record():
                 start_time=start_time,
                 end_time=end_time,
                 duration=duration,
-                user_id=user.id,
-                status=call_status
+                user_id=user.id
             )
-            db.session.add(mobile_call)
-            db.session.commit()
+            CallService.commit_with_rollback()
 
             logging.info("Searching for matching exotel call")
             # 2. Search for a matching Exotel call
@@ -301,10 +306,10 @@ def post_app_call_record():
                     s3_key = f"recordings/exotel/{seller_number}/{call_id or uuid.uuid4()}.mp3"
                     bucket_name = AWSConstants.AUDIO_FILES_S3_BUCKET
                     s3_url = upload_file_to_s3(temp_file_path, bucket_name, s3_key)
-                    if os.path.exists(temp_file_path):
+                    if temp_file_path and os.path.exists(temp_file_path):
                         os.unlink(temp_file_path)
                 except Exception as e:
-                    if 'temp_file_path' in locals() and os.path.exists(temp_file_path):
+                    if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
                         os.unlink(temp_file_path)
                     logging.info(f"Failed to upload Exotel recording: {str(e)}")
                     return jsonify({"error": f"Failed to upload Exotel recording: {str(e)}"}), 500
@@ -314,32 +319,26 @@ def post_app_call_record():
                 # Find or create buyer
                 buyer = find_or_create_buyer(buyer_number, user.agency_id)
                 
-                # Create a Meeting and Job for this reconciled call
-                meeting = Meeting(
-                    id=mobile_call.id,
-                    mobile_app_call_id=call_id,
-                    buyer_number=buyer_number,
-                    seller_number=seller_number,
-                    title=f"Meeting between {denormalize_phone_number(buyer_number)} and {user.name}",
-                    start_time=start_time,
-                    scheduled_at=start_time,
-                    status=ProcessingStatus.INITIALIZED,
+                # Create Meeting using MeetingService
+                meeting = MeetingService.create_meeting(
                     buyer_id=buyer.id,
                     seller_id=user.id,
-                    source=MeetingSource.PHONE,
-                    participants=[seller_number, buyer_number],
+                    title=f"Meeting between {denormalize_phone_number(buyer_number)} and {user.name}",
+                    start_time=start_time,
                     end_time=end_time,
-                    direction=mobile_call.call_type
+                    source=MeetingSource.PHONE,
+                    direction=mobile_call.call_type,
+                    mobile_app_call_id=call_id,
+                    participants=[seller_number, buyer_number],
+                    scheduled_at=start_time,
+                    status=ProcessingStatus.INITIALIZED
                 )
-                db.session.add(meeting)
-                db.session.flush()
 
-                job = Job(
+                # Create Job using JobService  
+                job = JobService.create_job(
                     meeting_id=meeting.id,
-                    status=JobStatus.INIT,
                     s3_audio_url=s3_url
                 )
-                db.session.add(job)
 
                 # Delete reconciled records
                 db.session.delete(matching_exotel_call)
@@ -360,14 +359,17 @@ def post_app_call_record():
                     }
                 }
                 runpod_diarization_url = os.getenv("RUNPOD_DIARIZATION_URL")
-                response = requests.post(
-                    runpod_diarization_url, headers=headers, data=json.dumps(payload)
-                )
-                if response.status_code == 200:
-                    result = response.json()
-                    logging.info(f"Successfully started diarization: {str(result)}")
+                if runpod_diarization_url:
+                    response = requests.post(
+                        runpod_diarization_url, headers=headers, data=json.dumps(payload)
+                    )
+                    if response.status_code == 200:
+                        result = response.json()
+                        logging.info(f"Successfully started diarization: {str(result)}")
+                    else:
+                        logging.error(f"Error in starting diarization: {response.status_code}, {response.text}")
                 else:
-                    logging.error(f"Error in starting diarization: {response.status_code}, {response.text}")
+                    logging.error("RUNPOD_DIARIZATION_URL environment variable not set")
 
                 logging.info(f"Intialized task for diarization for appcallID: {meeting.mobile_app_call_id}")
             else:

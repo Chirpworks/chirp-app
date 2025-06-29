@@ -35,7 +35,8 @@ class TokenBlocklistService(BaseService):
                 logging.info(f"Token {jti} is already blocklisted")
                 return existing_token
             
-            token_blocklist = TokenBlocklist(jti=jti)
+            token_blocklist = TokenBlocklist()
+            token_blocklist.jti = jti
             db.session.add(token_blocklist)
             db.session.flush()
             
@@ -222,7 +223,11 @@ class TokenBlocklistService(BaseService):
             new_jtis = [jti for jti in jtis if jti not in existing_jtis]
             
             # Bulk insert new tokens
-            new_tokens = [TokenBlocklist(jti=jti) for jti in new_jtis]
+            new_tokens = []
+            for jti in new_jtis:
+                token = TokenBlocklist()
+                token.jti = jti
+                new_tokens.append(token)
             db.session.bulk_save_objects(new_tokens)
             db.session.flush()
             
@@ -237,7 +242,7 @@ class TokenBlocklistService(BaseService):
             raise
     
     @classmethod
-    def search_tokens_by_date(cls, start_date: datetime, end_date: datetime = None) -> List[TokenBlocklist]:
+    def search_tokens_by_date(cls, start_date: datetime, end_date: Optional[datetime] = None) -> List[TokenBlocklist]:
         """
         Search for tokens blocklisted within a date range.
         

@@ -56,7 +56,7 @@ class BuyerService(BaseService):
             raise
     
     @classmethod
-    def create_buyer(cls, phone: str, agency_id: str, name: str = None, email: str = None) -> Buyer:
+    def create_buyer(cls, phone: str, agency_id: str, name: Optional[str] = None, email: Optional[str] = None) -> Buyer:
         """
         Create a new buyer with normalized phone number.
         
@@ -122,7 +122,7 @@ class BuyerService(BaseService):
             raise
     
     @classmethod
-    def update_buyer_info(cls, buyer_id: str, name: str = None, email: str = None) -> Optional[Buyer]:
+    def update_buyer_info(cls, buyer_id: str, name: Optional[str] = None, email: Optional[str] = None) -> Optional[Buyer]:
         """
         Update buyer's name and/or email information.
         
@@ -224,7 +224,7 @@ class BuyerService(BaseService):
             raise
     
     @classmethod
-    def get_buyers_with_meetings(cls, agency_id: str = None) -> List[dict]:
+    def get_buyers_with_meetings(cls, agency_id: Optional[str] = None) -> List[dict]:
         """
         Get buyers along with their meeting counts.
         

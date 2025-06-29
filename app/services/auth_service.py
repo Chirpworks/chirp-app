@@ -31,8 +31,8 @@ class AuthService:
         """
         try:
             # Use SellerService for authentication
-            user = SellerService.validate_credentials(email, password)
-            if not user:
+            is_valid, user = SellerService.validate_credentials(email, password)
+            if not is_valid or not user:
                 logging.warning(f"Authentication failed for email: {email}")
                 return None
             
@@ -129,7 +129,7 @@ class AuthService:
             return None
     
     @classmethod
-    def logout_user(cls, jti: str = None) -> bool:
+    def logout_user(cls, jti: Optional[str] = None) -> bool:
         """
         Logout a user by adding their current token to the blocklist.
         
@@ -143,7 +143,11 @@ class AuthService:
             # Get token ID if not provided
             if not jti:
                 try:
-                    jti = get_jwt()["jti"]
+                    jwt_data = get_jwt()
+                    jti = jwt_data.get("jti")
+                    if not jti:
+                        logging.error("No JTI found in JWT token")
+                        return False
                 except Exception as e:
                     logging.error(f"Failed to get JWT from request: {str(e)}")
                     return False
@@ -306,7 +310,7 @@ class AuthService:
                 return False
             
             # Update password using SellerService
-            success = SellerService.update_password(user_id, new_password)
+            success = SellerService.update_password(user_id, old_password, new_password)
             if success:
                 logging.info(f"Password changed successfully for user: {user_id}")
                 return True

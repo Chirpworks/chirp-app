@@ -15,17 +15,6 @@ from .base_service import BaseService
 logging = logging.getLogger(__name__)
 
 
-# Define ActionType enum locally since it seems to be missing from the model file
-# Based on migration and usage patterns
-try:
-    from app.models.action import ActionType
-except ImportError:
-    from enum import Enum
-    class ActionType(Enum):
-        SUGGESTED_ACTION = "suggested_action"
-        CONTEXTUAL_ACTION = "contextual_action"
-
-
 class ActionService(BaseService):
     """
     Service class for all action-related database operations and task management.
@@ -34,7 +23,7 @@ class ActionService(BaseService):
     
     @classmethod
     def create_action(cls, title: str, meeting_id: str, buyer_id: str, seller_id: str, 
-                     action_type: ActionType = None, **kwargs) -> Action:
+                     **kwargs) -> Action:
         """
         Create a new action for a meeting.
         
@@ -43,7 +32,6 @@ class ActionService(BaseService):
             meeting_id: Meeting UUID this action relates to
             buyer_id: Buyer UUID
             seller_id: Seller UUID
-            action_type: Type of action (SUGGESTED_ACTION or CONTEXTUAL_ACTION)
             **kwargs: Additional action fields (due_date, description, reasoning, signals)
             
         Returns:
@@ -60,9 +48,6 @@ class ActionService(BaseService):
                 **kwargs
             }
             
-            if action_type:
-                action_data['type'] = action_type
-            
             action = cls.create(**action_data)
             logging.info(f"Created action: {title} with ID: {action.id}")
             return action
@@ -72,7 +57,7 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_actions_for_user(cls, user_id: str, team_member_ids: List[str] = None) -> List[Dict[str, Any]]:
+    def get_actions_for_user(cls, user_id: str, team_member_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Get all actions for a user or team, formatted for API response.
         
@@ -160,7 +145,7 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def _format_action(cls, action: Action) -> Dict[str, Any]:
+    def _format_action(cls, action: Action) -> Optional[Dict[str, Any]]:
         """
         Format an action for API response.
         
@@ -168,7 +153,7 @@ class ActionService(BaseService):
             action: Action instance
             
         Returns:
-            Formatted action dictionary
+            Formatted action dictionary or None if formatting fails
         """
         try:
             seller_name = action.meeting.seller.name
@@ -187,10 +172,6 @@ class ActionService(BaseService):
                 "signals": action.signals,
                 "created_at": action.created_at.isoformat() if action.created_at else None,
             }
-            
-            # Add type if it exists (might be missing in some records)
-            if hasattr(action, 'type') and action.type:
-                formatted["type"] = action.type.value
             
             return formatted
             
@@ -304,7 +285,7 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_actions_by_status(cls, status: ActionStatus, user_id: str = None) -> List[Action]:
+    def get_actions_by_status(cls, status: ActionStatus, user_id: Optional[str] = None) -> List[Action]:
         """
         Get all actions with a specific status, optionally filtered by user.
         
@@ -334,7 +315,7 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_overdue_actions(cls, user_id: str = None) -> List[Action]:
+    def get_overdue_actions(cls, user_id: Optional[str] = None) -> List[Action]:
         """
         Get all overdue actions (due_date < now and status = PENDING).
         
@@ -370,7 +351,7 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_action_statistics(cls, user_id: str = None, date_range: Dict[str, datetime] = None) -> Dict[str, Any]:
+    def get_action_statistics(cls, user_id: Optional[str] = None, date_range: Optional[Dict[str, datetime]] = None) -> Dict[str, Any]:
         """
         Get action statistics for a user or all users.
         
