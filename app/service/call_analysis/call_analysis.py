@@ -8,7 +8,7 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-from app import Seller, Agency, Deal, Action, db
+from app import Seller, Agency, Action, db
 from app.models.action import ActionType
 
 from app.models.meeting import Meeting, ProcessingStatus

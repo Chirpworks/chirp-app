@@ -11,6 +11,17 @@ from app.service.aws.s3_client import S3Client
 logging = logging.getLogger(__name__)
 
 
+def find_or_create_buyer(buyer_phone, seller_agency_id):
+    """
+    Find existing buyer by phone number, or create new buyer if not found.
+    Returns: Buyer object
+    
+    NOTE: This function is deprecated. Use BuyerService.find_or_create_buyer() instead.
+    """
+    from app.services.buyer_service import BuyerService
+    return BuyerService.find_or_create_buyer(buyer_phone, seller_agency_id)
+
+
 def download_exotel_file_from_url(url: str):
     url = url.split("https://")[1]
     url = f"https://{ExotelCreds.EXOTEL_API_KEY}:{ExotelCreds.EXOTEL_API_TOKEN}@{url}"

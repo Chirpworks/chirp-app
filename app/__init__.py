@@ -9,9 +9,10 @@ from app.config import Config
 
 from app.models.agency import Agency
 from app.models.seller import Seller
+from app.models.buyer import Buyer
+from app.models.product import Product
 from app.models.job import Job
 from app.models.meeting import Meeting
-from app.models.deal import Deal
 from app.models.action import Action
 from app.models.exotel_calls import ExotelCall
 from app.models.mobile_app_calls import MobileAppCall

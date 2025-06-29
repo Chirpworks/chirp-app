@@ -12,6 +12,7 @@ from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_u
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.utils.call_recording_utils import normalize_phone_number
+from app.services import AuthService, SellerService, TokenBlocklistService
 
 logging = logging.getLogger(__name__)
 
@@ -52,8 +53,9 @@ def signup():
             return jsonify({'error': 'Invalid Agency Name'}), 400
 
         logging.info("Checking if Seller already exists")
-        existing_user = Seller.query.filter((Seller.email == email) | (Seller.phone == phone)).first()
-        if existing_user:
+        existing_user_by_email = SellerService.get_by_email(email)
+        existing_user_by_phone = SellerService.get_by_phone(phone)
+        if existing_user_by_email or existing_user_by_phone:
             logging.error({'error': 'Seller already exists'})
             return jsonify({'error': 'Seller already exists'}), 400
         logging.info(f"Seller doesn't exist. Creating new user with name {name} and email {email} and phone {phone}")
@@ -64,15 +66,18 @@ def signup():
         logging.info(f"normalizing phone number")
         phone = normalize_phone_number(phone)
 
-        logging.info(f"Creating user")
-        new_user = Seller(email=email, password=otp, agency_id=agency_id, phone=phone, role=role, name=name)
-
         logging.info("Sending OTP via email")
         _ = send_otp_email(to_email=email, otp=otp)
 
-        logging.info("Committing new user to DB")
-        db.session.add(new_user)
-        db.session.commit()
+        logging.info(f"Creating user using SellerService")
+        new_user = SellerService.create_seller(
+            email=email, 
+            password=otp, 
+            agency_id=agency_id, 
+            phone=phone, 
+            role=role, 
+            name=name
+        )
 
         logging.info(f"Created new user successfully with email={email}, name={name}")
         return jsonify({'message': 'Seller created successfully', 'name': name, 'user_id': str(new_user.id)}), 201
@@ -93,40 +98,58 @@ def login():
             logging.error({'error': 'Missing email or password'})
             return jsonify({'error': 'Missing email or password'}), 400
 
-        user = Seller.query.filter_by(email=email).first()
-        if not user or not user.check_password(password):
+        # Use AuthService for authentication
+        auth_result = AuthService.authenticate_user(email, password)
+        if not auth_result:
             logging.error({'error': 'Invalid credentials'})
             return jsonify({'error': f'Invalid credentials for email: {email}'}), 401
 
-        user_claims = generate_user_claims(user)
-        access_token = user.generate_access_token(expires_delta=timedelta(minutes=15), additional_claims=user_claims)
-        refresh_token = user.generate_refresh_token()
-        return jsonify({'access_token': access_token, 'refresh_token': refresh_token, 'user_id': user.id}), 200
+        return jsonify({
+            'access_token': auth_result['tokens']['access_token'], 
+            'refresh_token': auth_result['tokens']['refresh_token'], 
+            'user_id': auth_result['user']['id']
+        }), 200
+        
     except Exception as e:
-        logging.error({'error': f"Failed to login with error with error: {e}"})
+        logging.error({'error': f"Failed to login with error: {e}"})
         return jsonify({'error': 'Login Failed'}), 500
 
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)  # Requires a valid refresh token
 def refresh():
-    user_id = get_jwt_identity()  # Get user ID from refresh token
-    user = Seller.query.filter_by(id=user_id).first()
-    user_claims = generate_user_claims(user)
-    new_access_token = user.generate_access_token(expires_delta=timedelta(minutes=15), additional_claims=user_claims)
-    refresh_token = user.generate_refresh_token()
+    try:
+        user_id = get_jwt_identity()  # Get user ID from refresh token
+        
+        # Use AuthService for token refresh
+        tokens = AuthService.refresh_user_tokens(user_id)
+        if not tokens:
+            return jsonify({'error': 'Failed to refresh tokens'}), 401
 
-    return jsonify({'access_token': new_access_token, 'refresh_token': refresh_token}), 200
+        return jsonify({
+            'access_token': tokens['access_token'], 
+            'refresh_token': tokens['refresh_token']
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Token refresh error: {str(e)}")
+        return jsonify({'error': 'Token refresh failed'}), 500
 
 
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout():
-    jti = get_jwt()["jti"]  # Get token's unique ID
-    db.session.add(TokenBlocklist(jti=jti))  # Add to blacklist
-    db.session.commit()
+    try:
+        # Use AuthService for logout
+        success = AuthService.logout_user()
+        if not success:
+            return jsonify({"error": "Logout failed"}), 500
 
-    return jsonify({"message": "Successfully logged out"}), 200
+        return jsonify({"message": "Successfully logged out"}), 200
+        
+    except Exception as e:
+        logging.error(f"Logout error: {str(e)}")
+        return jsonify({"error": "Logout failed"}), 500
 
 
 @auth_bp.route('/update_password', methods=['POST'])
@@ -137,20 +160,22 @@ def update_password():
         old_password = data.get('old_password')
         new_password = data.get('new_password')
 
-        user = Seller.query.filter_by(email=email).first()
+        if not email or not old_password or not new_password:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        # Get user by email
+        user = SellerService.get_by_email(email)
         if not user:
             logging.error({"error": f"Seller not found with email {email}"})
             return jsonify({"message": "Seller not found"}), 404
 
-        if not check_password_hash(user.password_hash, old_password):
-            logging.error({"error": f"Old password incorrect for user with email {email}"})
+        # Use AuthService for password change
+        success = AuthService.change_user_password(str(user.id), old_password, new_password)
+        if not success:
             return jsonify({"message": "Old password incorrect"}), 401
 
-        user.password_hash = generate_password_hash(new_password)
-        db.session.commit()
-
         return jsonify({"message": "Password updated successfully"}), 200
+        
     except Exception as e:
-        logging.error(
-            {"error": f"Failed to update password for user with email {email} with error {e}"}
-        )
+        logging.error(f"Failed to update password for user with email {email}: {str(e)}")
+        return jsonify({"error": "Password update failed"}), 500

@@ -1,4 +1,6 @@
 import traceback
+from datetime import datetime, timedelta
+from typing import List, Union
 
 import logging
 
@@ -6,7 +8,7 @@ from flask import Blueprint, jsonify, request
 
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app import Seller, db, Meeting, Deal, MobileAppCall
+from app import Seller, db, Meeting, MobileAppCall
 from app.constants import CallDirection
 from app.models.seller import SellerRole
 from sqlalchemy import func

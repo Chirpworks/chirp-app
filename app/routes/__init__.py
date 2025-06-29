@@ -10,7 +10,6 @@ def register_routes(app):
     from .agencies import agency_bp
     from .actions import action_bp
     from .analysis import analysis_bp
-    from .deals import deals_bp
 
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(meetings_bp, url_prefix="/api/meetings")
@@ -21,4 +20,3 @@ def register_routes(app):
     app.register_blueprint(agency_bp, url_prefix='/api/agency')
     app.register_blueprint(action_bp, url_prefix='/api/actions')
     app.register_blueprint(analysis_bp, url_prefix='/api/analysis')
-    app.register_blueprint(deals_bp, url_prefix='/api/deals')

@@ -12,13 +12,13 @@ from sqlalchemy import and_
 from app import Seller, Meeting, db, Job
 from app.constants import MeetingSource, CallDirection
 from app.models import meeting
-from app.models.deal import Deal
 from app.models.job import JobStatus
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.seller import SellerRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
 from app.utils.call_recording_utils import denormalize_phone_number
 from app.utils.utils import human_readable_duration
+from app.services import MeetingService, SellerService
 
 meetings_bp = Blueprint("meetings", __name__)
 
@@ -92,10 +92,9 @@ def get_meeting_history():
     try:
         user_id = get_jwt_identity()
 
-        deal_id = request.args.get("dealId")
         team_member_ids = request.args.getlist("team_member_id")
         if team_member_ids:
-            user = Seller.query.filter_by(id=user_id).first()
+            user = SellerService.get_by_id(user_id)
             if not user:
                 logging.error("User not found; unauthorized")
                 return jsonify({"error": "User not found or unauthorized"}), 404
@@ -105,123 +104,19 @@ def get_meeting_history():
                     {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
                 )
 
-        if team_member_ids:
-            for user_id in team_member_ids:
-                user = Seller.query.filter_by(id=user_id).first()
-                if not user:
-                    logging.error(f"Seller with id {user_id} not found; unauthorized")
+            # Validate team member IDs
+            for member_id in team_member_ids:
+                member = SellerService.get_by_id(member_id)
+                if not member:
+                    logging.error(f"Seller with id {member_id} not found; unauthorized")
                     return jsonify({"error": "Seller not found or unauthorized"}), 404
-            logging.info(f"Fetching actions data for users {team_member_ids}")
-
             logging.info(f"Fetching call history for users {team_member_ids}")
-            # Join through deals to fetch user's meetings
-            meetings_query = (
-                Meeting.query
-                .join(Meeting.deal)
-                .filter(Deal.user_id.in_(team_member_ids))
-                .order_by(Meeting.start_time.desc())
-            )
-            mobile_app_calls_query = (
-                MobileAppCall.query
-                .filter(MobileAppCall.user_id.in_(team_member_ids))
-                .order_by(MobileAppCall.start_time.desc())
-            )
-        else:
-            # Join through deals to fetch user's meetings
-            meetings_query = (
-                Meeting.query
-                .join(Meeting.deal)
-                .filter(Deal.user_id == user_id)
-                .order_by(Meeting.start_time.desc())
-            )
-            mobile_app_calls_query = (
-                MobileAppCall.query
-                .filter(MobileAppCall.user_id == user_id)
-                .order_by(MobileAppCall.start_time.desc())
-            )
 
-        if deal_id:
-            meetings_query = meetings_query.filter(Meeting.deal_id == deal_id)
-            deal = Deal.query.get(deal_id)
-            mobile_app_calls_query = mobile_app_calls_query.filter(
-                and_(
-                    MobileAppCall.buyer_number == deal.buyer_number,
-                    MobileAppCall.seller_number == deal.seller_number,
-                ))
-
-        meetings = meetings_query.all()
-        mobile_app_calls = mobile_app_calls_query.all()
-        meetings.extend(mobile_app_calls)
-        meetings = sorted(
-            meetings,
-            key=lambda x: x.start_time.replace(
-                tzinfo=ZoneInfo("Asia/Kolkata")) if x.start_time and x.start_time.tzinfo is None else x.start_time,
-            reverse=True
-        )
-
-        local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
-        result = []
-        for call_record in meetings:
-            seller_name = Seller.query.filter_by(phone=call_record.seller_number).first().name
-            title = f"Meeting between {denormalize_phone_number(call_record.buyer_number)} and {seller_name}"
-            analysis_status = 'Processing'
-            direction = None
-            if isinstance(call_record, Meeting):
-                job_status = call_record.job.status
-                if job_status in [JobStatus.INIT, JobStatus.IN_PROGRESS]:
-                    analysis_status = 'Processing'
-                elif job_status == JobStatus.COMPLETED:
-                    analysis_status = 'Completed'
-                else:
-                    analysis_status = 'Not Recorded'
-            elif isinstance(call_record, MobileAppCall):
-                analysis_status = call_record.status
-            call_record_start_time = call_record.start_time
-            if call_record_start_time and call_record_start_time.tzinfo is None:
-                call_record_start_time = call_record_start_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-            call_record_end_time = call_record.end_time
-            if call_record_end_time and call_record_end_time.tzinfo is None:
-                call_record_end_time = call_record_end_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-            duration = human_readable_duration(call_record_end_time, call_record_start_time)
-            if isinstance(call_record, Meeting):
-                title = call_record.title
-                direction = call_record.direction
-            elif isinstance(call_record, MobileAppCall):
-                if call_record.status == 'Missed':
-                    title = f'Missed Call from {denormalize_phone_number(call_record.buyer_number)}'
-                    analysis_status = call_record.status
-                    direction = CallDirection.INCOMING.value
-                elif call_record.status == 'Not Answered':
-                    title = f'{denormalize_phone_number(call_record.buyer_number)} did not answer'
-                    analysis_status = call_record.status
-                    direction = CallDirection.OUTGOING.value
-                elif call_record.status == 'Processing':
-                    start_time_local = call_record.start_time
-                    if start_time_local.tzinfo is None:
-                        start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-                    if local_now - start_time_local > timedelta(seconds=30):
-                        analysis_status = 'Not Recorded'
-            else:
-                continue
-            result.append({
-                "id": str(call_record.id),
-                "title": title,
-                "source": call_record.source.value if isinstance(call_record, Meeting) else MeetingSource.PHONE.value,
-                "deal_id": str(call_record.deal_id) if isinstance(call_record, Meeting) else None,
-                "participants": call_record.participants if isinstance(call_record, Meeting) else None,
-                "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
-                "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
-                "buyer_number": denormalize_phone_number(call_record.buyer_number),
-                "seller_number": denormalize_phone_number(call_record.seller_number),
-                "analysis_status": analysis_status,
-                "duration": duration,
-                "call_notes": call_record.call_notes if isinstance(call_record, Meeting) else None,
-                "user_name": call_record.deal.user.name if isinstance(call_record, Meeting) else None,
-                "user_email": call_record.deal.user.email if isinstance(call_record, Meeting) else None,
-                "direction": direction
-            })
-
-        return jsonify(result), 200
+        # Use MeetingService to get call history
+        user_ids = team_member_ids if team_member_ids else [user_id]
+        call_history = MeetingService.get_call_history(user_ids)
+        
+        return jsonify(call_history), 200
 
     except Exception as e:
         logging.error("Failed to fetch call history: %s", traceback.format_exc())
@@ -236,7 +131,7 @@ def get_meeting_by_id(meeting_id):
 
         team_member_id = request.args.get("team_member_id")
         if team_member_id:
-            user = Seller.query.filter_by(id=user_id).first()
+            user = SellerService.get_by_id(user_id)
             if not user:
                 logging.error("Seller not found; unauthorized")
                 return jsonify({"error": "Seller not found or unauthorized"}), 404
@@ -250,38 +145,12 @@ def get_meeting_by_id(meeting_id):
 
         logging.info(f"Fetching call_data for meeting_id {meeting_id} for user {user_id}")
 
-        # Join through deal to verify the meeting belongs to this user's deals
-        meeting = (
-            Meeting.query
-            .join(Meeting.deal)
-            .filter(Meeting.id == meeting_id, Deal.user_id == user_id)
-            .first()
-        )
-
-        if not meeting:
+        # Use MeetingService to get meeting with job details
+        meeting_data = MeetingService.get_meeting_with_job(meeting_id, user_id)
+        if not meeting_data:
             return jsonify({"error": "Meeting not found or unauthorized"}), 404
 
-        analysis_status = meeting.job.status.value
-        duration = human_readable_duration(meeting.end_time, meeting.start_time)
-        result = {
-            "id": str(meeting.id),
-            "source": meeting.source.value,
-            "title": meeting.title,
-            "participants": meeting.participants,
-            "start_time": meeting.start_time.isoformat() if meeting.start_time else None,
-            "end_time": meeting.end_time.isoformat() if meeting.end_time else None,
-            "status": meeting.status.value,
-            "summary": meeting.summary,
-            "buyer_number": denormalize_phone_number(meeting.buyer_number),
-            "call_notes": meeting.call_notes,
-            "deal_id": meeting.deal_id,
-            "analysis_status": analysis_status,
-            "duration": duration,
-            "user_name": meeting.deal.user.name,
-            "user_email": meeting.deal.user.email
-        }
-
-        return jsonify(result), 200
+        return jsonify(meeting_data), 200
 
     except Exception as e:
         logging.error(f"Failed to fetch call data: {e}")
@@ -310,11 +179,11 @@ def get_meeting_diarization_by_id(meeting_id):
 
         logging.info(f"Fetching diarization for meeting_id {meeting_id} for user {user_id}")
 
-        # Join through deal to verify the meeting belongs to this user's deals
+        # Verify the meeting belongs to this user
         meeting = (
             Meeting.query
-            .join(Meeting.deal)
-            .filter(Meeting.id == meeting_id, Deal.user_id == user_id)
+            .join(Meeting.seller)
+            .filter(Meeting.id == meeting_id, Seller.id == user_id)
             .first()
         )
 
@@ -339,11 +208,11 @@ def get_meeting_feedback_by_id(meeting_id):
     try:
         user_id = get_jwt_identity()
 
-        # Join through deal to verify the meeting belongs to this user's deals
+        # Verify the meeting belongs to this user
         meeting = (
             Meeting.query
-            .join(Meeting.deal)
-            .filter(Meeting.id == meeting_id, Deal.user_id == user_id)
+            .join(Meeting.seller)
+            .filter(Meeting.id == meeting_id, Seller.id == user_id)
             .first()
         )
 
