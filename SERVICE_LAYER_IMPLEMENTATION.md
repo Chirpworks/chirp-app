@@ -360,7 +360,7 @@ return jsonify({
 - `POST /refresh` → `AuthService.refresh_user_tokens()`
 - `POST /logout` → `AuthService.logout_user()`
 - `POST /signup` → `SellerService.create_seller()`
-- `POST /update_password` → `AuthService.change_user_password()`
+- `POST /reset_password` → `AuthService.reset_user_password_with_validation()`
 
 #### 2. Actions Routes (`app/routes/actions.py`)
 

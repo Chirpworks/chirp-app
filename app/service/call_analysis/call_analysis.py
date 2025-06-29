@@ -1,7 +1,5 @@
-import json
 import traceback
 from typing import Optional
-from zoneinfo import ZoneInfo
 
 import logging
 import os
@@ -9,12 +7,11 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 
-from app import Seller, Agency, Action, db
+from app import Seller, Agency, db
 from app.services.action_service import ActionService
 
-from app.models.meeting import Meeting, ProcessingStatus
+from app.models.meeting import Meeting
 from app.service.llm.open_ai.chat_gpt import OpenAIClient
-from app.utils.call_recording_utils import denormalize_phone_number
 
 # Load environment variables (for local dev or ECS fallback)
 load_dotenv()

@@ -3,12 +3,11 @@ from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 
 from app import db
 from app.models.exotel_calls import ExotelCall
 from app.models.mobile_app_calls import MobileAppCall
-from app.models.seller import Seller
 from app.utils.call_recording_utils import normalize_phone_number, calculate_call_status
 from .base_service import BaseService
 
@@ -520,4 +519,4 @@ class CallService(BaseService):
             db.session.rollback()
             logging.info("Call service transaction rolled back")
         except SQLAlchemyError as e:
-            logging.error(f"Failed to rollback call service transaction: {str(e)}") 
+            logging.error(f"Failed to rollback call service transaction: {str(e)}")

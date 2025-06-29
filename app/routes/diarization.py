@@ -1,15 +1,9 @@
 import logging
-import os
-import uuid
-from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 
-from app import Job, db, Seller, Meeting
-from app.constants import AWSConstants
-from app.models.job import JobStatus
+from app import Job
 from app.service.aws.ecs_client import ECSClient
-from app.utils.call_recording_utils import download_file_from_url, upload_file_to_s3, download_exotel_file_from_url
 
 logging = logging.getLogger(__name__)
 

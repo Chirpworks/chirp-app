@@ -6,18 +6,15 @@ import logging
 import os
 import uuid
 from datetime import datetime, timedelta
-from enum import Enum
 
 import requests
 from flask import Blueprint, request, jsonify
 from sqlalchemy import and_
 
-from app import Job, db, Seller, Meeting
-from app.constants import AWSConstants, CallDirection, MeetingSource
+from app import Job, db, Seller
+from app.constants import AWSConstants, MeetingSource
 from app.models.exotel_calls import ExotelCall
-from app.models.job import JobStatus
 from app.models.meeting import ProcessingStatus
-from app.models.mobile_app_calls import MobileAppCall
 from app.service.aws.ecs_client import ECSClient
 from app.utils.call_recording_utils import upload_file_to_s3, download_exotel_file_from_url, get_audio_duration_seconds, \
     normalize_phone_number, calculate_call_status, denormalize_phone_number, find_or_create_buyer

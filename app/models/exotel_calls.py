@@ -1,11 +1,8 @@
 import uuid
-from enum import Enum
 
 from sqlalchemy import UUID
 
 from app import db
-
-from .seller import Seller
 
 
 # Deal model

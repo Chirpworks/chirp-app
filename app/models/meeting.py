@@ -7,10 +7,7 @@ from sqlalchemy import UUID
 
 from app import db
 
-from .seller import Seller
 from ..constants import MeetingSource
-from app.models.buyer import Buyer
-from app.models.product import Product
 
 
 class ProcessingStatus(Enum):

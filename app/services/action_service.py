@@ -8,7 +8,7 @@ from sqlalchemy import and_
 from app import db
 from app.models.action import Action, ActionStatus
 from app.models.meeting import Meeting
-from app.models.seller import Seller, SellerRole
+from app.models.seller import Seller
 from app.utils.call_recording_utils import denormalize_phone_number
 from .base_service import BaseService
 

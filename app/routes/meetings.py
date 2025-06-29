@@ -1,23 +1,15 @@
 import traceback
-from datetime import datetime, timedelta
-from typing import List, Union
-from zoneinfo import ZoneInfo
+from typing import Union
 
 import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from sqlalchemy import and_
 
-from app import Seller, Meeting, db, Job
-from app.constants import MeetingSource, CallDirection
-from app.models import meeting
-from app.models.job import JobStatus
+from app import Seller, Meeting, db
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.seller import SellerRole
 from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
-from app.utils.call_recording_utils import denormalize_phone_number
-from app.utils.utils import human_readable_duration
 from app.services import MeetingService, SellerService
 
 meetings_bp = Blueprint("meetings", __name__)
@@ -26,7 +18,7 @@ logging = logging.getLogger(__name__)
 
 
 @meetings_bp.route('/get_next/<user_id>', methods=['GET'])
-def get_upcoming_meetings(user_id) -> Union[List, dict]:
+def get_upcoming_meetings(user_id) -> Union[list, dict]:
     try:
         pass
         # TODO: fetch data from cache if exists. refresh from google calendar and store new data in db as well.

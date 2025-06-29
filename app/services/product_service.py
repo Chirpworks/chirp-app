@@ -1,11 +1,9 @@
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 
-from app import db
 from app.models.product import Product
-from app.models.agency import Agency
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)
@@ -388,4 +386,4 @@ class ProductService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to clone product {product_id}: {str(e)}")
-            raise 
+            raise

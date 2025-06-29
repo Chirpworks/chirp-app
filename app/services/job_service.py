@@ -6,7 +6,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
 from app.models.job import Job, JobStatus
-from app.models.meeting import Meeting
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)

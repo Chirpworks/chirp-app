@@ -1,12 +1,13 @@
 import logging
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from flask_jwt_extended import get_jwt_identity, get_jwt
 
+from app import db
 from app.models.seller import Seller
-from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_user_claims
-from .seller_service import SellerService
-from .token_service import TokenBlocklistService
+from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_user_claims, send_password_reset_confirmation_email
+from app.services.seller_service import SellerService
+from app.services.token_service import TokenBlocklistService
 
 logging = logging.getLogger(__name__)
 
@@ -284,42 +285,89 @@ class AuthService:
             logging.error(f"OTP verification error for {email}: {str(e)}")
             return None
     
+    
     @classmethod
-    def change_user_password(cls, user_id: str, old_password: str, new_password: str) -> bool:
+    def reset_user_password(cls, email: str, new_password: str) -> bool:
         """
-        Change user password after verifying old password.
+        Reset user password without requiring old password validation.
+        Sends a confirmation email after successful password reset.
         
         Args:
-            user_id: User's UUID
-            old_password: Current password
-            new_password: New password
+            email: User's email address
+            new_password: New password to set
             
         Returns:
-            True if password changed successfully, False otherwise
+            True if password reset successfully and email sent, False otherwise
         """
         try:
             # Get user
-            user = SellerService.get_by_id(user_id)
+            user = SellerService.get_by_email(email)
             if not user:
-                logging.warning(f"User not found for password change: {user_id}")
+                logging.warning(f"User not found for password reset: {email}")
                 return False
             
-            # Verify old password
-            if not user.check_password(old_password):
-                logging.warning(f"Invalid old password provided for user: {user_id}")
+            # Reset password using SellerService
+            success = SellerService.reset_password_by_email(email, new_password)
+            if not success:
+                logging.error(f"Failed to reset password for user: {email}")
                 return False
             
-            # Update password using SellerService
-            success = SellerService.update_password(user_id, old_password, new_password)
-            if success:
-                logging.info(f"Password changed successfully for user: {user_id}")
-                return True
-            else:
-                logging.error(f"Failed to update password for user: {user_id}")
-                return False
+            # Send confirmation email
+            email_sent = send_password_reset_confirmation_email(user.email, user.name)
+            if not email_sent:
+                logging.warning(f"Password reset successful but confirmation email failed for: {email}")
+                # Still return True since password was reset successfully
+                
+            logging.info(f"Password reset completed successfully for user: {email}")
+            return True
                 
         except Exception as e:
-            logging.error(f"Password change error for user {user_id}: {str(e)}")
+            logging.error(f"Password reset error for user {email}: {str(e)}")
+            return False
+
+    @classmethod
+    def reset_user_password_with_validation(cls, email: str, old_password: str, new_password: str) -> bool:
+        """
+        Reset user password with old password validation.
+        Sends a confirmation email after successful password reset.
+        
+        Args:
+            email: User's email address
+            old_password: Current password for validation
+            new_password: New password to set
+            
+        Returns:
+            True if password reset successfully and email sent, False otherwise
+        """
+        try:
+            # Get user
+            user = SellerService.get_by_email(email)
+            if not user:
+                logging.warning(f"User not found for password reset: {email}")
+                return False
+            
+            # Validate old password
+            if not user.check_password(old_password):
+                logging.warning(f"Invalid old password provided for user: {email}")
+                return False
+            
+            # Reset password using SellerService (with validation)
+            success = SellerService.update_password(str(user.id), old_password, new_password)
+            if not success:
+                logging.error(f"Failed to reset password for user: {email}")
+                return False
+            
+            # Send confirmation email
+            email_sent = send_password_reset_confirmation_email(user.email, user.name)
+            if not email_sent:
+                logging.warning(f"Password reset successful but confirmation email failed for: {email}")
+                # Still return True since password was reset successfully
+                
+            logging.info(f"Password reset completed successfully for user: {email}")
+            return True
+                
+        except Exception as e:
+            logging.error(f"Password reset error for user {email}: {str(e)}")
             return False
     
     @classmethod

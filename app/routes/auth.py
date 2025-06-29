@@ -1,18 +1,13 @@
 import json
-from datetime import timedelta
 import logging
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from app import db
-from app.models.seller import Seller
-from app.models.jwt_token_blocklist import TokenBlocklist
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.service.aws.s3_client import S3Client
-from app.utils.auth_utils import generate_secure_otp, send_otp_email, generate_user_claims
-from werkzeug.security import check_password_hash, generate_password_hash
+from app.utils.auth_utils import generate_secure_otp, send_otp_email
 
 from app.utils.call_recording_utils import normalize_phone_number
-from app.services import AuthService, SellerService, TokenBlocklistService
+from app.services import AuthService, SellerService
 
 logging = logging.getLogger(__name__)
 
@@ -152,30 +147,48 @@ def logout():
         return jsonify({"error": "Logout failed"}), 500
 
 
-@auth_bp.route('/update_password', methods=['POST'])
-def update_password():
+
+@auth_bp.route('/reset_password', methods=['POST'])
+def reset_password():
+    """
+    Reset password endpoint that requires old password validation.
+    Sends a confirmation email after successful password reset.
+    """
     try:
         data = request.get_json()
-        email = data.get('email') or ''
+        email = data.get('email')
         old_password = data.get('old_password')
         new_password = data.get('new_password')
 
         if not email or not old_password or not new_password:
-            return jsonify({"error": "Missing required fields"}), 400
+            return jsonify({"error": "Missing required fields: email, old_password and new_password"}), 400
 
-        # Get user by email
+        # Validate email format (basic validation)
+        if '@' not in email or '.' not in email:
+            return jsonify({"error": "Invalid email format"}), 400
+
+        # Validate password strength (basic validation)
+        if len(new_password) < 8:
+            return jsonify({"error": "Password must be at least 8 characters long"}), 400
+
+        # Check if user exists
         user = SellerService.get_by_email(email)
         if not user:
-            logging.error({"error": f"Seller not found with email {email}"})
-            return jsonify({"message": "Seller not found"}), 404
+            logging.warning(f"Password reset attempted for non-existent email: {email}")
+            return jsonify({"error": "User not found"}), 404
 
-        # Use AuthService for password change
-        success = AuthService.change_user_password(str(user.id), old_password, new_password)
+        # Reset password using AuthService with old password validation
+        success = AuthService.reset_user_password_with_validation(email, old_password, new_password)
         if not success:
-            return jsonify({"message": "Old password incorrect"}), 401
+            logging.warning(f"Password reset failed - invalid old password for user: {email}")
+            return jsonify({"error": "Invalid old password"}), 401
 
-        return jsonify({"message": "Password updated successfully"}), 200
+        logging.info(f"Password reset successful for user: {email}")
+        return jsonify({
+            "message": "Password reset successful. A confirmation email has been sent.",
+            "user_id": str(user.id)
+        }), 200
         
     except Exception as e:
-        logging.error(f"Failed to update password for user with email {email}: {str(e)}")
-        return jsonify({"error": "Password update failed"}), 500
+        logging.error(f"Failed to reset password: {str(e)}")
+        return jsonify({"error": "Password reset failed"}), 500

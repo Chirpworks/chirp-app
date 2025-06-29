@@ -3,13 +3,12 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 
-from app import db
 from app.models.meeting import Meeting, ProcessingStatus
-from app.models.seller import Seller, SellerRole
+from app.models.seller import Seller
 from app.models.mobile_app_calls import MobileAppCall
-from app.models.job import Job, JobStatus
+from app.models.job import JobStatus
 from app.constants import CallDirection, MeetingSource
 from app.utils.call_recording_utils import denormalize_phone_number
 from .base_service import BaseService

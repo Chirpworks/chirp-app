@@ -1,7 +1,7 @@
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import and_, or_
+from sqlalchemy import or_
 
 from app import db
 from app.models.agency import Agency

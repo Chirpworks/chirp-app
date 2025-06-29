@@ -189,6 +189,69 @@ class SellerService(BaseService):
             raise
     
     @classmethod
+    def reset_password(cls, seller_id: str, new_password: str) -> bool:
+        """
+        Reset seller's password without requiring old password validation.
+        Use this for password reset functionality where old password is not available.
+        
+        Args:
+            seller_id: Seller's UUID
+            new_password: New password to set
+            
+        Returns:
+            True if password reset successfully, False if seller not found
+            
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            seller = cls.get_by_id(seller_id)
+            if not seller:
+                logging.warning(f"Seller not found for password reset: {seller_id}")
+                return False
+                
+            seller.set_password(new_password)
+            db.session.commit()
+            
+            logging.info(f"Password reset successfully for seller: {seller.email}")
+            return True
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to reset password for seller {seller_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def reset_password_by_email(cls, email: str, new_password: str) -> bool:
+        """
+        Reset seller's password by email without requiring old password validation.
+        
+        Args:
+            email: Seller's email address
+            new_password: New password to set
+            
+        Returns:
+            True if password reset successfully, False if seller not found
+            
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            seller = cls.get_by_email(email)
+            if not seller:
+                logging.warning(f"Seller not found for password reset: {email}")
+                return False
+                
+            seller.set_password(new_password)
+            db.session.commit()
+            
+            logging.info(f"Password reset successfully for seller: {seller.email}")
+            return True
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to reset password for seller {email}: {str(e)}")
+            raise
+    
+    @classmethod
     def get_team_members(cls, manager_id: str) -> List[Seller]:
         """
         Get all team members for a specific manager.
