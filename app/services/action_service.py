@@ -81,16 +81,16 @@ class ActionService(BaseService):
             if len(seller_ids) > 1:
                 query = (
                     cls.model.query
-                    .join(cls.model.meeting)
-                    .join(Meeting.seller)
+                    .join(Meeting)
+                    .join(Seller)
                     .filter(Seller.id.in_(seller_ids))
                     .order_by(cls.model.due_date.asc())
                 )
             else:
                 query = (
                     cls.model.query
-                    .join(cls.model.meeting)
-                    .join(Meeting.seller)
+                    .join(Meeting)
+                    .join(Seller)
                     .filter(Seller.id == user_id)
                     .order_by(cls.model.due_date.asc())
                 )
@@ -126,8 +126,8 @@ class ActionService(BaseService):
         try:
             action = (
                 cls.model.query
-                .join(cls.model.meeting)
-                .join(Meeting.seller)
+                .join(Meeting)
+                .join(Seller)
                 .filter(cls.model.id == action_id, Seller.id == user_id)
                 .first()
             )
@@ -196,8 +196,8 @@ class ActionService(BaseService):
             # Verify user has access to this action
             action = (
                 cls.model.query
-                .join(cls.model.meeting)
-                .join(Meeting.seller)
+                .join(Meeting)
+                .join(Seller)
                 .filter(cls.model.id == action_id, Seller.id == user_id)
                 .first()
             )
@@ -237,8 +237,8 @@ class ActionService(BaseService):
             # Verify user has access to all actions
             accessible_actions = (
                 cls.model.query
-                .join(cls.model.meeting)
-                .join(Meeting.seller)
+                .join(Meeting)
+                .join(Seller)
                 .filter(cls.model.id.in_(action_ids), Seller.id == user_id)
                 .all()
             )
@@ -302,8 +302,8 @@ class ActionService(BaseService):
             if user_id:
                 query = (
                     query
-                    .join(cls.model.meeting)
-                    .join(Meeting.seller)
+                    .join(Meeting)
+                    .join(Seller)
                     .filter(Seller.id == user_id)
                 )
             
@@ -338,8 +338,8 @@ class ActionService(BaseService):
             if user_id:
                 query = (
                     query
-                    .join(cls.model.meeting)
-                    .join(Meeting.seller)
+                    .join(Meeting)
+                    .join(Seller)
                     .filter(Seller.id == user_id)
                 )
             
@@ -368,8 +368,8 @@ class ActionService(BaseService):
             if user_id:
                 query = (
                     query
-                    .join(cls.model.meeting)
-                    .join(Meeting.seller)
+                    .join(Meeting)
+                    .join(Seller)
                     .filter(Seller.id == user_id)
                 )
             

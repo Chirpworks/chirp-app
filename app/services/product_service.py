@@ -4,6 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import or_
 
 from app.models.product import Product
+from app.models.agency import Agency
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)
@@ -83,7 +84,7 @@ class ProductService(BaseService):
         try:
             product = (
                 cls.model.query
-                .join(cls.model.agency)
+                .join(Agency)
                 .filter(cls.model.id == product_id)
                 .first()
             )

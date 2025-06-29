@@ -110,8 +110,8 @@ class SellerService(BaseService):
         """
         try:
             normalized_phone = normalize_phone_number(phone)
-            seller = cls.model.query.filter(
-                or_(cls.model.email == email, cls.model.phone == normalized_phone)
+            seller = Seller.query.filter(
+                or_(Seller.email == email, Seller.phone == normalized_phone)
             ).first()
             
             if seller:
@@ -408,8 +408,8 @@ class SellerService(BaseService):
         """
         try:
             count = (
-                cls.model.query
-                .filter(cls.model.role != SellerRole.GUEST)
+                Seller.query
+                .filter(Seller.role != SellerRole.GUEST)
                 .count()
             )
             logging.info(f"Active sellers count: {count}")

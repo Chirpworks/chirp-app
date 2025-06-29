@@ -1,7 +1,7 @@
 import logging
 from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 
 from app import db
 from app.models.agency import Agency
@@ -259,12 +259,12 @@ class AgencyService(BaseService):
             search_term = f"%{query.lower()}%"
             
             agencies = (
-                cls.model.query
+                Agency.query
                 .filter(or_(
-                    cls.model.name.ilike(search_term),
-                    cls.model.description.ilike(search_term)
+                    Agency.name.ilike(search_term),
+                    Agency.description.ilike(search_term)
                 ))
-                .order_by(cls.model.name.asc())
+                .order_by(Agency.name.asc())
                 .all()
             )
             

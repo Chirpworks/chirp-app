@@ -7,6 +7,7 @@ from sqlalchemy import and_
 
 from app.models.meeting import Meeting, ProcessingStatus
 from app.models.seller import Seller
+from app.models.buyer import Buyer
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.job import JobStatus
 from app.constants import CallDirection, MeetingSource
@@ -188,7 +189,7 @@ class MeetingService(BaseService):
             # Get meetings for specified sellers
             meetings_query = (
                 cls.model.query
-                .join(cls.model.seller)
+                .join(Seller)
                 .filter(Seller.id.in_(seller_ids))
                 .order_by(cls.model.start_time.desc())
             )
@@ -365,8 +366,8 @@ class MeetingService(BaseService):
         try:
             meeting = (
                 cls.model.query
-                .join(cls.model.seller)
-                .join(cls.model.buyer)
+                .join(Seller)
+                .join(Buyer)
                 .filter(cls.model.id == meeting_id)
                 .first()
             )

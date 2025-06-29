@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, List, Optional
 from sqlalchemy.exc import SQLAlchemyError
 from app import db
 
@@ -11,7 +11,7 @@ class BaseService:
     Base service class providing common CRUD operations for all services.
     Each service should inherit from this class and set the model attribute.
     """
-    model: Type[db.Model] = None
+    model = None  # Type: Optional[Type[db.Model]]
     
     @classmethod
     def create(cls, **kwargs) -> Any:
