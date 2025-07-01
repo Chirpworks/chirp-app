@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.service.aws.ecs_client import ECSClient
+from app.external.aws.ecs_client import ECSClient
 from app.constants import CalendarName
 
 

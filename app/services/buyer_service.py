@@ -56,15 +56,24 @@ class BuyerService(BaseService):
             raise
     
     @classmethod
-    def create_buyer(cls, phone: str, agency_id: str, name: Optional[str] = None, email: Optional[str] = None) -> Buyer:
+    def create_buyer(cls, phone: str, agency_id: str, name: Optional[str] = None, email: Optional[str] = None,
+                    tags: Optional[dict] = None, requirements: Optional[dict] = None,
+                    solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
+                    risks: Optional[dict] = None, products_discussed: Optional[dict] = None) -> Buyer:
         """
-        Create a new buyer with normalized phone number.
+        Create a new buyer with normalized phone number and optional additional fields.
         
         Args:
             phone: Buyer's phone number (will be normalized)
             agency_id: Agency UUID
             name: Optional buyer name
             email: Optional buyer email
+            tags: Optional buyer tags as JSON
+            requirements: Optional buyer requirements as JSON
+            solutions_presented: Optional solutions presented as JSON
+            relationship_progression: Optional relationship progression text
+            risks: Optional risks as JSON
+            products_discussed: Optional products discussed as JSON
             
         Returns:
             Created Buyer instance
@@ -77,7 +86,13 @@ class BuyerService(BaseService):
                 'phone': normalized_phone,
                 'agency_id': agency_id,
                 'name': name,
-                'email': email
+                'email': email,
+                'tags': tags,
+                'requirements': requirements,
+                'solutions_presented': solutions_presented,
+                'relationship_progression': relationship_progression,
+                'risks': risks,
+                'products_discussed': products_discussed
             }
             
             buyer = cls.create(**buyer_data)
@@ -122,14 +137,23 @@ class BuyerService(BaseService):
             raise
     
     @classmethod
-    def update_buyer_info(cls, buyer_id: str, name: Optional[str] = None, email: Optional[str] = None) -> Optional[Buyer]:
+    def update_buyer_info(cls, buyer_id: str, name: Optional[str] = None, email: Optional[str] = None,
+                         tags: Optional[dict] = None, requirements: Optional[dict] = None,
+                         solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
+                         risks: Optional[dict] = None, products_discussed: Optional[dict] = None) -> Optional[Buyer]:
         """
-        Update buyer's name and/or email information.
+        Update buyer's information including all available fields.
         
         Args:
             buyer_id: Buyer UUID
             name: Optional new name
             email: Optional new email
+            tags: Optional buyer tags as JSON
+            requirements: Optional buyer requirements as JSON
+            solutions_presented: Optional solutions presented as JSON
+            relationship_progression: Optional relationship progression text
+            risks: Optional risks as JSON
+            products_discussed: Optional products discussed as JSON
             
         Returns:
             Updated Buyer instance or None if not found
@@ -140,6 +164,18 @@ class BuyerService(BaseService):
                 update_data['name'] = name
             if email is not None:
                 update_data['email'] = email
+            if tags is not None:
+                update_data['tags'] = tags
+            if requirements is not None:
+                update_data['requirements'] = requirements
+            if solutions_presented is not None:
+                update_data['solutions_presented'] = solutions_presented
+            if relationship_progression is not None:
+                update_data['relationship_progression'] = relationship_progression
+            if risks is not None:
+                update_data['risks'] = risks
+            if products_discussed is not None:
+                update_data['products_discussed'] = products_discussed
             
             if not update_data:
                 logging.warning(f"No update data provided for buyer {buyer_id}")

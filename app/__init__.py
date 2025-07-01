@@ -17,7 +17,7 @@ from app.models.action import Action
 from app.models.exotel_calls import ExotelCall
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.jwt_token_blocklist import TokenBlocklist
-from app.service.aws.ecs_client import ECSClient
+from app.external.aws.ecs_client import ECSClient
 
 from flask import Flask
 

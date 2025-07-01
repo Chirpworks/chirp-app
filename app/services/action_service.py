@@ -166,7 +166,7 @@ class ActionService(BaseService):
                 "description": action.description,
                 "meeting_id": str(action.meeting.id),
                 "meeting_title": action.meeting.title,
-                "meeting_buyer_number": denormalize_phone_number(action.meeting.buyer_number),
+                "meeting_buyer_number": denormalize_phone_number(action.meeting.buyer.phone),
                 "meeting_seller_name": seller_name,
                 "reasoning": action.reasoning,
                 "signals": action.signals,

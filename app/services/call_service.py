@@ -22,7 +22,7 @@ class CallService(BaseService):
     
     @classmethod
     def create_exotel_call(cls, call_from: str, start_time: datetime, end_time: datetime,
-                          duration: str, call_recording_url: str) -> ExotelCall:
+                          duration: int, call_recording_url: str) -> ExotelCall:
         """
         Create a new ExotelCall record.
         
@@ -30,7 +30,7 @@ class CallService(BaseService):
             call_from: Caller's phone number (will be normalized)
             start_time: Call start time
             end_time: Call end time
-            duration: Call duration string
+            duration: Call duration in seconds (integer)
             call_recording_url: URL to the call recording
             
         Returns:
@@ -43,7 +43,7 @@ class CallService(BaseService):
             exotel_call.call_from = normalized_phone
             exotel_call.start_time = start_time
             exotel_call.end_time = end_time
-            exotel_call.duration = duration
+            exotel_call.duration = int(duration)  # Ensure integer type
             exotel_call.call_recording_url = call_recording_url
             
             db.session.add(exotel_call)
@@ -59,7 +59,7 @@ class CallService(BaseService):
     @classmethod
     def create_mobile_app_call(cls, mobile_app_call_id: int, buyer_number: str, seller_number: str,
                               call_type: str, start_time: datetime, end_time: datetime,
-                              duration: str, user_id: str) -> MobileAppCall:
+                              duration: int, user_id: str) -> MobileAppCall:
         """
         Create a new MobileAppCall record.
         
@@ -70,7 +70,7 @@ class CallService(BaseService):
             call_type: Type of call (incoming/outgoing)
             start_time: Call start time
             end_time: Call end time
-            duration: Call duration string
+            duration: Call duration in seconds (integer)
             user_id: Seller's UUID
             
         Returns:
@@ -81,7 +81,7 @@ class CallService(BaseService):
             normalized_seller = normalize_phone_number(seller_number)
             
             # Calculate call status
-            status = calculate_call_status(call_type, duration)
+            status = calculate_call_status(call_type, str(duration))  # Convert to string for status calculation
             
             mobile_call = MobileAppCall()
             mobile_call.mobile_app_call_id = mobile_app_call_id
@@ -90,7 +90,7 @@ class CallService(BaseService):
             mobile_call.call_type = call_type
             mobile_call.start_time = start_time
             mobile_call.end_time = end_time
-            mobile_call.duration = duration
+            mobile_call.duration = int(duration)  # Ensure integer type
             mobile_call.user_id = user_id
             mobile_call.status = status
             
@@ -315,6 +315,38 @@ class CallService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get MobileAppCalls for seller {seller_number}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_last_mobile_app_call_by_seller(cls, seller_number: str) -> Optional[MobileAppCall]:
+        """
+        Get the most recent MobileAppCall for a specific seller by phone number.
+        
+        Args:
+            seller_number: Seller's phone number
+            
+        Returns:
+            Most recent MobileAppCall instance or None if not found
+        """
+        try:
+            normalized_seller = normalize_phone_number(seller_number)
+            
+            last_call = (
+                MobileAppCall.query
+                .filter_by(seller_number=normalized_seller)
+                .order_by(MobileAppCall.start_time.desc())
+                .first()
+            )
+            
+            if last_call:
+                logging.info(f"Found last MobileAppCall for seller {normalized_seller}: {last_call.id}")
+            else:
+                logging.info(f"No MobileAppCall found for seller {normalized_seller}")
+                
+            return last_call
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get last MobileAppCall for seller {seller_number}: {str(e)}")
             raise
     
     @classmethod

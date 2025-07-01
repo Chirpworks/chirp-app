@@ -1,16 +1,11 @@
 import uuid
 from datetime import datetime
-from enum import Enum
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import UUID
 
 from app import db
-
-
-class ActionStatus(Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
+from ..constants import ActionStatus
 
 
 # Meeting model

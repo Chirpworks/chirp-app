@@ -31,8 +31,9 @@ class Seller(db.Model, UserMixin):
     role = db.Column(db.Enum(SellerRole), default=SellerRole.USER)
     agency_id = db.Column(UUID(as_uuid=True), db.ForeignKey('agencies.id'), nullable=False)
     agency = db.relationship('Agency', back_populates='sellers')
-    calls = db.relationship('Meeting', back_populates='seller', cascade='all, delete-orphan')
+    meetings = db.relationship('Meeting', back_populates='seller', cascade='all, delete-orphan')
     unmapped_app_calls = db.relationship('MobileAppCall', back_populates='user', cascade='all, delete-orphan')
+    actions = db.relationship('Action', back_populates='seller', cascade='all, delete-orphan')
     manager_id = db.Column(UUID(as_uuid=True), db.ForeignKey('sellers.id'), nullable=True)
     manager = db.relationship('Seller', remote_side=[id], backref='team_members')
 

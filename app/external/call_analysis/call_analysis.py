@@ -11,7 +11,7 @@ from app import Seller, Agency, db
 from app.services.action_service import ActionService
 
 from app.models.meeting import Meeting
-from app.service.llm.open_ai.chat_gpt import OpenAIClient
+from app.external.llm.open_ai.chat_gpt import OpenAIClient
 
 # Load environment variables (for local dev or ECS fallback)
 load_dotenv()

@@ -1,20 +1,13 @@
 import uuid
 from datetime import datetime
-from enum import Enum
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import UUID
 
 from app import db
+from ..constants import JobStatus
 
 from .meeting import Meeting
-
-
-class JobStatus(Enum):
-    INIT = "init"
-    IN_PROGRESS = "in_progress"
-    COMPLETED = "completed"
-    FAILURE = "failure"
 
 
 class Job(db.Model):

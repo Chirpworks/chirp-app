@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 
 from app import Seller
 from app.constants import AWSConstants
-from app.service.aws.s3_client import S3Client
+from app.external.aws.s3_client import S3Client
 
 logging = logging.getLogger(__name__)
 

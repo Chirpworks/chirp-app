@@ -6,7 +6,7 @@ import requests
 from pydub import AudioSegment
 
 from app.constants import ExotelCreds
-from app.service.aws.s3_client import S3Client
+from app.external.aws.s3_client import S3Client
 
 logging = logging.getLogger(__name__)
 

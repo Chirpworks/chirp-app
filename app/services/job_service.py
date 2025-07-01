@@ -61,6 +61,32 @@ class JobService(BaseService):
         return cls.get_by_field('meeting_id', meeting_id)
     
     @classmethod
+    def get_meeting_by_job_id(cls, job_id: str):
+        """
+        Get meeting associated with a job ID.
+        
+        Args:
+            job_id: Job UUID
+            
+        Returns:
+            Meeting instance or None if not found
+        """
+        try:
+            job = cls.get_by_id(job_id)
+            if not job:
+                logging.warning(f"Job not found: {job_id}")
+                return None
+                
+            from app.services import MeetingService
+            meeting = MeetingService.get_by_id(job.meeting_id)
+            if meeting:
+                logging.info(f"Found meeting by job ID: {job_id}")
+            return meeting
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get meeting by job ID {job_id}: {str(e)}")
+            raise
+    
+    @classmethod
     def get_running_jobs(cls) -> List[Job]:
         """
         Get all currently running jobs.

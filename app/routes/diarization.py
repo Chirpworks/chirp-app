@@ -2,8 +2,8 @@ import logging
 
 from flask import Blueprint, request, jsonify
 
-from app import Job
-from app.service.aws.ecs_client import ECSClient
+from app.external.aws.ecs_client import ECSClient
+from app.services import JobService
 
 logging = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def retry_diarization():
         if not job_id:
             return jsonify({"error": "Missing required fields"}), 400
 
-        job = Job.query.get(job_id)
+        job = JobService.get_by_id(job_id)
         if not job:
             return jsonify({"error": "Job not found"}), 404
 

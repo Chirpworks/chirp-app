@@ -3,7 +3,7 @@ import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from app.service.aws.s3_client import S3Client
+from app.external.aws.s3_client import S3Client
 from app.utils.auth_utils import generate_secure_otp, send_otp_email
 
 from app.utils.call_recording_utils import normalize_phone_number

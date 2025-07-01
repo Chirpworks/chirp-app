@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app import Meeting, db, Job
 from app.models.job import JobStatus
-from app.service.job_scheduler.job_scheduler import JobScheduler
+from app.external.job_scheduler.job_scheduler import JobScheduler
 from app.constants import CalendarName
 
 # If modifying these scopes, delete the file token.json.

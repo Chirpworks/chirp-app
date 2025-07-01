@@ -11,11 +11,12 @@ import requests
 from flask import Blueprint, request, jsonify
 from sqlalchemy import and_
 
-from app import Job, db, Seller
+from app import db
+from app.services import JobService, SellerService
 from app.constants import AWSConstants, MeetingSource
 from app.models.exotel_calls import ExotelCall
-from app.models.meeting import ProcessingStatus
-from app.service.aws.ecs_client import ECSClient
+
+from app.external.aws.ecs_client import ECSClient
 from app.utils.call_recording_utils import upload_file_to_s3, download_exotel_file_from_url, get_audio_duration_seconds, \
     normalize_phone_number, calculate_call_status, denormalize_phone_number, find_or_create_buyer
 from app.services import BuyerService, SellerService, CallService, MeetingService, JobService
@@ -39,7 +40,7 @@ def post_recording():
         if not job_id or not recording_s3_url:
             return jsonify({"error": "Missing required fields"}), 400
 
-        job = Job.query.get(job_id)
+        job = JobService.get_by_id(job_id)
         if not job:
             return jsonify({"error": "Job not found"}), 404
 
@@ -134,7 +135,7 @@ def post_exotel_recording():
             call_from=call_from,
             start_time=call_start_time,
             end_time=call_end_time,
-            duration=call_duration,
+            duration=int(call_duration) if call_duration else 0,
             call_recording_url=call_recording_url
         )
         CallService.commit_with_rollback()
@@ -179,7 +180,7 @@ def post_exotel_recording():
                 mobile_app_call_id=matching_app_call.mobile_app_call_id,
                 participants=[call_from, matching_app_call.buyer_number],
                 scheduled_at=matching_app_call.start_time,
-                status=ProcessingStatus.PROCESSING
+
             )
             
             # Create Job using JobService
@@ -247,7 +248,7 @@ def post_app_call_record():
                 logging.error("all required fields were not sent in the request parameter")
                 return jsonify({"error": "Missing required fields"}), 400
 
-            user = Seller.query.filter_by(phone=seller_number).first()
+            user = SellerService.get_by_phone(seller_number)
 
             if not user:
                 logging.info(f"No user with phone number {seller_number} found")
@@ -277,7 +278,7 @@ def post_app_call_record():
                 call_type=call_type_str,
                 start_time=start_time,
                 end_time=end_time,
-                duration=duration,
+                duration=int(duration) if duration else 0,
                 user_id=user.id
             )
             CallService.commit_with_rollback()
@@ -327,8 +328,7 @@ def post_app_call_record():
                     direction=mobile_call.call_type,
                     mobile_app_call_id=call_id,
                     participants=[seller_number, buyer_number],
-                    scheduled_at=start_time,
-                    status=ProcessingStatus.INITIALIZED
+                    scheduled_at=start_time
                 )
 
                 # Create Job using JobService  

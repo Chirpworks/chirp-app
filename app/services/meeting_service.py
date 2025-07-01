@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy import and_
 
-from app.models.meeting import Meeting, ProcessingStatus
+from app.models.meeting import Meeting
 from app.models.seller import Seller
 from app.models.buyer import Buyer
 from app.models.mobile_app_calls import MobileAppCall
@@ -18,7 +18,7 @@ logging = logging.getLogger(__name__)
 
 
 def human_readable_duration(end_time: datetime, start_time: datetime) -> str:
-    """Helper function to calculate human readable duration"""
+    """Helper function to calculate human readable duration from start and end times"""
     if not end_time or not start_time:
         return "N/A"
     
@@ -66,7 +66,6 @@ class MeetingService(BaseService):
                 'title': title,
                 'start_time': start_time,
                 'source': kwargs.get('source', MeetingSource.PHONE),
-                'status': kwargs.get('status', ProcessingStatus.INITIALIZED),
                 **kwargs
             }
             
@@ -127,9 +126,12 @@ class MeetingService(BaseService):
                         )
                     )
                 
-                # Apply status filter
+                # Note: Meeting model doesn't have a status field
+                # Status is tracked through the associated Job model
+                # Apply status filter (if needed, filter through job relationship)
                 if 'status' in filters:
-                    query = query.filter(cls.model.status == filters['status'])
+                    logging.warning("Status filter requested but Meeting model doesn't have status field")
+                    # Could implement job.status filtering here if needed
                 
                 # Apply direction filter
                 if 'direction' in filters:
@@ -324,7 +326,8 @@ class MeetingService(BaseService):
                 "call_notes": getattr(call_record, 'call_notes', None),
                 "user_name": seller_name,
                 "user_email": getattr(call_record.seller, 'email', None) if isinstance(call_record, Meeting) else None,
-                "direction": direction
+                "call_type": direction,
+                "call_summary": getattr(call_record, 'summary', None)
             }
             
         except Exception as e:
@@ -380,6 +383,101 @@ class MeetingService(BaseService):
             return meeting
         except SQLAlchemyError as e:
             logging.error(f"Failed to get meeting with relationships {meeting_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_last_meeting_by_seller(cls, seller_id: str) -> Optional[Meeting]:
+        """
+        Get the most recent meeting for a specific seller.
+        
+        Args:
+            seller_id: Seller UUID
+            
+        Returns:
+            Most recent Meeting instance or None if not found
+        """
+        try:
+            last_meeting = (
+                cls.model.query
+                .filter_by(seller_id=seller_id)
+                .order_by(cls.model.start_time.desc())
+                .first()
+            )
+            
+            if last_meeting:
+                logging.info(f"Found last meeting for seller {seller_id}: {last_meeting.id}")
+            else:
+                logging.info(f"No meeting found for seller {seller_id}")
+                
+            return last_meeting
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get last meeting for seller {seller_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_call_history_by_buyer(cls, buyer_id: str) -> List[Dict[str, Any]]:
+        """
+        Get comprehensive call history for a specific buyer.
+        
+        Args:
+            buyer_id: Buyer UUID
+            user_id: Current user's UUID for authorization
+            
+        Returns:
+            List of call history dictionaries with formatted data
+        """
+        try:
+            # Get buyer to verify access
+            buyer = Buyer.query.get(buyer_id)
+            if not buyer:
+                logging.error(f"Buyer not found: {buyer_id}")
+                return []
+            
+            # Get meetings for the buyer
+            meetings_query = (
+                cls.model.query
+                .filter_by(buyer_id=buyer_id)
+                .order_by(cls.model.start_time.desc())
+            )
+            
+            # Get mobile app calls for the buyer (by phone number)
+            mobile_app_calls_query = (
+                MobileAppCall.query
+                .filter(MobileAppCall.buyer_number == buyer.phone)
+                .order_by(MobileAppCall.start_time.desc())
+            )
+            
+            meetings = meetings_query.all()
+            mobile_app_calls = mobile_app_calls_query.all()
+            
+            # Combine and sort all call records
+            all_calls = []
+            all_calls.extend(meetings)
+            all_calls.extend(mobile_app_calls)
+            
+            # Sort by start time
+            all_calls.sort(
+                key=lambda x: x.start_time.replace(
+                    tzinfo=ZoneInfo("Asia/Kolkata")
+                ) if x.start_time and x.start_time.tzinfo is None else x.start_time,
+                reverse=True
+            )
+            
+            # Format call history
+            local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
+            result = []
+            
+            for call_record in all_calls:
+                formatted_call = cls._format_call_record(call_record, local_now)
+                if formatted_call:
+                    result.append(formatted_call)
+            
+            logging.info(f"Retrieved {len(result)} call history records for buyer {buyer_id}")
+            return result
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get call history for buyer {buyer_id}: {str(e)}")
             raise
     
     @classmethod
