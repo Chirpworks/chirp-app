@@ -1,23 +1,11 @@
 import uuid
-from datetime import datetime, timezone, timedelta
-from enum import Enum
+from datetime import datetime
 from zoneinfo import ZoneInfo
-
-from sqlalchemy.dialects.postgresql import ENUM
-
 
 from sqlalchemy import UUID
 
 from app import db
-
-from .seller import Seller
-
-IST = timezone(timedelta(hours=5, minutes=30))
-
-
-class ActionStatus(Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
+from ..constants import ActionStatus
 
 
 # Meeting model

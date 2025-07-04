@@ -1,0 +1,24 @@
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: chirp-transcriber-job
+spec:
+  template:
+    spec:
+      containers:
+      - image: us-central1-docker.pkg.dev/PROJECT_ID/chirp-transcriptions/transcriber:latest
+        env:
+        - name: DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-url-secret     # create this secret to store your DB connection string
+              key: connection-string
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: gemini-api-key    # previously created in Secret Manager
+              key: latest
+        args:
+        - --job-id
+        - "$(JOB_ID)"               # Cloud Run will substitute the JOB_ID when executing
+      restartPolicy: Never           # do not retry failed jobs automatically

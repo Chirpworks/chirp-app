@@ -4,7 +4,7 @@ import boto3
 import json
 
 from app.constants import AWSConstants
-from app.service.aws.sqs_client import SQSClient
+from app.external.aws.sqs_client import SQSClient
 
 
 # Initialize AWS clients

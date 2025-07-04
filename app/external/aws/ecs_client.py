@@ -28,12 +28,16 @@ class ECSClient:
 
     def run_agent_task(self, job_id: str, calendar_name: CalendarName):
         """Run a job on ECS."""
-        task_definition = CALENDAR_NAME_TO_ECS_TASK_DEFINITION_MAP.get(calendar_name)
-        container_name = CALENDAR_NAME_TO_ECS_CONTAINER_NAME_MAP.get(calendar_name)
+        task_definition = CALENDAR_NAME_TO_ECS_TASK_DEFINITION_MAP.get(calendar_name.value)
+        container_name = CALENDAR_NAME_TO_ECS_CONTAINER_NAME_MAP.get(calendar_name.value)
+        
+        if not task_definition or not container_name:
+            raise ValueError(f"No task definition or container name found for calendar: {calendar_name.value}")
+        
         # TODO: Add env vars for email = os.getenv("GOOGLE_AGENT_EMAIL")
         #     password = os.getenv("GOOGLE_AGENT_PASSWORD")
         #     meet_link = os.getenv("GOOGLE_MEET_LINK") as overrides here
-        return self.run_task(task_definition=task_definition, container_name=container_name, job_id=job_id)
+        return self.run_task(task_definition=task_definition, container_name=container_name, job_id=job_id, cluster_name=self.agent_cluster_name)
 
     def get_agent_task_status(self, job_id):
         """Fetch ECS task status using job_id."""
@@ -41,13 +45,13 @@ class ECSClient:
         if not job:
             return None
 
-        # Get list of celery_tasks
+        # Get list of tasks
         response = self.client.list_tasks(cluster=self.agent_cluster_name)
         tasks = response.get("taskArns", [])
 
         for task_arn in tasks:
             task_info = self.client.describe_tasks(cluster=self.agent_cluster_name, tasks=[task_arn])
-            task = task_info.get("celery_tasks", [])[0]
+            task = task_info.get("tasks", [])[0]
 
             # Extract Job ID from environment variables inside the container
             container = task.get("containers", [])[0]

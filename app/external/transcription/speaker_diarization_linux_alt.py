@@ -19,7 +19,7 @@ from sqlalchemy.orm import sessionmaker
 from app import Job, Meeting  # Adjust import paths as needed
 from app.models.job import JobStatus
 
-from app.service.llm.open_ai.chat_gpt import OpenAIClient
+from app.external.llm.open_ai.chat_gpt import OpenAIClient
 
 # ─── GLOBAL CONFIGURATION ──────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ from flask_jwt_extended import get_current_user, jwt_required
 from google_auth_oauthlib.flow import Flow
 from app.config import Config
 
-from app.service.google_calendar.google_calendar_user import GoogleCalendarUserService
+from app.external.google_calendar.google_calendar_user import GoogleCalendarUserService
 
 google_auth_bp = Blueprint("google_auth", __name__)
 

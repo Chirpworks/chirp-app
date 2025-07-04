@@ -1,12 +1,11 @@
-import traceback
-
 import logging
 
 from flask import Blueprint, jsonify, request
 
 from flask_jwt_extended import get_jwt_identity, jwt_required
 
-from app import Seller, db, Meeting, Deal, MobileAppCall
+from app import db, Meeting, MobileAppCall
+from app.services import SellerService
 from app.constants import CallDirection
 from app.models.seller import SellerRole
 from sqlalchemy import func
@@ -23,16 +22,13 @@ user_bp = Blueprint("user", __name__)
 def get_team():
     try:
         user_id = get_jwt_identity()
-        user = Seller.query.filter_by(id=user_id).first()
+        user = SellerService.get_by_id(user_id)
 
         if not user:
             logging.error(f"Seller with id {user_id} not found")
             return jsonify({"error": "Seller not found"}), 404
 
-        users = (
-            Seller.query
-            .filter(Seller.agency_id == user.agency_id)
-        )
+        users = SellerService.get_by_agency(user.agency_id)
         all_members_total_outgoing_calls = 0
         all_members_total_incoming_calls = 0
         all_members_unanswered_outgoing_calls = 0
@@ -43,29 +39,29 @@ def get_team():
         for team_member in users:
             total_outgoing_calls = (
                 Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.seller_id == team_member.id)
                 .filter(Meeting.direction == CallDirection.OUTGOING.value)
-                .scalar()
+                .count()
             )
             total_incoming_calls = (
                 Meeting.query
-                .filter(Meeting.seller_number == team_member.phone)
+                .filter(Meeting.seller_id == team_member.id)
                 .filter(Meeting.direction == CallDirection.INCOMING.value)
-                .scalar()
+                .count()
             )
             unanswered_outgoing_calls = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id == team_member.id)
                 .filter(MobileAppCall.status == 'Not Answered')
-                .scalar()
+                .count()
             )
             unique_leads_engaged = (
-                db.session.query(func.count(func.distinct(Meeting.buyer_number)))
-                .filter(Meeting.seller_number == team_member.phone)
+                db.session.query(func.count(func.distinct(Meeting.buyer_id)))
+                .filter(Meeting.seller_id == team_member.id)
                 .scalar()
             )
             unique_leads_called_but_not_engaged = (
-                db.session.query(func.count(func.ditinct(MobileAppCall.buyer_number)))
+                db.session.query(func.count(func.distinct(MobileAppCall.buyer_number)))
                 .filter(MobileAppCall.seller_number == team_member.phone)
                 .scalar()
             )
@@ -99,7 +95,8 @@ def get_team():
 
         return jsonify(result), 200
     except Exception as e:
-        logging.error(f"Failed to fetch team members for manager {user.email}, {user_id=}, with error: {e}")
+        user_email = user.email if user else "unknown"
+        logging.error(f"Failed to fetch team members for manager {user_email}, {user_id=}, with error: {e}")
         return jsonify(f"Failed to fetch team members for user {user_id=}, with error: {e}")
 
 
@@ -238,7 +235,10 @@ def get_team():
 def get_user():
     try:
         user_id = get_jwt_identity()
-        user = Seller.query.filter_by(id=user_id).first()
+        user = SellerService.get_by_id(user_id)
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
 
         result = {
             "id": str(user.id),
@@ -268,12 +268,12 @@ def assign_manager():
             logging.error("Both manager_email and user_email are required data")
             return jsonify({"error": "Both manager_email and user_email are required data"}), 500
 
-        user = Seller.query.filter_by(email=user_email).first()
+        user = SellerService.get_by_email(user_email)
         if not user:
             logging.error(f"Seller with email {user_email} not found")
             return jsonify({"error": "Seller with email {user_email} not found"}), 404
 
-        manager = Seller.query.filter_by(email=manager_email).first()
+        manager = SellerService.get_by_email(manager_email)
         if not manager:
             logging.error(f"Manager with email {manager_email} not found")
             return jsonify({"error": f"Manager with email {manager_email} not found"})
@@ -284,6 +284,8 @@ def assign_manager():
 
         user.manager_id = manager.id
         db.session.commit()
+        
+        return jsonify({"message": "Manager assigned successfully"}), 200
     except Exception as e:
         logging.error(f"Failed to set manager {manager_email} for user {user_email}: {str(e)}")
         return jsonify({"error": f"Failed to set manager {manager_email} for user {user_email}: {str(e)}"})

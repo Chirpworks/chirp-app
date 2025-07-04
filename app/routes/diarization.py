@@ -1,15 +1,9 @@
 import logging
-import os
-import uuid
-from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 
-from app import Job, db, Seller, Meeting
-from app.constants import AWSConstants
-from app.models.job import JobStatus
-from app.service.aws.ecs_client import ECSClient
-from app.utils.call_recording_utils import download_file_from_url, upload_file_to_s3, download_exotel_file_from_url
+from app.external.aws.ecs_client import ECSClient
+from app.services import JobService
 
 logging = logging.getLogger(__name__)
 
@@ -29,7 +23,7 @@ def retry_diarization():
         if not job_id:
             return jsonify({"error": "Missing required fields"}), 400
 
-        job = Job.query.get(job_id)
+        job = JobService.get_by_id(job_id)
         if not job:
             return jsonify({"error": "Job not found"}), 404
 

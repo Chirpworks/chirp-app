@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 
 from app import Seller
 from app.constants import AWSConstants
-from app.service.aws.s3_client import S3Client
+from app.external.aws.s3_client import S3Client
 
 logging = logging.getLogger(__name__)
 
@@ -37,12 +37,67 @@ def send_otp_email(to_email, otp):
     msg['To'] = to_email
 
     try:
+        if not AWSConstants.SMTP_USERNAME or not AWSConstants.SMTP_PASSWORD:
+            logging.error("SMTP credentials not configured")
+            return False
+        assert AWSConstants.SMTP_USERNAME is not None
+        assert AWSConstants.SMTP_PASSWORD is not None
         with smtplib.SMTP_SSL(AWSConstants.SMTP_SERVER, AWSConstants.SMTP_PORT) as server:
             server.login(AWSConstants.SMTP_USERNAME, AWSConstants.SMTP_PASSWORD)
             server.sendmail(msg['From'], to_email, msg.as_string())
         return True
     except Exception as e:
         logging.info(f"SES email failed: {e}")
+        return False
+
+
+def send_password_reset_confirmation_email(to_email, user_name):
+    """
+    Send a confirmation email after password has been successfully reset.
+    
+    Args:
+        to_email: User's email address
+        user_name: User's display name
+        
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    logging.info(f"Sending password reset confirmation email to {to_email}")
+    subject = "Password Reset Successful - Chirpworks"
+    body = f"""Hello {user_name},
+
+Your password has been successfully reset for your Chirpworks account.
+
+If you did not request this password reset, please contact our support team immediately.
+
+For security reasons, we recommend:
+- Using a strong, unique password
+- Not sharing your password with anyone
+- Logging out of any devices you no longer use
+
+Thank you for using Chirpworks.
+
+Best regards,
+The Chirpworks Team"""
+
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = 'noreply@chirpworks.ai'
+    msg['To'] = to_email
+
+    try:
+        if not AWSConstants.SMTP_USERNAME or not AWSConstants.SMTP_PASSWORD:
+            logging.error("SMTP credentials not configured")
+            return False
+        assert AWSConstants.SMTP_USERNAME is not None
+        assert AWSConstants.SMTP_PASSWORD is not None
+        with smtplib.SMTP_SSL(AWSConstants.SMTP_SERVER, AWSConstants.SMTP_PORT) as server:
+            server.login(AWSConstants.SMTP_USERNAME, AWSConstants.SMTP_PASSWORD)
+            server.sendmail(msg['From'], to_email, msg.as_string())
+        logging.info(f"Password reset confirmation email sent successfully to {to_email}")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to send password reset confirmation email to {to_email}: {e}")
         return False
 
 

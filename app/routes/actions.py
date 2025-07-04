@@ -1,199 +1,103 @@
-import json
 import logging
 
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app import Meeting, db, Seller
-from app.models.action import Action, ActionStatus
-from app.models.deal import Deal
-
+from app.models.action import ActionStatus
 from app.models.seller import SellerRole
+from app.services import ActionService, SellerService
+
+action_bp = Blueprint("actions", __name__)
 
 logging = logging.getLogger(__name__)
 
-action_bp = Blueprint("action", __name__)
 
-
-@action_bp.route("/get_actions", methods=["GET"])
+@action_bp.route("/", methods=["GET"])
 @jwt_required()
 def get_actions():
     try:
         user_id = get_jwt_identity()
+        team_member_ids = request.args.getlist("team_member_id")
 
-        # Parse optional query params
-        deal_id = request.args.get("deal_id")
-        is_complete_str = request.args.get("is_complete")
-        is_complete = None
-        action_type = request.args.get("actionType")
+        # Authorization check for team member access
+        if team_member_ids:
+            user = SellerService.get_by_id(user_id)
+            if not user:
+                logging.error("User not found; unauthorized")
+                return jsonify({"error": "User not found or unauthorized"}), 404
+            if user.role != SellerRole.MANAGER:
+                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                return jsonify(
+                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"})
 
-        if is_complete_str is not None:
-            is_complete = is_complete_str.lower() == "true"
-
-        if not user_id:
-            logging.error("Failed to get action - Unauthorized")
-            return jsonify({"error": "Seller not found or unauthorized"}), 401
-
-        user_ids = request.args.getlist("user_id")
-        if user_ids:
-            for user_id in user_ids:
-                user = Seller.query.filter_by(id=user_id).first()
-                if not user:
-                    logging.error(f"Seller with id {user_id} not found; unauthorized")
+            # Validate team member IDs
+            for member_id in team_member_ids:
+                member = SellerService.get_by_id(member_id)
+                if not member:
+                    logging.error(f"Seller with id {member_id} not found; unauthorized")
                     return jsonify({"error": "Seller not found or unauthorized"}), 404
-            logging.info(f"Fetching actions data for users {user_ids}")
 
-            # Join through deals to fetch user's meetings
-            query = (
-                Action.query
-                .join(Action.meeting)
-                .join(Meeting.deal)
-                .filter(Deal.user_id.in_(user_ids))
-            )
-        else:
-            logging.info(f"Fetching actions data for user {user_id}")
-            # Base query: actions joined through meetings and deals
-            query = (
-                Action.query
-                .join(Action.meeting)
-                .join(Meeting.deal)
-                .filter(Deal.user_id == user_id)
-            )
-
-        if deal_id:
-            query = query.filter(Meeting.deal_id == deal_id)
-
-        if action_type:
-            query = query.filter(Action.type == action_type)
-
-        if is_complete is True:
-            query = query.filter(Action.status == ActionStatus.COMPLETED)
-        elif is_complete is False:
-            query = query.filter(Action.status == ActionStatus.PENDING)
-
-        actions = query.all()
-
-        # Prepare response
-        result = []
-        for action in actions:
-            is_complete = True if action.status == ActionStatus.COMPLETED else False
-            result.append({
-                "id": str(action.id),
-                "title": action.title,
-                "status": action.status.value,
-                "is_complete": is_complete,
-                "due_date": action.due_date.isoformat() if action.due_date else None,
-                "description": action.description,
-                "deal_name": action.meeting.deal.name,
-                "deal_id": str(action.meeting.deal_id),
-                "reasoning": action.reasoning,
-                "signals": action.signals,
-                "type": action.type.value,
-                "created_at": action.created_at.isoformat() if action.created_at else None,
-                "meeting_id": action.meeting_id
-            })
-
-        return jsonify(result), 200
+        # Use ActionService to get actions
+        actions = ActionService.get_actions_for_user(user_id, team_member_ids)
+        return jsonify(actions), 200
 
     except Exception as e:
-        logging.info(f"Failed to fetch actions with error: {e}")
-        return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
+        logging.error(f"Error fetching actions: {str(e)}")
+        return jsonify({"error": "Failed to fetch actions"}), 500
 
 
-@action_bp.route("/get_action_details/<uuid:action_id>", methods=["GET"])
+@action_bp.route("/<uuid:action_id>", methods=["GET"])
 @jwt_required()
-def get_action_by_id(action_id):
+def get_action_by_id(action_id: str):
     try:
         user_id = get_jwt_identity()
 
-        if not user_id:
-            logging.error("Failed to get action - Unauthorized")
-            return jsonify({"error": "Seller not found or unauthorized"}), 401
-
-        # Join to verify ownership through deal
-        action = (
-            Action.query
-            .join(Action.meeting)
-            .join(Meeting.deal)
-            .filter(Action.id == action_id)
-            .first()
-        )
-
+        # Use ActionService to get action
+        action = ActionService.get_action_by_id_for_user(action_id, user_id)
         if not action:
-            return jsonify({"error": "Action not found"}), 404
+            return jsonify({"error": "Action not found or unauthorized"}), 404
 
-        is_complete = action.status == ActionStatus.COMPLETED
-        result = {
-            "id": str(action.id),
-            "title": action.title,
-            "status": action.status.value,
-            "is_complete": is_complete,
-            "due_date": action.due_date.isoformat() if action.due_date else None,
-            "description": action.description,
-            "deal_name": action.meeting.deal.name,
-            "deal_id": str(action.meeting.deal_id),
-            "reasoning": action.reasoning,
-            "signals": action.signals,
-            "type": action.type.value,
-            "created_at": action.created_at.isoformat() if action.created_at else None,
-            "meeting_id": action.meeting_id
-        }
-
-        return jsonify(result), 200
+        return jsonify(action), 200
 
     except Exception as e:
-        logging.error(f"Failed to fetch action details: {e}")
-        return jsonify({"error": f"Failed to fetch action: {str(e)}"}), 500
+        logging.error(f"Error fetching action {action_id}: {str(e)}")
+        return jsonify({"error": "Failed to fetch action"}), 500
 
 
-@action_bp.route("/status", methods=["POST"])
+@action_bp.route("/update", methods=["POST"])
 @jwt_required()
-def update_multiple_action_statuses():
+def update_actions():
     try:
         user_id = get_jwt_identity()
         data = request.get_json()
 
-        action_ids = data.get("action_ids")
-        status_str = data.get("status")
+        if not data or not isinstance(data, list):
+            return jsonify({"error": "Invalid request format. Expected array of actions."}), 400
 
-        if not action_ids or not isinstance(action_ids, list) or not status_str:
-            return jsonify({"error": "Request must include 'action_ids' (list) and 'status'"}), 400
+        action_updates = []
 
+        for item in data:
+            action_id = item.get("id")
+            status = item.get("status")
+
+            if not action_id or not status:
+                return jsonify({"error": "Missing required fields: id and status"}), 400
+
+            if status not in [s.value for s in ActionStatus]:
+                return jsonify({"error": f"Invalid status: {status}"}), 400
+
+            action_updates.append({"id": action_id, "status": status})
+
+        # Use ActionService for bulk update
         try:
-            new_status = ActionStatus[status_str.upper()]
-        except KeyError:
-            return jsonify({"error": "Invalid status. Must be 'pending' or 'completed'"}), 400
-
-        # Fetch and filter actions that belong to this user
-        query = (
-            Action.query
-            .join(Action.meeting)
-            .join(Meeting.deal)
-            .filter(Action.id.in_(action_ids), Deal.user_id == user_id)
-        )
-
-        actions = query.all()
-
-        if not actions:
-            return jsonify({"error": "No valid actions found for current user"}), 404
-
-        if not user_id:
-            return jsonify({"error": "Seller not found or unauthorized"}), 401
-
-        updated_ids = []
-        for action in actions:
-            action.status = new_status
-            updated_ids.append(str(action.id))
-
-        db.session.commit()
-
-        return jsonify({
-            "message": f"Updated status for {len(updated_ids)} actions",
-            "updated_action_ids": updated_ids,
-            "new_status": new_status.value
-        }), 200
+            updated_count = ActionService.bulk_update_actions(action_updates, user_id)
+            ActionService.commit_with_rollback()
+            
+            return jsonify({"message": f"Updated {updated_count} actions successfully"}), 200
+            
+        except ValueError as ve:
+            return jsonify({"error": str(ve)}), 404
 
     except Exception as e:
-        logging.error(f"Failed to change action status: {e}")
-        db.session.rollback()
-        return jsonify({"error": f"Failed to update actions: {str(e)}"}), 500
+        logging.error(f"Error updating actions: {str(e)}")
+        return jsonify({"error": "Failed to update actions"}), 500

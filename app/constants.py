@@ -64,3 +64,21 @@ class CallDirection(Enum):
     INCOMING = "incoming"
     OUTGOING = "outgoing"
     MISSED = "missed"
+
+
+class CallStatus(Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class JobStatus(Enum):
+    INIT = "init"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILURE = "failure"
+
+
+class ActionStatus(Enum):
+    PENDING = "pending"
+    COMPLETED = "completed"
