@@ -76,8 +76,8 @@ class CallAnalysis:
                     text = self.get_previous_calls_context(related_meetings[:-1])
                     if text:
                         prompt_text = prompt_text.replace("<additional_context>", text)
-                if self.meeting.diarization:
-                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.diarization))
+                if self.meeting.transcription:
+                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.transcription))
 
             if not prompt_text:
                 logging.error("Analytical prompt text not found. Failed to generate analysis")
@@ -174,8 +174,8 @@ class CallAnalysis:
                     text = self.get_previous_calls_context(related_meetings[:-1])
                     if text and prompt_text:
                         prompt_text = prompt_text.replace("<additional_context>", str(text))
-                if self.meeting.diarization and prompt_text:
-                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.diarization))
+                if self.meeting.transcription and prompt_text:
+                    prompt_text = prompt_text.replace("<call_transcript>", str(self.meeting.transcription))
 
             if not prompt_text:
                 logging.error("Descriptive Prompt text not generated. Failed to generate analysis")

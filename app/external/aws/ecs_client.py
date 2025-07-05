@@ -67,7 +67,7 @@ class ECSClient:
         """Continuously monitor job statuses and update the database."""
         with app.app_context():
             while True:
-                running_jobs = Job.query.filter_by(status="running").all()
+                running_jobs = Job.query.filter_by(status=JobStatus.IN_PROGRESS).all()
 
                 for job in running_jobs:
                     task = self.get_agent_task_status(job.id)
@@ -81,27 +81,27 @@ class ECSClient:
                     # Check for failure scenarios
                     if last_status == "STOPPED" and exit_code != 0:
                         job.status = JobStatus.FAILURE
-                        job.completed_at = datetime.utcnow()
+                        job.end_time = datetime.utcnow()
                         db.session.commit()
                         print(f"Job {job.id} marked as FAILED (Exit Code: {exit_code})")
 
                     elif last_status in ["FAILED", "DEACTIVATING"]:
                         job.status = JobStatus.FAILURE
-                        job.completed_at = datetime.utcnow()
+                        job.end_time = datetime.utcnow()
                         db.session.commit()
                         print(f"Job {job.id} marked as FAILED due to ECS failure status.")
 
                     # Check for timeout (e.g., 1-hour runtime exceeded)
-                    elif job.started_at and datetime.utcnow() - job.started_at > timedelta(hours=AGENT_MEETING_TIME_IN_HOURS):
+                    elif job.start_time and datetime.utcnow() - job.start_time > timedelta(hours=AGENT_MEETING_TIME_IN_HOURS):
                         job.status = JobStatus.FAILURE
-                        job.completed_at = datetime.utcnow()
+                        job.end_time = datetime.utcnow()
                         db.session.commit()
                         print(f"Job {job.id} marked as FAILED due to timeout.")
 
                     # Mark job as completed if it finishes successfully
                     elif last_status == "STOPPED" and exit_code == 0:
                         job.status = JobStatus.COMPLETED
-                        job.completed_at = datetime.utcnow()
+                        job.end_time = datetime.utcnow()
                         db.session.commit()
                         print(f"Job {job.id} marked as COMPLETED.")
 

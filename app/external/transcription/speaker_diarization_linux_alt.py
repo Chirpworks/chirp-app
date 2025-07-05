@@ -352,19 +352,9 @@ def process_audio(job_id: str, bucket: str, key: str):
             meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
         if meeting:
             # Store the full aligned transcript (with speaker tags) as JSON
-            # (A) Store the full, word-level aligned output if needed:
-            meeting.transcript = json.dumps(aligned_with_speakers, ensure_ascii=False)
-
-            # (B) Build merged “speaker blocks” for diarization:
-            blocks = group_words_by_speaker(aligned_with_speakers)
-
-            # (C) Save those blocks as your diarization JSON:
-            openai_client = OpenAIClient()
-            diarization = openai_client.polish_with_gpt(blocks)
-            meeting.diarization = diarization
-
+            meeting.transcription = json.dumps(aligned_with_speakers, ensure_ascii=False)
             session.commit()
-            logger.info(f"Updated Meeting {meeting.id} with transcript & diarization.")
+            logger.info(f"Updated Meeting {meeting.id} with transcript.")
             update_job_status(job_id, JobStatus.COMPLETED)
         else:
             logger.error(f"Meeting record not found for job_id={job_id}")

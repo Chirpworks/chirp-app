@@ -78,15 +78,17 @@ class GoogleCalendarUserService:
             scheduled_at = datetime.fromisoformat(start_time) if start_time else datetime.utcnow()
 
             # Check if meeting already exists
-            existing_meeting = Meeting.query.filter_by(id=meeting_id, user_id=user.id).first()
+            existing_meeting = Meeting.query.filter_by(id=meeting_id, seller_id=user.id).first()
 
             if not existing_meeting:
                 # Create new meeting
                 new_meeting = Meeting(
                     id=meeting_id,
                     title=title,
-                    scheduled_at=scheduled_at,
-                    user_id=user.id
+                    start_time=scheduled_at,
+                    seller_id=user.id,
+                    buyer_id=None,  # Set appropriately if you have buyer info
+                    source=None  # Set appropriately if you have source info
                 )
                 db.session.add(new_meeting)
                 db.session.flush()  # Get ID before commit

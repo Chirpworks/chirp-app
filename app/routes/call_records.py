@@ -45,7 +45,7 @@ def post_recording():
             return jsonify({"error": "Job not found"}), 404
 
         # Update job with the recording URL
-        job.recording_s3_url = recording_s3_url
+        job.s3_audio_url = recording_s3_url
         db.session.commit()
 
         # Initialize ECS task for speaker diarization
@@ -55,7 +55,7 @@ def post_recording():
         return jsonify({
             "message": "Recording received and ECS speaker diarization task started",
             "job_id": job.id,
-            "recording_s3_url": job.recording_s3_url,
+            "s3_audio_url": job.s3_audio_url,
             "ecs_task_response": task_response
         }), 200
     except Exception as e:

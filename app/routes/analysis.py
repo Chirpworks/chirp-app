@@ -1,8 +1,9 @@
 import logging
+import requests
 from flask import Blueprint, request, jsonify
 
-from app.external.call_analysis.call_analysis import CallAnalysis
 from app.services import JobService, MeetingService
+from app.models.job import JobStatus
 
 logging = logging.getLogger(__name__)
 
@@ -32,19 +33,34 @@ def trigger_analysis():
         if not meeting:
             logging.error(f"Meeting for job {job_id} not found")
             return jsonify({"error": f"Meeting for job {job_id} not found"}), 404
-        if not meeting.diarization:
-            logging.error(f"Meeting with id {meeting.id} is missing diarization data")
-            return jsonify({"error": f"Meeting with id {meeting.id} is missing diarization data"}), 400
+        # Check if job is completed and transcription is available
+        if job.status != JobStatus.COMPLETED:
+            logging.error(f"Job with id {job_id} is not completed. Current status: {job.status}")
+            return jsonify({"error": f"Job with id {job_id} is not completed. Current status: {job.status}"}), 400
+            
+        if not meeting.transcription:
+            logging.error(f"Meeting with id {meeting.id} is missing transcription data")
+            return jsonify({"error": f"Meeting with id {meeting.id} is missing transcription data"}), 400
 
-        call_analyzer = CallAnalysis(meeting=meeting)
-        call_analyzer.analyze_meeting()
+        # Call Google RunCloud API for analysis
+        buyer_id = str(meeting.buyer_id)
+        meeting_id = str(meeting.id)
+        
+        # TODO: Replace with actual Google RunCloud endpoint URL
+        runcloud_url = ""
+        
+        try:
+            response = requests.post(runcloud_url, json={
+                "buyer_id": buyer_id,
+                "meeting_id": meeting_id
+            })
+            response.raise_for_status()
+            logging.info(f"Successfully triggered analysis via RunCloud API for job_id: {job_id}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to call RunCloud API for job_id {job_id}: {e}")
+            return jsonify({"error": f"Failed to trigger analysis via RunCloud API: {str(e)}"}), 500
 
-        # logging.info("Initializing ECS task for diarization.")
-        # # Initialize ECS task for speaker diarization
-        # ecs_client = ECSClient()
-        # task_response = ecs_client.run_analysis_task(job_id=job_id)
-
-        return jsonify({"message": f"Analysis task completed successfully for job_id: {job_id}"}), 200
+        return jsonify({"message": f"Analysis task triggered successfully for job_id: {job_id}"}), 200
     except Exception as e:
         logging.error(f"Failed to trigger analysis for Job ID: {job_id} with error: {e}")
         return jsonify({"error": f"Failed to trigger call analysis: {str(e)}"}), 500

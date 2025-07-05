@@ -4,7 +4,7 @@ import runpod
 import traceback
 
 # Your diarization function
-from service.transcription.speaker_diarization_gemini import run_diarization
+from app.external.transcription.speaker_diarization_gemini import run_diarization
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
