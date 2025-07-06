@@ -123,7 +123,7 @@ def process_audio(job_id, bucket, key):
         if job:
             meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
         if meeting:
-            meeting.transcription = json.dumps(transcription)
+            meeting.transcription = json.dumps(diarization)
             session.commit()
         else:
             logger.error(f"Meeting {job_id} not found.")
