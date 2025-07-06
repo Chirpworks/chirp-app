@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -43,6 +44,7 @@ def get_actions():
 
     except Exception as e:
         logging.error(f"Error fetching actions: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Failed to fetch actions"}), 500
 
 
@@ -61,6 +63,7 @@ def get_action_by_id(action_id: str):
 
     except Exception as e:
         logging.error(f"Error fetching action {action_id}: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Failed to fetch action"}), 500
 
 
@@ -100,4 +103,5 @@ def update_actions():
 
     except Exception as e:
         logging.error(f"Error updating actions: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Failed to update actions"}), 500

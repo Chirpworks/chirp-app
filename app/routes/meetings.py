@@ -28,6 +28,8 @@ def get_upcoming_meetings(user_id):
         # schedule_jobs(events)
         return jsonify([])
     except Exception as e:
+        logging.error(f"Failed to get upcoming meetings: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"failed to create account. Error - {e}"})
 
 
@@ -107,6 +109,7 @@ def get_meeting_by_id(meeting_id):
 
     except Exception as e:
         logging.error(f"Failed to fetch call data: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
 
 
@@ -129,6 +132,8 @@ def get_meeting_feedback_by_id(meeting_id):
         return jsonify(result), 200
 
     except Exception as e:
+        logging.error(f"Failed to fetch meeting feedback: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch meeting: {str(e)}"}), 500
 
 
@@ -152,6 +157,7 @@ def get_meeting_transcription_by_id(meeting_id):
 
     except Exception as e:
         logging.error(f"Failed to fetch meeting transcription data: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch meeting transcription: {str(e)}"}), 500
 
 
@@ -195,6 +201,8 @@ def get_last_synced_call_id():
             return jsonify({"message": "No synced calls found", "last_synced_call_id": None}), 200
 
     except Exception as e:
+        logging.error(f"Failed to fetch last synced call id: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch last synced call id: {str(e)}"}), 500
 
 
@@ -235,4 +243,5 @@ def update_meeting_summary(meeting_id):
 
     except Exception as e:
         logging.error(f"Failed to update meeting summary for meeting_id {meeting_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to update meeting summary: {str(e)}"}), 500

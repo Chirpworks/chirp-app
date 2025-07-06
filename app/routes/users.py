@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from flask import Blueprint, jsonify, request
 
@@ -97,6 +98,7 @@ def get_team():
     except Exception as e:
         user_email = user.email if user else "unknown"
         logging.error(f"Failed to fetch team members for manager {user_email}, {user_id=}, with error: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify(f"Failed to fetch team members for user {user_id=}, with error: {e}")
 
 

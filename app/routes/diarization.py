@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from flask import Blueprint, request, jsonify
 
@@ -33,8 +34,10 @@ def retry_diarization():
 
         return jsonify({
             "message": "Recording received and ECS speaker diarization task started",
-            "job_id": job.id,
+            "job_id": str(job.id),
             "ecs_task_response": task_response
         }), 200
     except Exception as e:
+        logging.error(f"Failed to retry diarization: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return {"error": f"failed to create account. Error - {e}"}

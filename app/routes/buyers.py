@@ -1,4 +1,5 @@
 import logging
+import traceback
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
@@ -43,6 +44,7 @@ def get_buyer_profile(buyer_id):
 
     except Exception as e:
         logging.error(f"Failed to fetch buyer profile for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch buyer profile: {str(e)}"}), 500
 
 
@@ -68,6 +70,7 @@ def get_buyer_call_history(buyer_id):
 
     except Exception as e:
         logging.error(f"Failed to fetch call history for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch call history: {str(e)}"}), 500
 
 
@@ -124,6 +127,7 @@ def update_buyer_profile(buyer_id):
 
     except Exception as e:
         logging.error(f"Failed to update buyer profile for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to update buyer profile: {str(e)}"}), 500
 
 
@@ -151,4 +155,5 @@ def get_buyer_products_catalogue(buyer_id):
 
     except Exception as e:
         logging.error(f"Failed to fetch products catalogue for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch products catalogue: {str(e)}"}), 500

@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from flask import Blueprint, jsonify, request
 
@@ -39,4 +40,5 @@ def create_agency():
         return jsonify({'message': 'Agency created successfully', 'agency_id': str(new_agency.id)}), 201
     except Exception as e:
         logging.error(f"Failed to create agency with error {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Agency creation failed'}), 500

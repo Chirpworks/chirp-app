@@ -54,11 +54,13 @@ def post_recording():
 
         return jsonify({
             "message": "Recording received and ECS speaker diarization task started",
-            "job_id": job.id,
+            "job_id": str(job.id),
             "s3_audio_url": job.s3_audio_url,
             "ecs_task_response": task_response
         }), 200
     except Exception as e:
+        logging.error(f"Failed to process recording: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return {"error": f"failed to create account. Error - {e}"}
 
 
@@ -160,7 +162,8 @@ def post_exotel_recording():
             except Exception as e:
                 if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
-                logging.info(f"Failed to upload Exotel recording: {str(e)}")
+                logging.error(f"Failed to upload Exotel recording: {str(e)}")
+                logging.error(f"Traceback: {traceback.format_exc()}")
                 return jsonify({"error": f"Failed to upload Exotel recording: {str(e)}"}), 500
 
             logging.info(f"Creating new meeting and job entry for reconciled call for user {user.email}")
@@ -309,7 +312,8 @@ def post_app_call_record():
                 except Exception as e:
                     if 'temp_file_path' in locals() and temp_file_path and os.path.exists(temp_file_path):
                         os.unlink(temp_file_path)
-                    logging.info(f"Failed to upload Exotel recording: {str(e)}")
+                    logging.error(f"Failed to upload Exotel recording: {str(e)}")
+                    logging.error(f"Traceback: {traceback.format_exc()}")
                     return jsonify({"error": f"Failed to upload Exotel recording: {str(e)}"}), 500
 
                 logging.info("Creating new meeting and job entry for reconciled call.")

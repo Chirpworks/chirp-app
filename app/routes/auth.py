@@ -1,5 +1,6 @@
 import json
 import logging
+import traceback
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -78,6 +79,7 @@ def signup():
         return jsonify({'message': 'Seller created successfully', 'name': name, 'user_id': str(new_user.id)}), 201
     except Exception as e:
         logging.error(f"Failed to complete signup with error {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Signup Failed'}), 500
 
 
@@ -106,7 +108,8 @@ def login():
         }), 200
         
     except Exception as e:
-        logging.error({'error': f"Failed to login with error: {e}"})
+        logging.error(f"Failed to login with error: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Login Failed'}), 500
 
 
@@ -128,6 +131,7 @@ def refresh():
         
     except Exception as e:
         logging.error(f"Token refresh error: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Token refresh failed'}), 500
 
 
@@ -144,6 +148,7 @@ def logout():
         
     except Exception as e:
         logging.error(f"Logout error: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Logout failed"}), 500
 
 
@@ -191,4 +196,5 @@ def reset_password():
         
     except Exception as e:
         logging.error(f"Failed to reset password: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Password reset failed"}), 500

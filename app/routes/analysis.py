@@ -1,4 +1,5 @@
 import logging
+import traceback
 import requests
 from flask import Blueprint, request, jsonify
 
@@ -39,20 +40,20 @@ def trigger_analysis():
             return jsonify({"error": f"Job with id {job_id} is not completed. Current status: {job.status}"}), 400
             
         if not meeting.transcription:
-            logging.error(f"Meeting with id {meeting.id} is missing transcription data")
-            return jsonify({"error": f"Meeting with id {meeting.id} is missing transcription data"}), 400
+            logging.error(f"Meeting with id {str(meeting.id)} is missing transcription data")
+            return jsonify({"error": f"Meeting with id {str(meeting.id)} is missing transcription data"}), 400
 
         # Call Google RunCloud API for analysis
         buyer_id = str(meeting.buyer_id)
         meeting_id = str(meeting.id)
         
         # TODO: Replace with actual Google RunCloud endpoint URL
-        runcloud_url = ""
+        runcloud_url = "https://call-analysis-pipeline-dev-109365356440.europe-west1.run.app"
         
         try:
             response = requests.post(runcloud_url, json={
-                "buyer_id": buyer_id,
-                "meeting_id": meeting_id
+                "buyerId": buyer_id,
+                "callId": meeting_id
             })
             response.raise_for_status()
             logging.info(f"Successfully triggered analysis via RunCloud API for job_id: {job_id}")
@@ -63,4 +64,5 @@ def trigger_analysis():
         return jsonify({"message": f"Analysis task triggered successfully for job_id: {job_id}"}), 200
     except Exception as e:
         logging.error(f"Failed to trigger analysis for Job ID: {job_id} with error: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to trigger call analysis: {str(e)}"}), 500
