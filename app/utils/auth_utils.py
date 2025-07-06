@@ -28,8 +28,8 @@ def generate_secure_otp(length=8):
 
 def send_otp_email(to_email, otp):
     logging.info(f"Sending otp to {to_email}")
-    subject = "Your OTP Code for Logging in to Chirpworks"
-    body = f"Your One-Time Password is: {otp}"
+    subject = "System Generated Password for Logging in to Chirpworks"
+    body = f"Your System Generated Password is: {otp}"
 
     msg = MIMEText(body)
     msg['Subject'] = subject
