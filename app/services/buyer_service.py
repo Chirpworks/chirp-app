@@ -300,4 +300,72 @@ class BuyerService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get buyers with meetings: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_buyers_with_last_contact(cls, agency_id: str) -> List[dict]:
+        """
+        Get buyers with their last contact information, sorted by last contacted date.
+        
+        Args:
+            agency_id: Agency UUID to filter buyers
+            
+        Returns:
+            List of dictionaries with buyer info and last contact details
+        """
+        try:
+            from app.models.meeting import Meeting  # Local import to avoid circular imports
+            from sqlalchemy import func, desc
+            
+            # Subquery to get the latest meeting for each buyer
+            latest_meeting_subquery = db.session.query(
+                Meeting.buyer_id,
+                func.max(Meeting.start_time).label('last_contacted_at')
+            ).group_by(Meeting.buyer_id).subquery()
+            
+            # Main query to get buyers with their last contact info
+            query = db.session.query(
+                cls.model,
+                latest_meeting_subquery.c.last_contacted_at,
+                Meeting.seller_id,
+                Meeting.id.label('last_meeting_id')
+            ).outerjoin(
+                latest_meeting_subquery,
+                cls.model.id == latest_meeting_subquery.c.buyer_id
+            ).outerjoin(
+                Meeting,
+                (Meeting.buyer_id == cls.model.id) & 
+                (Meeting.start_time == latest_meeting_subquery.c.last_contacted_at)
+            ).filter(
+                cls.model.agency_id == agency_id
+            ).order_by(
+                desc(latest_meeting_subquery.c.last_contacted_at)
+            )
+            
+            results = query.all()
+            
+            buyers_with_contact = []
+            for buyer, last_contacted_at, seller_id, meeting_id in results:
+                # Get seller name for last contact
+                last_contacted_by = None
+                if seller_id:
+                    from app.models.seller import Seller
+                    seller = Seller.query.get(seller_id)
+                    last_contacted_by = seller.name if seller else None
+                
+                buyers_with_contact.append({
+                    'id': str(buyer.id),
+                    'name': buyer.name,
+                    'email': buyer.email,
+                    'phone': buyer.phone,
+                    'products_discussed': buyer.products_discussed,
+                    'last_contacted_by': last_contacted_by,
+                    'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None
+                })
+            
+            logging.info(f"Found {len(buyers_with_contact)} buyers with last contact info for agency {agency_id}")
+            return buyers_with_contact
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get buyers with last contact for agency {agency_id}: {str(e)}")
             raise 

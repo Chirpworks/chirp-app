@@ -30,8 +30,18 @@ class AgencyService(BaseService):
             
         Returns:
             Created Agency instance
+            
+        Raises:
+            ValueError: If agency with same name already exists
+            SQLAlchemyError: If database operation fails
         """
         try:
+            # Check if agency with same name already exists
+            existing_agency = cls.get_by_field('name', name)
+            if existing_agency:
+                logging.warning(f"Agency with name '{name}' already exists with ID: {existing_agency.id}")
+                raise ValueError(f"Agency with name '{name}' already exists")
+            
             agency_data = {
                 'name': name
             }
@@ -419,4 +429,40 @@ class AgencyService(BaseService):
             'id': str(product.id),
             'name': product.name,
             'description': product.description
-        } 
+        }
+    
+    @classmethod
+    def agency_exists_by_id(cls, agency_id: str) -> bool:
+        """
+        Check if an agency with the given ID exists.
+        
+        Args:
+            agency_id: Agency UUID to check
+            
+        Returns:
+            True if agency exists, False otherwise
+        """
+        try:
+            agency = cls.get_by_id(agency_id)
+            return agency is not None
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to check agency existence for ID {agency_id}: {str(e)}")
+            raise
+
+    @classmethod
+    def agency_exists_by_name(cls, name: str) -> bool:
+        """
+        Check if an agency with the given name exists.
+        
+        Args:
+            name: Agency name to check
+            
+        Returns:
+            True if agency exists, False otherwise
+        """
+        try:
+            agency = cls.get_by_field('name', name)
+            return agency is not None
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to check agency existence for name {name}: {str(e)}")
+            raise 

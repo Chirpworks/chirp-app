@@ -12,6 +12,42 @@ buyers_bp = Blueprint("buyers", __name__)
 logging = logging.getLogger(__name__)
 
 
+@buyers_bp.route("/all", methods=["GET"])
+@jwt_required()
+def get_agency_buyers():
+    """
+    Get all buyers from the current seller's agency.
+    Returns buyers sorted by last contacted date with contact information.
+    """
+    try:
+        user_id = get_jwt_identity()
+        logging.info(f"Fetching agency buyers for user {user_id}")
+
+        # Get current seller to determine agency
+        seller = SellerService.get_by_id(user_id)
+        if not seller:
+            return jsonify({"error": "User not found"}), 404
+
+        # Get buyers with last contact information for the seller's agency
+        buyers = BuyerService.get_buyers_with_last_contact(str(seller.agency_id))
+        
+        # Denormalize phone numbers for display
+        for buyer in buyers:
+            if buyer['phone']:
+                buyer['phone'] = denormalize_phone_number(buyer['phone'])
+
+        return jsonify({
+            "buyers": buyers,
+            "total_count": len(buyers),
+            "agency_id": str(seller.agency_id)
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch agency buyers for user {user_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to fetch agency buyers: {str(e)}"}), 500
+
+
 @buyers_bp.route("/profile/<uuid:buyer_id>", methods=["GET"])
 def get_buyer_profile(buyer_id):
     """
