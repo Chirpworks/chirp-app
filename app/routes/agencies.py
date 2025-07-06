@@ -34,7 +34,7 @@ def create_agency():
         db.session.add(new_agency)
         db.session.commit()
 
-        add_agency_to_list(agency_id=new_agency.id, agency_name=name)
+        add_agency_to_list(agency_id=str(new_agency.id), agency_name=name)
         logging.info(f"Created new agency successfully with name={name}")
         return jsonify({'message': 'Agency created successfully', 'agency_id': str(new_agency.id)}), 201
     except Exception as e:

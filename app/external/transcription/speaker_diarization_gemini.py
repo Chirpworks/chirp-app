@@ -28,6 +28,8 @@ FLASK_API_URL = os.getenv("FLASK_API_URL")
 s3_client = boto3.client("s3")
 
 # Initialize SQLAlchemy session
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
 engine = create_engine(DATABASE_URL)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -142,29 +144,93 @@ def transcribe_and_diarize(audio_file_path):
 
     audio_file = client.files.upload(file=audio_file_path)
 
+    prompt = """You are a professional call transcription and analysis expert. Please transcribe and analyze this business call recording.
+
+CONTEXT: This is a business call between a seller (sales representative) and a buyer (potential customer). The call may contain sales discussions, product presentations, negotiations, or customer service interactions.
+
+TASK: Please provide a detailed transcription with speaker diarization and classification.
+
+REQUIREMENTS:
+1. Transcribe the audio accurately, handling multiple languages (English, Hindi, Punjabi, Tamil, Telugu, Malayalam)
+2. Provide English transliteration for all non-English speech
+3. Identify and separate speakers clearly
+4. Classify each speaker as either "buyer" or "seller" based on context clues
+5. Provide English translation for non-English segments
+6. Maintain chronological order of speech
+
+OUTPUT FORMAT: Return ONLY a valid JSON array with this exact structure:
+[
+  {
+    "speaker_id": "speaker_1",
+    "speaker_role": "buyer|seller",
+    "text": "English transliteration of what was said",
+    "translation": "English translation if original was not in English",
+    "timestamp_start": "approximate_start_time",
+    "timestamp_end": "approximate_end_time",
+    "confidence": "high|medium|low"
+  }
+]
+
+CLASSIFICATION GUIDELINES:
+- SELLER: Person presenting products/services, asking qualifying questions, discussing pricing, following up on leads
+- BUYER: Person asking about products/services, expressing needs/concerns, negotiating terms, making purchasing decisions
+
+IMPORTANT: 
+- Return ONLY the JSON array, no additional text or markdown formatting
+- Ensure JSON is properly formatted and valid
+- If uncertain about speaker role, use context clues from the conversation
+- Handle overlapping speech by creating separate entries
+- Mark unclear speech with low confidence"""
+
     response = client.models.generate_content(
-        model="gemini-2.5-flash-preview-05-20", contents=["This is an audio clip with language being a possible mix of English. "
-                                            "Hindi, Punjabi, Tamil, Telugu and Malayalam and 2 speakers."
-                                            "Transcribe this audio clip and give clear speaker diarization."
-                                            "Also, give me the entire response transliterated in English"
-                                            "For each segment, give me a json response in the format:"
-                                            "{\"speaker\": <speaker_id>, \"text\": <english_transliterated_text>, \"translation\": <translation>} "
-                                                          "Pass every individual json in a list.",
-                                            audio_file]
+        model="gemini-2.5-flash-preview-05-20", 
+        contents=[prompt, audio_file]
     )
 
+    # Improved JSON parsing
     response_text = response.text
-    logger.info(f"Transcription: {response_text}")
-    response_text = response_text.split("```json")[1]
-    response_text = response_text.strip("```json").strip("```")
-    response_text = response_text.strip("'''json").strip("'''")
-    logger.info(f"Transcription: {response_text}")
-    response_text = json.loads(response_text)
-    transcription = ''
-    for segment in response_text:
-        transcription += segment['text']
-    diarization = response_text
-    return transcription, diarization
+    if response_text is None:
+        raise ValueError("Empty response from Gemini API")
+    response_text = response_text.strip()
+    logger.info(f"Raw Gemini response: {response_text}")
+    
+    # Remove any markdown formatting if present
+    if "```json" in response_text:
+        response_text = response_text.split("```json")[1].split("```")[0]
+    elif "```" in response_text:
+        response_text = response_text.split("```")[1]
+    
+    response_text = response_text.strip()
+    logger.info(f"Cleaned response text: {response_text}")
+    
+    try:
+        parsed_response = json.loads(response_text)
+        
+        # Validate and process the response
+        transcription = ''
+        diarization = []
+        
+        for segment in parsed_response:
+            # Build full transcription
+            transcription += segment.get('text', '') + ' '
+            
+            # Validate and clean segment
+            clean_segment = {
+                'speaker': segment.get('speaker_id', 'unknown'),
+                'role': segment.get('speaker_role', 'unknown'),
+                'text': segment.get('text', ''),
+                'translation': segment.get('translation', ''),
+                'confidence': segment.get('confidence', 'medium')
+            }
+            diarization.append(clean_segment)
+        
+        logger.info(f"Successfully processed {len(diarization)} segments")
+        return transcription.strip(), diarization
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        logger.error(f"Raw response: {response_text}")
+        raise ValueError(f"Invalid JSON response from Gemini: {e}")
 
 
 def run_diarization(job_id):
@@ -203,4 +269,4 @@ def run_diarization(job_id):
 
 
 if __name__ == "__main__":
-    run_diarization()
+    run_diarization(JOB_ID)
