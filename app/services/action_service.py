@@ -182,7 +182,7 @@ class ActionService(BaseService):
     @classmethod
     def update_action_status(cls, action_id: str, status: ActionStatus, user_id: str) -> Optional[Action]:
         """
-        Update action status with user authorization check.
+        Update the status of an action with user authorization.
         
         Args:
             action_id: Action UUID
@@ -191,6 +191,9 @@ class ActionService(BaseService):
             
         Returns:
             Updated Action instance or None if not found/unauthorized
+            
+        Raises:
+            SQLAlchemyError: If database operation fails
         """
         try:
             # Verify user has access to this action
@@ -207,13 +210,14 @@ class ActionService(BaseService):
                 return None
             
             action.status = status
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Updated action {action_id} status to {status.value}")
             return action
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to update action {action_id} status: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -255,12 +259,13 @@ class ActionService(BaseService):
                 action.status = ActionStatus(update["status"])
                 updated_count += 1
             
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             logging.info(f"Bulk updated {updated_count} actions for user {user_id}")
             return updated_count
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to bulk update actions: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod

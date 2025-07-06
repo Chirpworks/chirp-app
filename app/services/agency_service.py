@@ -356,13 +356,14 @@ class AgencyService(BaseService):
             # The cascade='all, delete-orphan' in the model will handle the deletion
             # of related sellers, buyers, and products
             db.session.delete(agency)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.warning(f"DELETED agency {agency_name} and all related data!")
             return True
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to delete agency {agency_id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod

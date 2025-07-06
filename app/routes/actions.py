@@ -94,7 +94,6 @@ def update_actions():
         # Use ActionService for bulk update
         try:
             updated_count = ActionService.bulk_update_actions(action_updates, user_id)
-            ActionService.commit_with_rollback()
             
             return jsonify({"message": f"Updated {updated_count} actions successfully"}), 200
             

@@ -47,13 +47,14 @@ class CallService(BaseService):
             exotel_call.call_recording_url = call_recording_url
             
             db.session.add(exotel_call)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Created ExotelCall with ID: {exotel_call.id}")
             return exotel_call
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to create ExotelCall: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -95,13 +96,14 @@ class CallService(BaseService):
             mobile_call.status = status
             
             db.session.add(mobile_call)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Created MobileAppCall with ID: {mobile_call.id}")
             return mobile_call
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to create MobileAppCall: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -193,11 +195,12 @@ class CallService(BaseService):
         """
         try:
             db.session.delete(exotel_call)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             logging.info(f"Deleted ExotelCall: {exotel_call.id}")
             return True
         except SQLAlchemyError as e:
             logging.error(f"Failed to delete ExotelCall {exotel_call.id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -213,11 +216,12 @@ class CallService(BaseService):
         """
         try:
             db.session.delete(mobile_call)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             logging.info(f"Deleted MobileAppCall: {mobile_call.id}")
             return True
         except SQLAlchemyError as e:
             logging.error(f"Failed to delete MobileAppCall {mobile_call.id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -410,13 +414,14 @@ class CallService(BaseService):
                 return None
             
             mobile_call.status = status
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Updated MobileAppCall {mobile_call_id} status to {status}")
             return mobile_call
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to update MobileAppCall {mobile_call_id} status: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod

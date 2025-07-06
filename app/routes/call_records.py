@@ -140,7 +140,6 @@ def post_exotel_recording():
             duration=int(call_duration) if call_duration else 0,
             call_recording_url=call_recording_url
         )
-        CallService.commit_with_rollback()
 
         logging.info("Searching for matching mobile app call")
         # Search for a matching mobile app call using CallService
@@ -196,7 +195,6 @@ def post_exotel_recording():
             # Delete reconciled records using CallService
             CallService.delete_exotel_call(exotel_call)
             CallService.delete_mobile_app_call(matching_app_call)
-            CallService.commit_with_rollback()
 
             logging.info("Initializing task for diarization.")
             # Initialize ECS task for speaker diarization
@@ -284,7 +282,6 @@ def post_app_call_record():
                 duration=int(duration) if duration else 0,
                 user_id=user.id
             )
-            CallService.commit_with_rollback()
 
             logging.info("Searching for matching exotel call")
             # 2. Search for a matching Exotel call
@@ -344,7 +341,6 @@ def post_app_call_record():
                 # Delete reconciled records
                 db.session.delete(matching_exotel_call)
                 db.session.delete(mobile_call)
-                db.session.commit()
 
                 logging.info("Initializing ECS task for diarization.")
                 # Initialize ECS task for speaker diarization

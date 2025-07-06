@@ -60,7 +60,7 @@ class SellerService(BaseService):
             )
             
             db.session.add(seller)
-            db.session.flush()
+            db.session.commit()
             
             logging.info(f"Created seller: {email} with ID: {seller.id}")
             return seller
@@ -156,7 +156,7 @@ class SellerService(BaseService):
     @classmethod
     def update_password(cls, seller_id: str, old_password: str, new_password: str) -> bool:
         """
-        Update seller's password with validation.
+        Update seller's password with old password validation.
         
         Args:
             seller_id: Seller's UUID
@@ -164,10 +164,11 @@ class SellerService(BaseService):
             new_password: New password to set
             
         Returns:
-            True if password updated successfully, False if old password invalid
+            True if password updated successfully, False if validation fails
             
         Raises:
             ValueError: If seller not found
+            SQLAlchemyError: If database operation fails
         """
         try:
             seller = cls.get_by_id(seller_id)
@@ -179,13 +180,14 @@ class SellerService(BaseService):
                 return False
                 
             seller.set_password(new_password)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Password updated for seller: {seller.email}")
             return True
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to update password for seller {seller_id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod

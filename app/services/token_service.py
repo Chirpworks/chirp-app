@@ -20,13 +20,13 @@ class TokenBlocklistService(BaseService):
     @classmethod
     def add_token_to_blocklist(cls, jti: str) -> TokenBlocklist:
         """
-        Add a JWT token to the blocklist (blacklist).
+        Add a JWT token to the blocklist.
         
         Args:
-            jti: JWT Token ID (unique identifier)
+            jti: JWT Token ID
             
         Returns:
-            Created TokenBlocklist instance
+            TokenBlocklist instance (existing or newly created)
         """
         try:
             # Check if token is already blocklisted
@@ -38,13 +38,14 @@ class TokenBlocklistService(BaseService):
             token_blocklist = TokenBlocklist()
             token_blocklist.jti = jti
             db.session.add(token_blocklist)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.info(f"Added token {jti} to blocklist")
             return token_blocklist
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to add token {jti} to blocklist: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -91,13 +92,14 @@ class TokenBlocklistService(BaseService):
                 return False
             
             db.session.delete(token_record)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             logging.warning(f"REMOVED token {jti} from blocklist - token is now active!")
             return True
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to remove token {jti} from blocklist: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -229,7 +231,7 @@ class TokenBlocklistService(BaseService):
                 token.jti = jti
                 new_tokens.append(token)
             db.session.bulk_save_objects(new_tokens)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             
             added_count = len(new_tokens)
             duplicate_count = len(jtis) - added_count

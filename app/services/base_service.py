@@ -34,11 +34,12 @@ class BaseService:
         try:
             instance = cls.model(**kwargs)
             db.session.add(instance)
-            db.session.flush()  # Get ID without committing
+            db.session.commit()  # Commit the transaction
             logging.info(f"Created {cls.model.__name__} with ID: {instance.id}")
             return instance
         except SQLAlchemyError as e:
             logging.error(f"Failed to create {cls.model.__name__}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -153,11 +154,12 @@ class BaseService:
                 else:
                     logging.warning(f"Field '{field}' does not exist in {cls.model.__name__}")
             
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             logging.info(f"Updated {cls.model.__name__} with ID: {record_id}")
             return instance
         except SQLAlchemyError as e:
             logging.error(f"Failed to update {cls.model.__name__} with ID {record_id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @classmethod
@@ -180,11 +182,12 @@ class BaseService:
                 return False
                 
             db.session.delete(instance)
-            db.session.flush()
+            db.session.commit()  # Commit the transaction
             logging.info(f"Deleted {cls.model.__name__} with ID: {record_id}")
             return True
         except SQLAlchemyError as e:
             logging.error(f"Failed to delete {cls.model.__name__} with ID {record_id}: {str(e)}")
+            db.session.rollback()
             raise
     
     @staticmethod
