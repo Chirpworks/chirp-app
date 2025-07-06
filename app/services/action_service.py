@@ -412,4 +412,72 @@ class ActionService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get action statistics: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_pending_actions_count_for_buyer(cls, buyer_id: str) -> int:
+        """
+        Get the count of pending actions for a specific buyer.
+        
+        Args:
+            buyer_id: Buyer UUID
+            
+        Returns:
+            Count of pending actions
+        """
+        try:
+            count = (
+                cls.model.query
+                .filter(
+                    and_(
+                        cls.model.buyer_id == buyer_id,
+                        cls.model.status == ActionStatus.PENDING
+                    )
+                )
+                .count()
+            )
+            
+            logging.info(f"Found {count} pending actions for buyer {buyer_id}")
+            return count
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get pending actions count for buyer {buyer_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_all_actions_for_buyer(cls, buyer_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all actions for a specific buyer, sorted by status and due date.
+        PENDING actions first (sorted by due_date ascending), then COMPLETED actions (sorted by due_date).
+        
+        Args:
+            buyer_id: Buyer UUID
+            
+        Returns:
+            List of formatted action dictionaries
+        """
+        try:
+            # Get all actions for the buyer
+            actions = (
+                cls.model.query
+                .filter(cls.model.buyer_id == buyer_id)
+                .order_by(
+                    cls.model.status.asc(),  # PENDING comes before COMPLETED
+                    cls.model.due_date.asc()
+                )
+                .all()
+            )
+            
+            # Format actions for API response
+            result = []
+            for action in actions:
+                formatted_action = cls._format_action(action)
+                if formatted_action:
+                    result.append(formatted_action)
+            
+            logging.info(f"Retrieved {len(result)} actions for buyer {buyer_id}")
+            return result
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get actions for buyer {buyer_id}: {str(e)}")
             raise 

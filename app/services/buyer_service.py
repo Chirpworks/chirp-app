@@ -368,4 +368,65 @@ class BuyerService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get buyers with last contact for agency {agency_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_buyer_with_last_contact(cls, buyer_id: str) -> Optional[dict]:
+        """
+        Get a single buyer with their last contact information.
+        
+        Args:
+            buyer_id: Buyer UUID
+            
+        Returns:
+            Dictionary with buyer info and last contact details, or None if not found
+        """
+        try:
+            from app.models.meeting import Meeting  # Local import to avoid circular imports
+            from sqlalchemy import func, desc
+            
+            # Get the buyer first
+            buyer = cls.get_by_id(buyer_id)
+            if not buyer:
+                return None
+            
+            # Get the latest meeting for this buyer
+            latest_meeting = db.session.query(
+                Meeting
+            ).filter(
+                Meeting.buyer_id == buyer_id
+            ).order_by(
+                desc(Meeting.start_time)
+            ).first()
+            
+            # Get seller name for last contact
+            last_contacted_by = None
+            last_contacted_at = None
+            
+            if latest_meeting and latest_meeting.seller_id:
+                from app.models.seller import Seller
+                seller = Seller.query.get(latest_meeting.seller_id)
+                last_contacted_by = seller.name if seller else None
+                last_contacted_at = latest_meeting.start_time
+            
+            buyer_with_contact = {
+                'id': str(buyer.id),
+                'name': buyer.name,
+                'email': buyer.email,
+                'phone': buyer.phone,
+                'tags': buyer.tags,
+                'requirements': buyer.requirements,
+                'solutions_presented': buyer.solutions_presented,
+                'relationship_progression': buyer.relationship_progression,
+                'risks': buyer.risks,
+                'products_discussed': buyer.products_discussed,
+                'last_contacted_by': last_contacted_by,
+                'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None
+            }
+            
+            logging.info(f"Found buyer {buyer_id} with last contact info")
+            return buyer_with_contact
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get buyer with last contact for {buyer_id}: {str(e)}")
             raise 

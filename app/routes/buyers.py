@@ -3,7 +3,7 @@ import traceback
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.services import BuyerService, SellerService, MeetingService
+from app.services import BuyerService, SellerService, MeetingService, ActionService
 from app.models.seller import SellerRole
 from app.utils.call_recording_utils import denormalize_phone_number
 
@@ -52,31 +52,21 @@ def get_agency_buyers():
 def get_buyer_profile(buyer_id):
     """
     Fetch buyer profile by buyer ID.
-    Returns all buyer fields except meetings, actions, and agency.
+    Returns all buyer fields except meetings, actions, and agency, plus last contact information.
     """
     try:
         logging.info(f"Fetching buyer profile for buyer_id {buyer_id}")
 
-        # Get buyer by ID
-        buyer = BuyerService.get_by_id(buyer_id)
-        if not buyer:
+        # Get buyer with last contact information
+        buyer_data = BuyerService.get_buyer_with_last_contact(str(buyer_id))
+        if not buyer_data:
             return jsonify({"error": "Buyer not found"}), 404
 
-        # Build response with all fields except meetings, actions, and agency
-        result = {
-            "id": str(buyer.id),
-            "phone": denormalize_phone_number(buyer.phone),
-            "name": buyer.name,
-            "email": buyer.email,
-            "tags": buyer.tags,
-            "requirements": buyer.requirements,
-            "solutions_presented": buyer.solutions_presented,
-            "relationship_progression": buyer.relationship_progression,
-            "risks": buyer.risks,
-            "products_discussed": buyer.products_discussed
-        }
+        # Denormalize phone number for display
+        if buyer_data['phone']:
+            buyer_data['phone'] = denormalize_phone_number(buyer_data['phone'])
 
-        return jsonify(result), 200
+        return jsonify(buyer_data), 200
 
     except Exception as e:
         logging.error(f"Failed to fetch buyer profile for buyer_id {buyer_id}: {e}")
@@ -193,3 +183,61 @@ def get_buyer_products_catalogue(buyer_id):
         logging.error(f"Failed to fetch products catalogue for buyer_id {buyer_id}: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch products catalogue: {str(e)}"}), 500
+
+
+@buyers_bp.route("/actions/count/<uuid:buyer_id>", methods=["GET"])
+def get_buyer_pending_actions_count(buyer_id):
+    """
+    Get the count of pending actions for a specific buyer.
+    Returns a simple number representing the count of pending actions.
+    """
+    try:
+        logging.info(f"Fetching pending actions count for buyer_id {buyer_id}")
+
+        # Verify buyer exists
+        buyer = BuyerService.get_by_id(buyer_id)
+        if not buyer:
+            return jsonify({"error": "Buyer not found"}), 404
+
+        # Get pending actions count
+        pending_count = ActionService.get_pending_actions_count_for_buyer(str(buyer_id))
+
+        return jsonify({
+            "buyer_id": str(buyer_id),
+            "pending_actions_count": pending_count
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch pending actions count for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to fetch pending actions count: {str(e)}"}), 500
+
+
+@buyers_bp.route("/actions/<uuid:buyer_id>", methods=["GET"])
+def get_buyer_actions(buyer_id):
+    """
+    Get all actions for a specific buyer.
+    Returns actions sorted with PENDING actions first (by due_date ascending), 
+    followed by COMPLETED actions (by due_date ascending).
+    """
+    try:
+        logging.info(f"Fetching all actions for buyer_id {buyer_id}")
+
+        # Verify buyer exists
+        buyer = BuyerService.get_by_id(buyer_id)
+        if not buyer:
+            return jsonify({"error": "Buyer not found"}), 404
+
+        # Get all actions for the buyer
+        actions = ActionService.get_all_actions_for_buyer(str(buyer_id))
+
+        return jsonify({
+            "buyer_id": str(buyer_id),
+            "actions": actions,
+            "total_count": len(actions)
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch actions for buyer_id {buyer_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
