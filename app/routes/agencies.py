@@ -138,3 +138,69 @@ def create_product():
         logging.error(f"Failed to create product with error {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': 'Product creation failed'}), 500
+
+
+@agency_bp.route("/product_catalogue", methods=["GET"])
+def get_agency_product_catalogue():
+    """
+    Get product catalogue for an agency.
+    Accepts either agency_id or agency_name as query parameter.
+    Returns all products for the specified agency.
+    """
+    try:
+        logging.info("Product catalogue API initiated")
+        
+        # Get query parameters
+        agency_id = request.args.get("agency_id")
+        agency_name = request.args.get("agency_name")
+        
+        if not agency_id and not agency_name:
+            return jsonify({'error': 'Either agency_id or agency_name is required'}), 400
+        
+        if agency_id and agency_name:
+            return jsonify({'error': 'Provide either agency_id or agency_name, not both'}), 400
+        
+        # Determine agency
+        agency = None
+        if agency_id:
+            logging.info(f"Fetching product catalogue for agency_id: {agency_id}")
+            agency = AgencyService.get_by_id(agency_id)
+            if not agency:
+                return jsonify({'error': f'Agency with ID "{agency_id}" not found'}), 404
+        else:
+            logging.info(f"Fetching product catalogue for agency_name: {agency_name}")
+            agency = AgencyService.get_by_field('name', agency_name)
+            if not agency:
+                return jsonify({'error': f'Agency with name "{agency_name}" not found'}), 404
+        
+        # Get products for the agency
+        try:
+            products = ProductService.get_products_by_agency(str(agency.id))
+            
+            # Format products for response
+            product_list = []
+            for product in products:
+                product_data = {
+                    'id': str(product.id),
+                    'name': product.name,
+                    'description': product.description,
+                    'features': product.features
+                }
+                product_list.append(product_data)
+            
+            logging.info(f"Retrieved {len(product_list)} products for agency: {agency.name}")
+            return jsonify({
+                'agency_id': str(agency.id),
+                'agency_name': agency.name,
+                'products': product_list,
+                'total_count': len(product_list)
+            }), 200
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Database error while fetching products: {str(e)}")
+            return jsonify({'error': 'Failed to fetch products due to database error'}), 500
+            
+    except Exception as e:
+        logging.error(f"Failed to fetch product catalogue with error {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': 'Failed to fetch product catalogue'}), 500

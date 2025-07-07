@@ -47,16 +47,25 @@ def trigger_analysis():
         buyer_id = str(meeting.buyer_id)
         meeting_id = str(meeting.id)
         
+        # Get agency_id from the buyer
+        buyer = meeting.buyer
+        if not buyer:
+            logging.error(f"Buyer not found for meeting {meeting_id}")
+            return jsonify({"error": f"Buyer not found for meeting {meeting_id}"}), 404
+        
+        agency_id = str(buyer.agency_id)
+        
         # TODO: Replace with actual Google RunCloud endpoint URL
         runcloud_url = "https://call-analysis-pipeline-dev-109365356440.europe-west1.run.app"
         
         try:
             response = requests.post(runcloud_url, json={
                 "buyerId": buyer_id,
-                "callId": meeting_id
+                "callId": meeting_id,
+                "agencyId": agency_id
             })
             response.raise_for_status()
-            logging.info(f"Successfully triggered analysis via RunCloud API for job_id: {job_id}")
+            logging.info(f"Successfully triggered analysis via RunCloud API for job_id: {job_id} with agency_id: {agency_id}")
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to call RunCloud API for job_id {job_id}: {e}")
             return jsonify({"error": f"Failed to trigger analysis via RunCloud API: {str(e)}"}), 500
