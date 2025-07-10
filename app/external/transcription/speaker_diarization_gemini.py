@@ -56,6 +56,7 @@ def update_job_status(job_id, status):
         if job:
             job.status = status
             session.commit()
+            logger.info(f"Updated job {job_id} with status {status.value}")
         else:
             logger.error(f"Job {job_id} not found.")
     except Exception as ex:
@@ -126,9 +127,9 @@ def process_audio(job_id, bucket, key):
             meeting.transcription = json.dumps(diarization)
             session.commit()
         else:
-            logger.error(f"Meeting {job_id} not found.")
+            logger.error(f"Meeting {meeting.id} not found.")
 
-        logger.info(f"Updated meeting {job_id} with transcript.")
+        logger.info(f"Updated meeting {meeting.id} with transcript.")
 
         # Update job status to COMPLETED
         update_job_status(job_id, JobStatus.COMPLETED)

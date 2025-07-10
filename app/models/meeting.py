@@ -40,6 +40,6 @@ class Meeting(db.Model):
     solutions_discussed = db.Column(db.JSON, nullable=True)
     risks = db.Column(db.JSON, nullable=True)
     summary = db.Column(db.JSON, nullable=True)
-    type = db.Column(db.String, nullable=True)
+    type = db.Column(db.JSON, nullable=True)
 
     actions = db.relationship('Action', back_populates='meeting', cascade='all, delete-orphan')

@@ -1,6 +1,8 @@
 import logging
 import traceback
 import requests
+import os
+import threading
 from flask import Blueprint, request, jsonify
 
 from app.services import JobService, MeetingService
@@ -9,6 +11,26 @@ from app.models.job import JobStatus
 logging = logging.getLogger(__name__)
 
 analysis_bp = Blueprint("analysis", __name__)
+
+
+def _trigger_analysis_async(runcloud_url, payload, job_id, agency_id):
+    """
+    Helper function to trigger analysis in a separate thread.
+    This runs independently of the main request.
+    """
+    try:
+        logging.info(f"Starting async analysis trigger for job_id: {job_id}")
+        response = requests.post(
+            runcloud_url,
+            json=payload,
+            timeout=30,
+            verify=True
+        )
+        response.raise_for_status()
+        logging.info(f"Async analysis completed successfully for job_id: {job_id}")
+    except Exception as e:
+        logging.error(f"Async analysis failed for job_id {job_id}: {e}")
+        # Don't raise the exception since this is running in a separate thread
 
 
 @analysis_bp.route("/trigger_analysis", methods=["POST"])
@@ -55,17 +77,42 @@ def trigger_analysis():
         
         agency_id = str(buyer.agency_id)
         
-        # TODO: Replace with actual Google RunCloud endpoint URL
-        runcloud_url = "https://call-analysis-pipeline-dev-109365356440.europe-west1.run.app"
+        # Get RunCloud URL from environment variable or use default
+        runcloud_url = os.getenv("RUNCLOUD_ANALYSIS_URL", "https://call-analysis-pipeline-dev-109365356440.europe-west1.run.app/analyze")
+        logging.info(f"Using RunCloud URL: {runcloud_url}")
         
         try:
-            response = requests.post(runcloud_url, json={
-                "buyerId": buyer_id,
-                "callId": meeting_id,
-                "agencyId": agency_id
-            })
-            response.raise_for_status()
-            logging.info(f"Successfully triggered analysis via RunCloud API for job_id: {job_id} with agency_id: {agency_id}")
+            # Add timeout and better error handling
+            payload = {
+                "buyer_id": buyer_id,
+                "call_id": meeting_id,
+                "agency_id": agency_id
+            }
+            logging.info(f"Sending async request to RunCloud API with payload: {payload}")
+            
+            # Send request asynchronously - don't wait for response
+            response = requests.post(
+                runcloud_url, 
+                json=payload,
+                timeout=5,  # Short timeout just to ensure request is sent
+                verify=True,  # Verify SSL certificates
+                stream=True  # Don't wait for full response
+            )
+            
+            # Close the response immediately to free up resources
+            response.close()
+            
+            logging.info(f"Successfully triggered async analysis via RunCloud API for job_id: {job_id} with agency_id: {agency_id}")
+            logging.info(f"Request sent to RunCloud API - pipeline triggered")
+        except requests.exceptions.Timeout as e:
+            logging.error(f"Timeout calling RunCloud API for job_id {job_id}: {e}")
+            return jsonify({"error": f"Timeout calling RunCloud API: {str(e)}"}), 504
+        except requests.exceptions.SSLError as e:
+            logging.error(f"SSL error calling RunCloud API for job_id {job_id}: {e}")
+            return jsonify({"error": f"SSL error calling RunCloud API: {str(e)}"}), 502
+        except requests.exceptions.ConnectionError as e:
+            logging.error(f"Connection error calling RunCloud API for job_id {job_id}: {e}")
+            return jsonify({"error": f"Connection error calling RunCloud API: {str(e)}"}), 503
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to call RunCloud API for job_id {job_id}: {e}")
             return jsonify({"error": f"Failed to trigger analysis via RunCloud API: {str(e)}"}), 500

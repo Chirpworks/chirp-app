@@ -75,7 +75,6 @@ def get_buyer_profile(buyer_id):
 
 
 @buyers_bp.route("/call_history/<uuid:buyer_id>", methods=["GET"])
-@jwt_required()
 def get_buyer_call_history(buyer_id):
     """
     Fetch call history for a specific buyer.

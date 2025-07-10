@@ -270,7 +270,7 @@ class MeetingService(BaseService):
             
             if isinstance(call_record, Meeting):
                 # Meeting record
-                job_status = call_record.job.status if call_record.job else JobStatus.INIT
+                job_status = call_record.job.status
                 if job_status in [JobStatus.INIT, JobStatus.IN_PROGRESS]:
                     analysis_status = 'Processing'
                 elif job_status == JobStatus.COMPLETED:
@@ -316,7 +316,6 @@ class MeetingService(BaseService):
                 "id": str(call_record.id),
                 "title": title,
                 "source": call_record.source.value if isinstance(call_record, Meeting) else MeetingSource.PHONE.value,
-                "participants": getattr(call_record, 'participants', None),
                 "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
                 "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
                 "buyer_number": denormalize_phone_number(buyer_number),
@@ -326,7 +325,8 @@ class MeetingService(BaseService):
                 "call_notes": getattr(call_record, 'call_notes', None),
                 "user_name": seller_name,
                 "user_email": getattr(call_record.seller, 'email', None) if isinstance(call_record, Meeting) else None,
-                "call_type": direction,
+                "call_direction": direction,
+                "call_type": getattr(call_record, 'type', None),
                 "call_summary": getattr(call_record, 'summary', None)
             }
             

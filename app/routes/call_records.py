@@ -179,10 +179,7 @@ def post_exotel_recording():
                 end_time=matching_app_call.end_time,
                 source=MeetingSource.PHONE,
                 direction=matching_app_call.call_type,
-                mobile_app_call_id=matching_app_call.mobile_app_call_id,
-                participants=[call_from, matching_app_call.buyer_number],
-                scheduled_at=matching_app_call.start_time,
-
+                mobile_app_call_id=matching_app_call.mobile_app_call_id
             )
             
             # Create Job using JobService
@@ -327,9 +324,7 @@ def post_app_call_record():
                     end_time=end_time,
                     source=MeetingSource.PHONE,
                     direction=mobile_call.call_type,
-                    mobile_app_call_id=call_id,
-                    participants=[seller_number, buyer_number],
-                    scheduled_at=start_time
+                    mobile_app_call_id=call_id
                 )
 
                 # Create Job using JobService  

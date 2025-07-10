@@ -7,9 +7,11 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app import db
-from app.services import SellerService, MeetingService, CallService
+from app.services import SellerService, MeetingService, CallService, ActionService
 from app.models.seller import SellerRole
 from app.external.google_calendar.google_calendar_user import GoogleCalendarUserService
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 meetings_bp = Blueprint("meetings", __name__)
 
@@ -105,7 +107,34 @@ def get_meeting_by_id(meeting_id):
         if str(meeting_data.seller_id) != user_id:
             return jsonify({"error": "Meeting not found or unauthorized"}), 404
 
-        return jsonify(meeting_data), 200
+        # Convert Meeting model to dictionary for JSON serialization
+        meeting_dict = {
+            "id": str(meeting_data.id),
+            "mobile_app_call_id": meeting_data.mobile_app_call_id,
+            "buyer_id": str(meeting_data.buyer_id),
+            "seller_id": str(meeting_data.seller_id),
+            "source": meeting_data.source.value if meeting_data.source else None,
+            "start_time": meeting_data.start_time.isoformat() if meeting_data.start_time else None,
+            "end_time": meeting_data.end_time.isoformat() if meeting_data.end_time else None,
+            "transcription": meeting_data.transcription,
+            "direction": meeting_data.direction,
+            "title": meeting_data.title,
+            "call_purpose": meeting_data.call_purpose,
+            "key_discussion_points": meeting_data.key_discussion_points,
+            "buyer_pain_points": meeting_data.buyer_pain_points,
+            "solutions_discussed": meeting_data.solutions_discussed,
+            "risks": meeting_data.risks,
+            "summary": meeting_data.summary,
+            "type": meeting_data.type,
+            "job": {
+                "id": str(meeting_data.job.id),
+                "status": meeting_data.job.status.value if meeting_data.job.status else None,
+                "created_at": meeting_data.job.created_at.isoformat() if meeting_data.job.created_at else None,
+                "updated_at": meeting_data.job.updated_at.isoformat() if meeting_data.job.updated_at else None
+            } if meeting_data.job else None
+        }
+
+        return jsonify(meeting_dict), 200
 
     except Exception as e:
         logging.error(f"Failed to fetch call data: {e}")
@@ -138,7 +167,6 @@ def get_meeting_feedback_by_id(meeting_id):
 
 
 @meetings_bp.route("/call_data/transcription/<uuid:meeting_id>", methods=["GET"])
-@jwt_required()
 def get_meeting_transcription_by_id(meeting_id):
     try:
         logging.info(f"Fetching transcription for meeting_id {meeting_id}")
@@ -209,39 +237,104 @@ def get_last_synced_call_id():
 @meetings_bp.route("/call_data/summary/<uuid:meeting_id>", methods=["PUT"])
 def update_meeting_summary(meeting_id):
     """
-    Update call summary for a specific meeting.
-    Updates the summary field in the Meetings table.
+    Update call summary, title, type, and other analysis fields for a specific meeting,
+    and create associated actions.
     """
     try:
-        logging.info(f"Updating call summary for meeting_id {meeting_id}")
+        logging.info(f"Updating call analysis data for meeting_id {meeting_id}")
 
-        # Get request data
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
-        call_summary = data.get("callSummary")
-        if call_summary is None:
-            return jsonify({"error": "callSummary field is required"}), 400
-
-        # Verify the meeting exists
         meeting = MeetingService.get_by_id(meeting_id)
         if not meeting:
             return jsonify({"error": "Meeting not found"}), 404
 
-        # Update the meeting summary using MeetingService
-        updated_meeting = MeetingService.update_llm_analysis(meeting_id, {"summary": call_summary})
-        if not updated_meeting:
-            return jsonify({"error": "Failed to update meeting summary"}), 500
+        # Prepare a dictionary to hold all updates for the meeting
+        update_data = {}
 
-        result = {
+        # Get top-level fields: callTitle and callType
+        if "call_title" in data:
+            update_data["title"] = data["call_title"]
+        if "call_type" in data:
+            update_data["type"] = data["call_type"]
+
+        # Process callSummary if it exists
+        call_summary = data.get("call_summary")
+        actions_to_create = []
+
+        if isinstance(call_summary, dict):
+            # Extract specific keys for individual columns and remove them from the summary dict
+            llm_fields_to_extract = [
+                "call_purpose", "key_discussion_points", "buyer_pain_points",
+                "solutions_discussed", "risks"
+            ]
+            for field in llm_fields_to_extract:
+                if field in call_summary:
+                    update_data[field] = call_summary.pop(field)
+
+            # Pop the actions list so it's not stored in the summary JSON
+            actions_to_create = call_summary.pop('actions', [])
+            
+            # The remainder of the call_summary object is saved to the summary field
+            update_data["summary"] = call_summary
+
+        # Update the meeting with all collected data
+        if update_data:
+            updated_meeting = MeetingService.update_llm_analysis(meeting_id, update_data)
+            if not updated_meeting:
+                return jsonify({"error": "Failed to update meeting"}), 500
+        else:
+            updated_meeting = meeting # No updates were made
+
+        # Create actions if any were found
+        created_action_ids = []
+        if actions_to_create:
+            logging.info(f"Found {len(actions_to_create)} actions to create for meeting {meeting_id}")
+            kolkata_tz = ZoneInfo("Asia/Kolkata")
+
+            for action_item in actions_to_create:
+                title = action_item.get("action_name")
+                if not title:
+                    logging.warning(f"Skipping action item due to missing 'action_name': {action_item}")
+                    continue
+
+                due_date_str = action_item.get("due_date")
+                due_date = None
+                if due_date_str:
+                    try:
+                        parsed_date = datetime.fromisoformat(due_date_str.replace('Z', '+00:00'))
+                        if parsed_date.tzinfo is None:
+                            due_date = parsed_date.replace(tzinfo=ZoneInfo("UTC")).astimezone(kolkata_tz)
+                        else:
+                            due_date = parsed_date.astimezone(kolkata_tz)
+                    except ValueError:
+                        logging.warning(f"Could not parse due_date '{due_date_str}'. Skipping due date for action '{title}'.")
+
+                new_action = ActionService.create_action(
+                    title=title,
+                    meeting_id=str(meeting_id),
+                    buyer_id=str(meeting.buyer_id),
+                    seller_id=str(meeting.seller_id),
+                    due_date=due_date,
+                    description={"text": action_item.get("description")},
+                    reasoning=action_item.get("reasoning"),
+                    signals=action_item.get("signals")
+                )
+                created_action_ids.append(str(new_action.id))
+
+        response = {
             "id": str(updated_meeting.id),
-            "summary": updated_meeting.summary
+            "message": "Meeting analysis data updated successfully",
+            "updated_fields": list(update_data.keys()),
+            "actions_created": len(created_action_ids),
+            "created_action_ids": created_action_ids
         }
 
-        return jsonify(result), 200
+        return jsonify(response), 200
 
     except Exception as e:
-        logging.error(f"Failed to update meeting summary for meeting_id {meeting_id}: {e}")
+        logging.error(f"Failed to update meeting analysis for meeting_id {meeting_id}: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"error": f"Failed to update meeting summary: {str(e)}"}), 500
+        return jsonify({"error": f"Failed to update meeting analysis: {str(e)}"}), 500

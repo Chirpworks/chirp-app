@@ -17,10 +17,41 @@ class BuyerService(BaseService):
     model = Buyer
     
     @classmethod
+    def get_by_phone_and_agency(cls, phone: str, agency_id: str) -> Optional[Buyer]:
+        """
+        Get buyer by phone number and agency_id (with normalization).
+        This allows the same phone number to exist for different agencies.
+        
+        Args:
+            phone: Phone number to search for
+            agency_id: Agency UUID
+            
+        Returns:
+            Buyer instance or None if not found
+        """
+        try:
+            normalized_phone = normalize_phone_number(phone)
+            buyer = cls.model.query.filter_by(
+                phone=normalized_phone,
+                agency_id=agency_id
+            ).first()
+            
+            if buyer:
+                logging.info(f"Found buyer with phone {normalized_phone} in agency {agency_id}")
+            else:
+                logging.info(f"No buyer found with phone {normalized_phone} in agency {agency_id}")
+                
+            return buyer
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get buyer by phone {phone} and agency {agency_id}: {str(e)}")
+            raise
+
+    @classmethod
     def find_or_create_buyer(cls, buyer_phone: str, seller_agency_id: str) -> Buyer:
         """
-        Find existing buyer by phone number, or create new buyer if not found.
-        This is the main method used by call processing workflows.
+        Find existing buyer by phone number and agency_id, or create new buyer if not found.
+        This allows the same phone number to exist for different agencies.
         
         Args:
             buyer_phone: Buyer's phone number (will be normalized)
@@ -33,15 +64,15 @@ class BuyerService(BaseService):
             # Normalize phone number for consistent search
             normalized_phone = normalize_phone_number(buyer_phone)
             
-            # Try to find existing buyer
-            buyer = cls.get_by_phone(normalized_phone)
+            # Try to find existing buyer by phone AND agency_id
+            buyer = cls.get_by_phone_and_agency(normalized_phone, seller_agency_id)
             
             if buyer:
-                logging.info(f"Found existing buyer with phone {normalized_phone}")
+                logging.info(f"Found existing buyer with phone {normalized_phone} in agency {seller_agency_id}")
                 return buyer
             
             # Create new buyer if not found
-            logging.info(f"Creating new buyer with phone {normalized_phone}")
+            logging.info(f"Creating new buyer with phone {normalized_phone} in agency {seller_agency_id}")
             buyer = cls.create_buyer(
                 phone=normalized_phone,
                 agency_id=seller_agency_id,
