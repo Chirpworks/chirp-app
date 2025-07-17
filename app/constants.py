@@ -82,3 +82,10 @@ class JobStatus(Enum):
 class ActionStatus(Enum):
     PENDING = "pending"
     COMPLETED = "completed"
+
+
+class MobileAppCallStatus(Enum):
+    MISSED = "Missed"
+    REJECTED = "Rejected"
+    NOT_ANSWERED = "Not Answered"
+    PROCESSING = "Processing"

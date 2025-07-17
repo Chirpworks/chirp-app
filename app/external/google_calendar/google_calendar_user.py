@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import json
+import logging
 
 from flask import session, redirect, url_for, jsonify
 from google.auth.exceptions import RefreshError
@@ -11,7 +12,9 @@ from sqlalchemy.exc import IntegrityError
 from app import Meeting, db, Job
 from app.models.job import JobStatus
 from app.external.job_scheduler.job_scheduler import JobScheduler
-from app.constants import CalendarName
+from app.constants import CalendarName, MeetingSource, CallDirection
+from app.services.meeting_service import MeetingService
+from app.services.buyer_service import BuyerService
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -81,17 +84,23 @@ class GoogleCalendarUserService:
             existing_meeting = Meeting.query.filter_by(id=meeting_id, seller_id=user.id).first()
 
             if not existing_meeting:
-                # Create new meeting
-                new_meeting = Meeting(
-                    id=meeting_id,
+                # For Google Calendar meetings, we need a buyer - create a placeholder buyer
+                # This should be improved to extract buyer info from the meeting details
+                placeholder_buyer = BuyerService.find_or_create_buyer(
+                    buyer_phone="+1000000000",  # Placeholder phone
+                    seller_agency_id=user.agency_id
+                )
+                
+                # Create new meeting using MeetingService
+                new_meeting = MeetingService.create_meeting(
+                    buyer_id=placeholder_buyer.id,
+                    seller_id=user.id,
                     title=title,
                     start_time=scheduled_at,
-                    seller_id=user.id,
-                    buyer_id=None,  # Set appropriately if you have buyer info
-                    source=None  # Set appropriately if you have source info
+                    source=MeetingSource.GOOGLE_MEETS,
+                    direction=CallDirection.OUTGOING.value
                 )
-                db.session.add(new_meeting)
-                db.session.flush()  # Get ID before commit
+                # MeetingService.create_meeting handles the database session
 
                 # Create corresponding job entry
                 new_job = Job(

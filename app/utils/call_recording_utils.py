@@ -7,6 +7,7 @@ from pydub import AudioSegment
 
 from app.constants import ExotelCreds
 from app.external.aws.s3_client import S3Client
+from app.constants import MobileAppCallStatus
 
 logging = logging.getLogger(__name__)
 
@@ -88,14 +89,16 @@ def denormalize_phone_number(phone_number):
 
 def calculate_call_status(call_type, duration):
     if call_type == 'missed':
-        return 'Missed'
+        return MobileAppCallStatus.MISSED.value
+    elif call_type == 'rejected':
+        return MobileAppCallStatus.REJECTED.value
     elif call_type == 'incoming' and duration == '0':
-        return 'Missed'
+        return MobileAppCallStatus.MISSED.value
     elif call_type == 'outgoing' and duration == '0':
-        return 'Not Answered'
+        return MobileAppCallStatus.NOT_ANSWERED.value
     elif call_type == 'incoming' and int(duration) > 0:
-        return 'Processing'
+        return MobileAppCallStatus.PROCESSING.value
     elif call_type == 'outgoing' and int(duration) > 0:
-        return 'Processing'
+        return MobileAppCallStatus.PROCESSING.value
     else:
-        return 'Processing'
+        return MobileAppCallStatus.PROCESSING.value

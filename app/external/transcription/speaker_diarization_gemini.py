@@ -49,16 +49,49 @@ def notify_flask_server(job_id):
 
 def update_job_status(job_id, status):
     """
-    Updates the job status in the jobs table.
+    Updates the job status via API endpoint.
     """
     try:
-        job = session.query(Job).filter_by(id=job_id).first()
-        if job:
-            job.status = status
-            session.commit()
-            logger.info(f"Updated job {job_id} with status {status.value}")
+        # Use API endpoint to update job status
+        api_url = FLASK_API_URL
+        endpoint = f"{api_url}/api/jobs/update_status"
+        
+        payload = {
+            "job_id": job_id,
+            "status": status.value
+        }
+        
+        response = requests.post(endpoint, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            logger.info(f"Updated job {job_id} with status {status.value} via API")
         else:
-            logger.error(f"Job {job_id} not found.")
+            logger.error(f"Failed to update job {job_id} status via API. Status: {response.status_code}, Response: {response.text}")
+            # Fallback to direct database update if API fails
+            logger.info(f"Falling back to direct database update for job {job_id}")
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job:
+                job.status = status
+                session.commit()
+                logger.info(f"Updated job {job_id} with status {status.value} via database fallback")
+            else:
+                logger.error(f"Job {job_id} not found in database fallback")
+                
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request failed for job {job_id}: {e}")
+        # Fallback to direct database update if API request fails
+        logger.info(f"Falling back to direct database update for job {job_id}")
+        try:
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job:
+                job.status = status
+                session.commit()
+                logger.info(f"Updated job {job_id} with status {status.value} via database fallback")
+            else:
+                logger.error(f"Job {job_id} not found in database fallback")
+        except Exception as db_ex:
+            logger.exception(f"Database fallback also failed for job {job_id}: {db_ex}")
+            raise db_ex
     except Exception as ex:
         logger.exception(f"Error updating job status for job {job_id}: {ex}")
         raise ex
@@ -66,13 +99,48 @@ def update_job_status(job_id, status):
 
 def get_audio_url(job_id):
     """
-    Queries the database to get the S3 URL for the audio file for the given job_id.
+    Gets the S3 URL for the audio file for the given job_id via API endpoint.
     """
-    job = session.query(Job).filter_by(id=job_id).first()
-    if job and job.s3_audio_url:
-        return job.s3_audio_url
-    else:
-        raise ValueError(f"No audio URL found for job_id {job_id}")
+    try:
+        # Use API endpoint to get audio URL
+        api_url = FLASK_API_URL
+        endpoint = f"{api_url}/api/jobs/{job_id}/audio_url"
+        
+        response = requests.get(endpoint, timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            logger.info(f"Retrieved audio URL for job {job_id} via API")
+            return data['s3_audio_url']
+        else:
+            logger.error(f"Failed to get audio URL for job {job_id} via API. Status: {response.status_code}, Response: {response.text}")
+            # Fallback to direct database query if API fails
+            logger.info(f"Falling back to direct database query for job {job_id}")
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job and job.s3_audio_url:
+                logger.info(f"Retrieved audio URL for job {job_id} via database fallback")
+                return job.s3_audio_url
+            else:
+                raise ValueError(f"No audio URL found for job_id {job_id}")
+
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request failed for job {job_id}: {e}")
+        # Fallback to direct database query if API request fails
+        logger.info(f"Falling back to direct database query for job {job_id}")
+        try:
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job and job.s3_audio_url:
+                logger.info(f"Retrieved audio URL for job {job_id} via database fallback")
+                return job.s3_audio_url
+            else:
+                raise ValueError(f"No audio URL found for job_id {job_id}")
+        except Exception as db_ex:
+            logger.exception(f"Database fallback also failed for job {job_id}: {db_ex}")
+            raise db_ex
+    except Exception as ex:
+        logger.exception(f"Error getting audio URL for job {job_id}: {ex}")
+        raise ex
 
 
 def parse_s3_url(s3_url):
@@ -117,22 +185,59 @@ def process_audio(job_id, bucket, key):
         logger.error(f"Error while transcribing audio file for job_id: {job_id}. Error: {e}")
         raise e
 
-    # Update the meetings table with the transcript and timestamp
+            # Update the meetings table with the transcript and timestamp
     try:
-        meeting = None
-        job = session.query(Job).filter_by(id=job_id).first()
-        if job:
-            meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
-        if meeting:
-            meeting.transcription = json.dumps(diarization)
-            session.commit()
+        # Use API endpoint to update meeting transcription
+        api_url = FLASK_API_URL
+        endpoint = f"{api_url}/api/jobs/{job_id}/meeting/transcription"
+        
+        payload = {
+            "transcription": json.dumps(diarization)
+        }
+        
+        response = requests.put(endpoint, json=payload, timeout=30)
+        
+        if response.status_code == 200:
+            logger.info(f"Updated meeting transcription for job {job_id} via API")
+            logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
         else:
-            logger.error(f"Meeting {meeting.id} not found.")
+            logger.error(f"Failed to update meeting transcription for job {job_id} via API. Status: {response.status_code}, Response: {response.text}")
+            # Fallback to direct database update if API fails
+            logger.info(f"Falling back to direct database update for job {job_id}")
+            meeting = None
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job:
+                meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
+            if meeting:
+                meeting.transcription = json.dumps(diarization)
+                session.commit()
+                logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
+                logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
+            else:
+                logger.error(f"Meeting not found for job {job_id}.")
+                update_job_status(job_id, JobStatus.FAILURE)
 
-        logger.info(f"Updated meeting {meeting.id} with transcript.")
-
-        # Update job status to COMPLETED
-        update_job_status(job_id, JobStatus.COMPLETED)
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request failed for job {job_id}: {e}")
+        # Fallback to direct database update if API request fails
+        logger.info(f"Falling back to direct database update for job {job_id}")
+        try:
+            meeting = None
+            job = session.query(Job).filter_by(id=job_id).first()
+            if job:
+                meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
+            if meeting:
+                meeting.transcription = json.dumps(diarization)
+                session.commit()
+                logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
+                logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
+            else:
+                logger.error(f"Meeting not found for job {job_id}.")
+                update_job_status(job_id, JobStatus.FAILURE)
+        except Exception as db_ex:
+            logger.exception(f"Database fallback also failed for job {job_id}: {db_ex}")
+            update_job_status(job_id, JobStatus.FAILURE)
+            raise db_ex
     except Exception as e:
         logger.error(f"Error processing job {job_id}: {e}")
         update_job_status(job_id, JobStatus.FAILURE)

@@ -13,7 +13,7 @@ from sqlalchemy import and_
 
 from app import db
 from app.services import JobService, SellerService
-from app.constants import AWSConstants, MeetingSource
+from app.constants import AWSConstants, MeetingSource, MobileAppCallStatus, CallDirection
 from app.models.exotel_calls import ExotelCall
 
 from app.external.aws.ecs_client import ECSClient
@@ -170,6 +170,18 @@ def post_exotel_recording():
             # Find or create buyer using BuyerService
             buyer = BuyerService.find_or_create_buyer(matching_app_call.buyer_number, user.agency_id)
             
+            # Convert call_type to CallDirection enum value
+            if matching_app_call.call_type == "incoming":
+                meeting_direction = CallDirection.INCOMING.value
+            elif matching_app_call.call_type == "outgoing":
+                meeting_direction = CallDirection.OUTGOING.value
+            elif matching_app_call.call_type == "missed":
+                meeting_direction = CallDirection.INCOMING.value  # Missed calls are incoming
+            elif matching_app_call.call_type == "rejected":
+                meeting_direction = CallDirection.INCOMING.value  # Rejected calls are incoming
+            else:
+                meeting_direction = None  # Fallback for unknown types
+            
             # Create Meeting using MeetingService
             meeting = MeetingService.create_meeting(
                 buyer_id=buyer.id,
@@ -178,7 +190,7 @@ def post_exotel_recording():
                 start_time=matching_app_call.start_time,
                 end_time=matching_app_call.end_time,
                 source=MeetingSource.PHONE,
-                direction=matching_app_call.call_type,
+                direction=meeting_direction,
                 mobile_app_call_id=matching_app_call.mobile_app_call_id
             )
             
@@ -263,7 +275,7 @@ def post_app_call_record():
 
             call_status = calculate_call_status(call_type_str, duration)
 
-            if call_status == 'Processing' and duration != '0':
+            if call_status == MobileAppCallStatus.PROCESSING.value and duration != '0':
                 # adding this time to enlarge the window for exotel call reconciliation
                 end_time = end_time + timedelta(seconds=3)
 
@@ -315,6 +327,18 @@ def post_app_call_record():
                 # Find or create buyer
                 buyer = find_or_create_buyer(buyer_number, user.agency_id)
                 
+                # Convert call_type to CallDirection enum value
+                if mobile_call.call_type == "incoming":
+                    meeting_direction = CallDirection.INCOMING.value
+                elif mobile_call.call_type == "outgoing":
+                    meeting_direction = CallDirection.OUTGOING.value
+                elif mobile_call.call_type == "missed":
+                    meeting_direction = CallDirection.INCOMING.value  # Missed calls are incoming
+                elif mobile_call.call_type == "rejected":
+                    meeting_direction = CallDirection.INCOMING.value  # Rejected calls are incoming
+                else:
+                    meeting_direction = None  # Fallback for unknown types
+                
                 # Create Meeting using MeetingService
                 meeting = MeetingService.create_meeting(
                     buyer_id=buyer.id,
@@ -323,7 +347,7 @@ def post_app_call_record():
                     start_time=start_time,
                     end_time=end_time,
                     source=MeetingSource.PHONE,
-                    direction=mobile_call.call_type,
+                    direction=meeting_direction,
                     mobile_app_call_id=call_id
                 )
 

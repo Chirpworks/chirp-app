@@ -9,6 +9,7 @@ from app import db
 from app.models.exotel_calls import ExotelCall
 from app.models.mobile_app_calls import MobileAppCall
 from app.utils.call_recording_utils import normalize_phone_number, calculate_call_status
+from app.constants import MobileAppCallStatus
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)
@@ -381,7 +382,7 @@ class CallService(BaseService):
                 .filter(
                     and_(
                         MobileAppCall.start_time < threshold_time,
-                        MobileAppCall.status == 'Processing'
+                        MobileAppCall.status == MobileAppCallStatus.PROCESSING.value
                     )
                 )
                 .order_by(MobileAppCall.start_time.asc())
@@ -516,7 +517,7 @@ class CallService(BaseService):
             old_mobile_calls = MobileAppCall.query.filter(
                 and_(
                     MobileAppCall.start_time < cutoff_date,
-                    MobileAppCall.status.in_(['Processing', 'Not Answered', 'Missed'])
+                    MobileAppCall.status.in_([MobileAppCallStatus.PROCESSING.value, MobileAppCallStatus.NOT_ANSWERED.value, MobileAppCallStatus.MISSED.value])
                 )
             ).all()
             mobile_count = len(old_mobile_calls)

@@ -323,7 +323,8 @@ class BuyerService(BaseService):
                     'name': buyer.name,
                     'email': buyer.email,
                     'agency_id': str(buyer.agency_id),
-                    'meeting_count': meeting_count
+                    'meeting_count': meeting_count,
+                    'company_name': buyer.company_name
                 })
             
             logging.info(f"Found {len(buyers_with_meetings)} buyers with meeting counts")
@@ -391,7 +392,8 @@ class BuyerService(BaseService):
                     'phone': buyer.phone,
                     'products_discussed': buyer.products_discussed,
                     'last_contacted_by': last_contacted_by,
-                    'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None
+                    'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None,
+                    'company_name': buyer.company_name
                 })
             
             logging.info(f"Found {len(buyers_with_contact)} buyers with last contact info for agency {agency_id}")
@@ -452,7 +454,8 @@ class BuyerService(BaseService):
                 'risks': buyer.risks,
                 'products_discussed': buyer.products_discussed,
                 'last_contacted_by': last_contacted_by,
-                'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None
+                'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None,
+                'company_name': buyer.company_name
             }
             
             logging.info(f"Found buyer {buyer_id} with last contact info")
@@ -460,4 +463,4 @@ class BuyerService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get buyer with last contact for {buyer_id}: {str(e)}")
-            raise 
+            raise

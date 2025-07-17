@@ -118,6 +118,8 @@ def generate_user_claims(user: Seller):
         "user_name": user.name,
         "user_email": user.email,
         "user_role": user.role.value,
-        "user_phone": user.phone
+        "user_phone": user.phone,
+        "agency_id": str(user.agency_id),
+        "agency_name": user.agency.name
     }
     return user_claims

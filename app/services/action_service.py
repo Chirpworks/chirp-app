@@ -171,6 +171,10 @@ class ActionService(BaseService):
                 "reasoning": action.reasoning,
                 "signals": action.signals,
                 "created_at": action.created_at.isoformat() if action.created_at else None,
+                "buyer_id": action.buyer_id,
+                "buyer_name": action.buyer.name,
+                "buyer_phone": action.buyer.phone,
+                "buyer_company_name": action.buyer.company_name
             }
             
             return formatted
@@ -480,4 +484,4 @@ class ActionService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get actions for buyer {buyer_id}: {str(e)}")
-            raise 
+            raise

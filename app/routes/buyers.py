@@ -4,7 +4,6 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.services import BuyerService, SellerService, MeetingService, ActionService
-from app.models.seller import SellerRole
 from app.utils.call_recording_utils import denormalize_phone_number
 
 buyers_bp = Blueprint("buyers", __name__)

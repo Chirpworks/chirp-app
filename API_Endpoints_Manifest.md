@@ -230,6 +230,28 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 **Input:**
 - Query: `team_member_id` (optional, array of UUIDs)
 **Output:** Call history data
+```json
+[
+  {
+    "id": "string",
+    "title": "string",
+    "source": "string",  // "phone" or "google_meets"
+    "start_time": "ISO datetime",
+    "end_time": "ISO datetime",
+    "buyer_number": "string",
+    "seller_number": "string",
+    "analysis_status": "string",  // "Processing", "Completed", "Not Recorded", "Missed", "Rejected"
+    "duration": "string",
+    "call_notes": "string",
+    "user_name": "string",
+    "user_email": "string",
+    "call_direction": "string",  // "incoming", "outgoing"
+    "call_type": "string",
+    "app_call_type": "string",
+    "call_summary": "string"
+  }
+]
+```
 
 #### GET `/meetings/call_data/<meeting_id>`
 **Description:** Get detailed meeting data by ID
@@ -355,7 +377,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
     "sellerNumber": "string",
     "appCallId": "string",
     "buyerNumber": "string",
-    "callType": "string",
+    "callType": "string",  // "incoming", "outgoing", "missed", "rejected"
     "startTime": "string",
     "endTime": "string",
     "duration": "string"
@@ -368,6 +390,14 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "message": "Mobile app call records processed successfully."
 }
 ```
+
+**Call Type Status Mapping:**
+- `"missed"` → Status: "Missed"
+- `"rejected"` → Status: "Rejected" 
+- `"incoming"` with duration "0" → Status: "Missed"
+- `"outgoing"` with duration "0" → Status: "Not Answered"
+- `"incoming"` with duration > 0 → Status: "Processing"
+- `"outgoing"` with duration > 0 → Status: "Processing"
 
 ### 4.2 Diarization & Analysis
 

@@ -10,8 +10,8 @@ from app.models.seller import Seller
 from app.models.buyer import Buyer
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.job import JobStatus
-from app.constants import CallDirection, MeetingSource
-from app.utils.call_recording_utils import denormalize_phone_number
+from app.constants import CallDirection, MeetingSource, MobileAppCallStatus
+from app.utils.call_recording_utils import denormalize_phone_number, normalize_phone_number
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)
@@ -92,7 +92,7 @@ class MeetingService(BaseService):
             meeting = cls.model.query.filter_by(id=meeting_id).first()
             if meeting:
                 # Accessing job attribute loads the relationship
-                _ = meeting.job
+                job = meeting.job
                 logging.info(f"Found meeting with job: {meeting_id}")
             else:
                 logging.warning(f"Meeting not found: {meeting_id}")
@@ -285,13 +285,24 @@ class MeetingService(BaseService):
                 # Mobile app call record
                 analysis_status = call_record.status
                 
-                if call_record.status == 'Missed':
-                    title = f'Missed Call from {denormalize_phone_number(buyer_number)}'
+                if call_record.status == MobileAppCallStatus.MISSED.value:
+                    title = 'Missed Call'
                     direction = CallDirection.INCOMING.value
-                elif call_record.status == 'Not Answered':
+                elif call_record.status == MobileAppCallStatus.REJECTED.value:
+                    title = f'Rejected Call from {denormalize_phone_number(buyer_number)}'
+                    direction = CallDirection.INCOMING.value
+                elif call_record.status == MobileAppCallStatus.NOT_ANSWERED.value:
                     title = f'{denormalize_phone_number(buyer_number)} did not answer'
                     direction = CallDirection.OUTGOING.value
-                elif call_record.status == 'Processing':
+                elif call_record.status == MobileAppCallStatus.PROCESSING.value:
+                    # Set direction based on call_type field
+                    if call_record.call_type == "incoming":
+                        direction = CallDirection.INCOMING.value
+                    elif call_record.call_type == "outgoing":
+                        direction = CallDirection.OUTGOING.value
+                    else:
+                        direction = None  # Fallback for unknown call types
+                    
                     start_time_local = call_record.start_time
                     if start_time_local.tzinfo is None:
                         start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
@@ -309,8 +320,18 @@ class MeetingService(BaseService):
             if call_record_end_time and call_record_end_time.tzinfo is None:
                 call_record_end_time = call_record_end_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
             
-            # Calculate duration
-            duration = human_readable_duration(call_record_end_time, call_record_start_time)
+            # Calculate duration based on call success status
+            if isinstance(call_record, MobileAppCall):
+                # For MobileAppCall records, check if call was successful
+                if call_record.status in [MobileAppCallStatus.MISSED.value, MobileAppCallStatus.REJECTED.value, MobileAppCallStatus.NOT_ANSWERED.value]:
+                    # Unsuccessful calls always show 0s duration
+                    duration = "0s"
+                else:
+                    # Successful calls (PROCESSING status) show actual duration
+                    duration = human_readable_duration(call_record_end_time, call_record_start_time)
+            else:
+                # For Meeting records, always show actual duration (these are successful calls)
+                duration = human_readable_duration(call_record_end_time, call_record_start_time)
             
             return {
                 "id": str(call_record.id),
@@ -327,6 +348,7 @@ class MeetingService(BaseService):
                 "user_email": getattr(call_record.seller, 'email', None) if isinstance(call_record, Meeting) else None,
                 "call_direction": direction,
                 "call_type": getattr(call_record, 'type', None),
+                "app_call_type": getattr(call_record, "call_type", None),
                 "call_summary": getattr(call_record, 'summary', None)
             }
             
@@ -353,6 +375,27 @@ class MeetingService(BaseService):
             return meeting
         except SQLAlchemyError as e:
             logging.error(f"Failed to update LLM analysis for meeting {meeting_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def update_transcription(cls, meeting_id: str, transcription: str) -> Optional[Meeting]:
+        """
+        Update meeting with transcription data.
+        
+        Args:
+            meeting_id: Meeting UUID
+            transcription: Transcription data (JSON string)
+            
+        Returns:
+            Updated Meeting instance or None if not found
+        """
+        try:
+            meeting = cls.update(meeting_id, transcription=transcription)
+            if meeting:
+                logging.info(f"Updated transcription for meeting: {meeting_id}")
+            return meeting
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to update transcription for meeting {meeting_id}: {str(e)}")
             raise
     
     @classmethod
@@ -442,9 +485,11 @@ class MeetingService(BaseService):
             )
             
             # Get mobile app calls for the buyer (by phone number)
+            # Normalize buyer phone for consistent comparison
+            normalized_buyer_phone = normalize_phone_number(buyer.phone)
             mobile_app_calls_query = (
                 MobileAppCall.query
-                .filter(MobileAppCall.buyer_number == buyer.phone)
+                .filter(MobileAppCall.buyer_number == normalized_buyer_phone)
                 .order_by(MobileAppCall.start_time.desc())
             )
             

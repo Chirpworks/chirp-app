@@ -21,3 +21,4 @@ class Buyer(db.Model):
     relationship_progression = db.Column(db.Text, nullable=True)
     risks = db.Column(db.JSON, nullable=True)
     products_discussed = db.Column(db.JSON, nullable=True)
+    company_name = db.Column(db.String(100), nullable=True)

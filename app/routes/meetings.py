@@ -129,9 +129,9 @@ def get_meeting_by_id(meeting_id):
             "job": {
                 "id": str(meeting_data.job.id),
                 "status": meeting_data.job.status.value if meeting_data.job.status else None,
-                "created_at": meeting_data.job.created_at.isoformat() if meeting_data.job.created_at else None,
-                "updated_at": meeting_data.job.updated_at.isoformat() if meeting_data.job.updated_at else None
-            } if meeting_data.job else None
+                "start_time": meeting_data.job.start_time.isoformat() if meeting_data.job.start_time else None,
+                "end_time": meeting_data.job.end_time.isoformat() if meeting_data.job.end_time else None
+            } if meeting_data.job else None,
         }
 
         return jsonify(meeting_dict), 200
@@ -246,6 +246,7 @@ def update_meeting_summary(meeting_id):
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
+        logging.info(f"Received update summary data from Pipeline: {data}")
 
         meeting = MeetingService.get_by_id(meeting_id)
         if not meeting:
@@ -273,9 +274,6 @@ def update_meeting_summary(meeting_id):
             for field in llm_fields_to_extract:
                 if field in call_summary:
                     update_data[field] = call_summary.pop(field)
-
-            # Pop the actions list so it's not stored in the summary JSON
-            actions_to_create = call_summary.pop('actions', [])
             
             # The remainder of the call_summary object is saved to the summary field
             update_data["summary"] = call_summary
@@ -289,6 +287,7 @@ def update_meeting_summary(meeting_id):
             updated_meeting = meeting # No updates were made
 
         # Create actions if any were found
+        actions_to_create = data.get("actions")
         created_action_ids = []
         if actions_to_create:
             logging.info(f"Found {len(actions_to_create)} actions to create for meeting {meeting_id}")
