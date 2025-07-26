@@ -182,13 +182,15 @@ def post_exotel_recording():
             else:
                 meeting_direction = None  # Fallback for unknown types
             
-            # Create Meeting using MeetingService
+            # Create Meeting using MeetingService with corrected end_time (remove 3-second buffer)
+            # Calculate original end_time from start_time + duration to avoid the 3-second reconciliation buffer
+            corrected_end_time = matching_app_call.start_time + timedelta(seconds=matching_app_call.duration)
             meeting = MeetingService.create_meeting(
                 buyer_id=buyer.id,
                 seller_id=user.id,
                 title=f"Meeting between {denormalize_phone_number(matching_app_call.buyer_number)} and {user.name}",
                 start_time=matching_app_call.start_time,
-                end_time=matching_app_call.end_time,
+                end_time=corrected_end_time,
                 source=MeetingSource.PHONE,
                 direction=meeting_direction,
                 mobile_app_call_id=matching_app_call.mobile_app_call_id
@@ -258,6 +260,13 @@ def post_app_call_record():
                 logging.error("all required fields were not sent in the request parameter")
                 return jsonify({"error": "Missing required fields"}), 400
 
+            # Check if a record with this mobile_app_call_id already exists
+            if call_id:
+                existing_record = CallService.get_mobile_app_call_by_app_call_id(call_id)
+                if existing_record:
+                    logging.info(f"Record with appCallId {call_id} already exists. Skipping processing.")
+                    continue
+
             user = SellerService.get_by_phone(seller_number)
 
             if not user:
@@ -275,6 +284,9 @@ def post_app_call_record():
 
             call_status = calculate_call_status(call_type_str, duration)
 
+            # Store original end_time for meeting creation
+            original_end_time = end_time
+            
             if call_status == MobileAppCallStatus.PROCESSING.value and duration != '0':
                 # adding this time to enlarge the window for exotel call reconciliation
                 end_time = end_time + timedelta(seconds=3)
@@ -339,13 +351,13 @@ def post_app_call_record():
                 else:
                     meeting_direction = None  # Fallback for unknown types
                 
-                # Create Meeting using MeetingService
+                # Create Meeting using MeetingService with original end_time (without 3-second buffer)
                 meeting = MeetingService.create_meeting(
                     buyer_id=buyer.id,
                     seller_id=user.id,
                     title=f"Meeting between {denormalize_phone_number(buyer_number)} and {user.name}",
                     start_time=start_time,
-                    end_time=end_time,
+                    end_time=original_end_time,
                     source=MeetingSource.PHONE,
                     direction=meeting_direction,
                     mobile_app_call_id=call_id

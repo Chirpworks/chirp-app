@@ -21,6 +21,9 @@ class Config:
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
     GOOGLE_DISCOVERY_URL = "https://accounts.google.com/.well-known/openid-configuration"
+    
+    # Test token generation secret
+    TEST_TOKEN_SECRET = os.getenv("TEST_TOKEN_SECRET")
 
     # Flask-Session Config
     SESSION_TYPE = "redis"

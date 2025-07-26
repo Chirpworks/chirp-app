@@ -90,7 +90,8 @@ class BuyerService(BaseService):
     def create_buyer(cls, phone: str, agency_id: str, name: Optional[str] = None, email: Optional[str] = None,
                     tags: Optional[dict] = None, requirements: Optional[dict] = None,
                     solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
-                    risks: Optional[dict] = None, products_discussed: Optional[dict] = None) -> Buyer:
+                    risks: Optional[dict] = None, products_discussed: Optional[dict] = None, 
+                    company_name: Optional[str] = None) -> Buyer:
         """
         Create a new buyer with normalized phone number and optional additional fields.
         
@@ -105,6 +106,7 @@ class BuyerService(BaseService):
             relationship_progression: Optional relationship progression text
             risks: Optional risks as JSON
             products_discussed: Optional products discussed as JSON
+            company_name: Optional buyer company name
             
         Returns:
             Created Buyer instance
@@ -123,7 +125,8 @@ class BuyerService(BaseService):
                 'solutions_presented': solutions_presented,
                 'relationship_progression': relationship_progression,
                 'risks': risks,
-                'products_discussed': products_discussed
+                'products_discussed': products_discussed,
+                'company_name': company_name
             }
             
             buyer = cls.create(**buyer_data)
@@ -371,7 +374,7 @@ class BuyerService(BaseService):
             ).filter(
                 cls.model.agency_id == agency_id
             ).order_by(
-                desc(latest_meeting_subquery.c.last_contacted_at)
+                latest_meeting_subquery.c.last_contacted_at.desc().nullslast()
             )
             
             results = query.all()

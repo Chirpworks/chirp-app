@@ -10,6 +10,7 @@ from app import db
 from app.services import SellerService, MeetingService, CallService, ActionService
 from app.models.seller import SellerRole
 from app.external.google_calendar.google_calendar_user import GoogleCalendarUserService
+from app.utils.time_utils import get_date_range_from_timeframe, validate_time_frame
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -46,16 +47,21 @@ def get_meeting_history():
     try:
         user_id = get_jwt_identity()
 
-        team_member_ids = request.args.getlist("team_member_id")
+        # Get time_frame parameter
+        time_frame = request.args.get("time_frame", "today")
+        if not validate_time_frame(time_frame):
+            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
+
+        team_member_ids = request.args.getlist("team_member_ids")
         if team_member_ids:
             user = SellerService.get_by_id(user_id)
             if not user:
                 logging.error("User not found; unauthorized")
                 return jsonify({"error": "User not found or unauthorized"}), 404
             if user.role != SellerRole.MANAGER:
-                logging.info(f"Unauthorized User. 'team_member_id' query parameter is only applicable for a manager.")
+                logging.info(f"Unauthorized User. 'team_member_ids' query parameter is only applicable for a manager.")
                 return jsonify(
-                    {"error": "Unauthorized User: 'team_member_id' query parameter is only applicable for a manager"}
+                    {"error": "Unauthorized User: 'team_member_ids' query parameter is only applicable for a manager"}
                 )
 
             # Validate team member IDs
@@ -66,8 +72,11 @@ def get_meeting_history():
                     return jsonify({"error": "Seller not found or unauthorized"}), 404
             logging.info(f"Fetching call history for users {team_member_ids}")
 
-        # Use MeetingService to get call history
-        call_history = MeetingService.get_call_history(user_id, team_member_ids)
+        # Get date range for filtering
+        start_date, end_date = get_date_range_from_timeframe(time_frame)
+        
+        # Use MeetingService to get call history with time filtering
+        call_history = MeetingService.get_call_history(user_id, team_member_ids, start_date, end_date)
         
         return jsonify(call_history), 200
 
@@ -82,20 +91,6 @@ def get_meeting_by_id(meeting_id):
     try:
         user_id = get_jwt_identity()
 
-        team_member_id = request.args.get("team_member_id")
-        if team_member_id:
-            user = SellerService.get_by_id(user_id)
-            if not user:
-                logging.error("Seller not found; unauthorized")
-                return jsonify({"error": "Seller not found or unauthorized"}), 404
-            if user.role != SellerRole.MANAGER:
-                logging.info(f"Unauthorized Seller. 'team_member_id' query parameter is only applicable for a manager.")
-                return jsonify(
-                    {"error": "Unauthorized Seller: 'team_member_id' query parameter is only applicable for a manager"}
-                )
-            logging.info(f"setting user_id to {team_member_id=} for manager_id={user_id}")
-            user_id = team_member_id
-
         logging.info(f"Fetching call_data for meeting_id {meeting_id} for user {user_id}")
 
         # Use MeetingService to get meeting with job details
@@ -104,7 +99,11 @@ def get_meeting_by_id(meeting_id):
             return jsonify({"error": "Meeting not found"}), 404
             
         # Verify user has access to this meeting
-        if str(meeting_data.seller_id) != user_id:
+        # Managers can access any meeting, others can only access their own meetings
+        user = SellerService.get_by_id(user_id)
+        if user and user.role == SellerRole.MANAGER:
+            logging.info(f"Manager {user_id} accessing meeting {meeting_id}")
+        elif str(meeting_data.seller_id) != user_id:
             return jsonify({"error": "Meeting not found or unauthorized"}), 404
 
         # Convert Meeting model to dictionary for JSON serialization
@@ -232,6 +231,79 @@ def get_last_synced_call_id():
         logging.error(f"Failed to fetch last synced call id: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch last synced call id: {str(e)}"}), 500
+
+
+@meetings_bp.route("/last_synced_call_timestamp", methods=["GET"])
+def get_last_synced_call_timestamp():
+    try:
+        seller_number = request.args.get("sellerNumber")
+        if not seller_number:
+            return jsonify({"error": "Missing sellerNumber parameter"}), 400
+            
+        logging.info(f"getting last synced call timestamp for phone: {seller_number}")
+
+        user = SellerService.get_by_phone(seller_number)
+        if not user:
+            logging.info(f"user not found for phone {seller_number}")
+            return jsonify({"message": f"No user with phone number {seller_number} found"}), 404
+
+        last_app_call = CallService.get_last_mobile_app_call_by_seller(seller_number)
+
+        last_meeting = MeetingService.get_last_meeting_by_seller(user.id)
+
+        if last_app_call and not last_meeting:
+            # Convert to Asia/Kolkata timezone if not already
+            app_call_time = last_app_call.start_time
+            if app_call_time.tzinfo is None:
+                app_call_time = app_call_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            else:
+                app_call_time = app_call_time.astimezone(ZoneInfo("Asia/Kolkata"))
+            
+            logging.info(f"last synced call timestamp returned: {app_call_time}")
+            return jsonify(
+                {"source": "mobile_app_call", "last_synced_call_timestamp": app_call_time.isoformat()}
+            ), 200
+        elif last_meeting and not last_app_call:
+            # Convert to Asia/Kolkata timezone if not already
+            meeting_time = last_meeting.start_time
+            if meeting_time.tzinfo is None:
+                meeting_time = meeting_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            else:
+                meeting_time = meeting_time.astimezone(ZoneInfo("Asia/Kolkata"))
+            
+            logging.info(f"last synced call timestamp returned: {meeting_time}")
+            return jsonify({"source": "meeting", "last_synced_call_timestamp": meeting_time.isoformat()}), 200
+        elif last_app_call and last_meeting:
+            if last_app_call.start_time > last_meeting.start_time:
+                # Convert to Asia/Kolkata timezone if not already
+                app_call_time = last_app_call.start_time
+                if app_call_time.tzinfo is None:
+                    app_call_time = app_call_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+                else:
+                    app_call_time = app_call_time.astimezone(ZoneInfo("Asia/Kolkata"))
+                
+                logging.info(f"last synced call timestamp returned: {app_call_time}")
+                return jsonify(
+                    {"source": "mobile_app_call", "last_synced_call_timestamp": app_call_time.isoformat()}
+                ), 200
+            else:
+                # Convert to Asia/Kolkata timezone if not already
+                meeting_time = last_meeting.start_time
+                if meeting_time.tzinfo is None:
+                    meeting_time = meeting_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+                else:
+                    meeting_time = meeting_time.astimezone(ZoneInfo("Asia/Kolkata"))
+                
+                logging.info(f"last synced call timestamp returned: {meeting_time}")
+                return jsonify({"source": "meeting", "last_synced_call_timestamp": meeting_time.isoformat()}), 200
+        else:
+            logging.info("No synced calls found")
+            return jsonify({"message": "No synced calls found", "last_synced_call_timestamp": None}), 200
+
+    except Exception as e:
+        logging.error(f"Failed to fetch last synced call timestamp: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to fetch last synced call timestamp: {str(e)}"}), 500
 
 
 @meetings_bp.route("/call_data/summary/<uuid:meeting_id>", methods=["PUT"])

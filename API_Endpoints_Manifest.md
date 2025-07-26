@@ -228,7 +228,8 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 **Description:** Get call history for user or team members
 **Authentication:** JWT required
 **Input:**
-- Query: `team_member_id` (optional, array of UUIDs)
+- Query: `team_member_ids` (optional, array of UUIDs)
+- Query: `time_frame` (optional, string, default: "today") - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
 **Output:** Call history data
 ```json
 [
@@ -239,6 +240,8 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
     "start_time": "ISO datetime",
     "end_time": "ISO datetime",
     "buyer_number": "string",
+    "buyer_name": "string",
+    "buyer_email": "string",
     "seller_number": "string",
     "analysis_status": "string",  // "Processing", "Completed", "Not Recorded", "Missed", "Rejected"
     "duration": "string",
@@ -297,6 +300,19 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 {
   "source": "string",
   "last_synced_call_id": "string"
+}
+```
+
+#### GET `/meetings/last_synced_call_timestamp`
+**Description:** Get last synced call timestamp for a seller
+**Authentication:** None
+**Input:**
+- Query: `sellerNumber` (string)
+**Output:**
+```json
+{
+  "source": "string",
+  "last_synced_call_timestamp": "ISO datetime string"
 }
 ```
 
@@ -439,7 +455,37 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 5. Buyer Management
 
-### 5.1 Buyer Profile Operations
+### 5.1 Buyer Operations
+
+#### GET `/buyers/all`
+**Description:** Get all buyers from the current seller's agency
+**Authentication:** JWT required
+**Input:** None
+**Output:**
+```json
+{
+  "buyers": [
+    {
+      "id": "uuid",
+      "phone": "string",
+      "name": "string",
+      "email": "string",
+      "tags": "array",
+      "requirements": "string",
+      "solutions_presented": "string",
+      "relationship_progression": "string",
+      "risks": "string",
+      "products_discussed": "string",
+      "company_name": "string",
+      "last_contacted_at": "ISO datetime"
+    }
+  ],
+  "total_count": "number",
+  "agency_id": "uuid"
+}
+```
+
+### 5.2 Buyer Profile Operations
 
 #### GET `/buyers/profile/<buyer_id>`
 **Description:** Get buyer profile by ID
@@ -487,6 +533,73 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 - Path: `buyer_id` (UUID)
 **Output:** Call history data
 
+#### GET `/buyers/actions/<buyer_id>`
+**Description:** Get all actions for a specific buyer
+**Authentication:** JWT required
+**Input:**
+- Path: `buyer_id` (UUID)
+**Output:** Actions data
+```json
+{
+  "buyer_id": "uuid",
+  "actions": [
+    {
+      "id": "uuid",
+      "title": "string",
+      "due_date": "ISO datetime",
+      "status": "string",
+      "description": "object",
+      "meeting_id": "uuid",
+      "meeting_title": "string",
+      "meeting_buyer_number": "string",
+      "meeting_buyer_name": "string",
+      "meeting_seller_name": "string",
+      "reasoning": "string",
+      "signals": "object",
+      "created_at": "ISO datetime",
+      "buyer_id": "uuid",
+      "buyer_name": "string",
+      "buyer_phone": "string",
+      "buyer_company_name": "string"
+    }
+  ],
+  "total_count": "number"
+}
+```
+
+#### GET `/buyers/actions/count/<buyer_id>`
+**Description:** Get count of pending actions for a buyer
+**Authentication:** JWT required
+**Input:**
+- Path: `buyer_id` (UUID)
+**Output:**
+```json
+{
+  "buyer_id": "uuid",
+  "pending_actions_count": "number"
+}
+```
+
+#### POST `/buyers/create`
+**Description:** Create a new buyer
+**Authentication:** JWT required
+**Input:**
+```json
+{
+  "phone": "string",
+  "name": "string",
+  "email": "string",
+  "company_name": "string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Buyer created successfully",
+  "buyer_id": "uuid"
+}
+```
+
 #### GET `/buyers/product_catalogue/<buyer_id>`
 **Description:** Get products catalogue for a buyer
 **Authentication:** None
@@ -507,11 +620,44 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 ### 6.1 Action Operations
 
 #### GET `/actions/`
-**Description:** Get actions for user or team members
+**Description:** Get actions for user or team members with optional status filtering
 **Authentication:** JWT required
-**Input:**
-- Query: `team_member_id` (optional, array of UUIDs)
+**Query Parameters:**
+- `team_member_ids` (optional): Array of team member UUIDs (managers only)
+- `status` (optional): Filter by action status - 'pending' or 'completed'
+**Input:** None (parameters in query string)
 **Output:** Actions data
+```json
+{
+  "actions": [
+    {
+      "id": "uuid",
+      "title": "string",
+      "due_date": "ISO datetime",
+      "status": "string",
+      "description": "object",
+      "meeting_id": "uuid",
+      "meeting_title": "string",
+      "meeting_buyer_number": "string",
+      "meeting_buyer_name": "string",
+      "meeting_seller_name": "string",
+      "reasoning": "string",
+      "signals": "object",
+      "created_at": "ISO datetime",
+      "buyer_id": "uuid",
+      "buyer_name": "string",
+      "buyer_phone": "string",
+      "buyer_company_name": "string"
+    }
+  ],
+  "total_count": "number",
+  "filtered_by_status": "string or null"
+}
+```
+
+**Sorting Behavior:**
+- When `status` parameter is provided: Actions are sorted by creation date (newest first)
+- When no `status` parameter: Actions are sorted by due date (earliest first)
 
 #### GET `/actions/<action_id>`
 **Description:** Get specific action by ID
@@ -519,6 +665,27 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 **Input:**
 - Path: `action_id` (UUID)
 **Output:** Action data
+```json
+{
+  "id": "uuid",
+  "title": "string",
+  "due_date": "ISO datetime",
+  "status": "string",
+  "description": "object",
+  "meeting_id": "uuid",
+  "meeting_title": "string",
+  "meeting_buyer_number": "string",
+  "meeting_buyer_name": "string",
+  "meeting_seller_name": "string",
+  "reasoning": "string",
+  "signals": "object",
+  "created_at": "ISO datetime",
+  "buyer_id": "uuid",
+  "buyer_name": "string",
+  "buyer_phone": "string",
+  "buyer_company_name": "string"
+}
+```
 
 #### POST `/actions/update`
 **Description:** Bulk update action statuses
@@ -627,6 +794,181 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ---
 
+## 12. Performance Analytics
+
+### 12.1 Call Performance Metrics
+
+#### POST `/performance/call/<meeting_id>/metrics`
+**Description:** Create or update call performance metrics for a specific meeting (used by external analysis services)
+**Authentication:** None
+**Input:**
+```json
+{
+  "intro": {
+    "score": 8.5,
+    "date": "2024-01-15", 
+    "reason": "Excellent value proposition"
+  },
+  "rapport_building": {
+    "score": 7.2,
+    "date": "2024-01-15",
+    "reason": "Good connection established"
+  },
+  "need_realization": {
+    "score": 6.8,
+    "date": "2024-01-15", 
+    "reason": "Identified key pain points"
+  },
+  "script_adherance": {
+    "score": 8.0,
+    "date": "2024-01-15",
+    "reason": "Followed script well"
+  },
+  "objection_handling": {
+    "score": 7.5,
+    "date": "2024-01-15",
+    "reason": "Handled objections effectively"
+  },
+  "pricing_and_negotiation": {
+    "score": 6.5,
+    "date": "2024-01-15",
+    "reason": "Room for improvement"
+  },
+  "closure_and_next_steps": {
+    "score": 8.2,
+    "date": "2024-01-15",
+    "reason": "Clear next steps defined"
+  },
+  "conversation_structure_and_flow": {
+    "score": 7.8,
+    "date": "2024-01-15",
+    "reason": "Good flow maintained"
+  },
+  "overall_score": 7.5,
+  "analyzed_at": "2024-01-15T10:30:00Z"
+}
+```
+**Output:**
+```json
+{
+  "message": "Call performance metrics updated successfully",
+  "call_performance": {
+    "id": "uuid",
+    "meeting_id": "uuid", 
+    "overall_score": 7.5,
+    "analyzed_at": "2024-01-15T10:30:00Z",
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### GET `/performance/call/<meeting_id>/metrics`
+**Description:** Get call performance metrics for a specific meeting
+**Authentication:** JWT Required
+**Input:** None (meeting_id in URL path)
+**Output:**
+```json
+{
+  "message": "Call performance metrics retrieved successfully",
+  "performance": {
+    "meeting_id": "uuid",
+    "overall_score": 7.5,
+    "analyzed_at": "2024-01-15T10:30:00Z",
+    "metrics": {
+      "intro": {
+        "score": 8.5,
+        "date": "2024-01-15",
+        "reason": "Excellent value proposition"
+      },
+      "rapport_building": {
+        "score": 7.2,
+        "date": "2024-01-15", 
+        "reason": "Good connection established"
+      }
+      // ... other metrics
+    }
+  }
+}
+```
+
+#### DELETE `/performance/call/<meeting_id>/metrics`
+**Description:** Delete call performance metrics for a specific meeting (Admin/Manager only)
+**Authentication:** JWT Required (Admin/Manager role)
+**Input:** None (meeting_id in URL path)
+**Output:**
+```json
+{
+  "message": "Call performance metrics deleted successfully"
+}
+```
+
+#### GET `/performance/user/<user_id>/metrics`
+**Description:** Get call performance metrics for a user within a date range with daily averages
+**Authentication:** JWT Required
+**Query Parameters:**
+- `start_date` (optional): Start date in YYYY-MM-DD format (defaults to 30 days ago)
+- `end_date` (optional): End date in YYYY-MM-DD format (defaults to today)
+**Input:** None (user_id in URL path, dates in query params)
+**Output:**
+```json
+{
+  "message": "User performance metrics retrieved successfully",
+  "user_info": {
+    "user_id": "uuid",
+    "name": "John Doe",
+    "email": "john@example.com"
+  },
+  "date_range": {
+    "start_date": "2024-01-01",
+    "end_date": "2024-01-31"
+  },
+  "daily_metrics": {
+    "2024-01-01": {
+      "intro": 8.5,
+      "rapport_building": 7.2,
+      "need_realization": 6.8,
+      "script_adherance": 8.0,
+      "objection_handling": 7.5,
+      "pricing_and_negotiation": 6.5,
+      "closure_and_next_steps": 8.2,
+      "conversation_structure_and_flow": 7.8,
+      "overall_score": 7.5,
+      "calls_count": 3
+    },
+    "2024-01-02": {
+      "intro": 7.8,
+      "rapport_building": 8.1,
+      "overall_score": 7.7,
+      "calls_count": 2
+    },
+    "2024-01-03": null
+  },
+  "period_summary": {
+    "total_calls": 15,
+    "days_with_data": 8,
+    "days_in_range": 31,
+    "overall_averages": {
+      "intro": 8.1,
+      "rapport_building": 7.6,
+      "overall_score": 7.4
+    }
+  }
+}
+```
+
+### 12.2 Validation Rules
+- All performance scores must be between 0 and 10
+- Date format must be YYYY-MM-DD
+- Meeting must exist and user must have access
+- Only meeting owner, admin, or manager can update metrics
+- Only admin or manager can delete metrics
+- Users can view their own performance data; admin/manager can view any user's data
+- Date range cannot exceed 365 days
+- Daily metrics show null for days with no call data
+
+---
+
 ## Notes
 
 1. All UUIDs are returned as strings in JSON responses
@@ -634,4 +976,5 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 3. Team member access is restricted to users with MANAGER role
 4. Some endpoints support bulk operations for efficiency
 5. Google OAuth integration requires proper configuration of client credentials
-6. File uploads and processing are handled asynchronously via ECS tasks 
+6. File uploads and processing are handled asynchronously via ECS tasks
+7. Performance metrics are scored on a 0-10 scale for standardized evaluation 

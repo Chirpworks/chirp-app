@@ -239,3 +239,86 @@ def get_buyer_actions(buyer_id):
         logging.error(f"Failed to fetch actions for buyer_id {buyer_id}: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
+
+
+@buyers_bp.route("/create", methods=["POST"])
+@jwt_required()
+def create_buyer():
+    """
+    Create a new buyer for the current seller's agency.
+    Accepts JSON with required fields: name, phone, and optional fields: email, company_name, tags, etc.
+    """
+    try:
+        user_id = get_jwt_identity()
+        logging.info(f"Creating buyer for user {user_id}")
+
+        # Get current seller to determine agency
+        seller = SellerService.get_by_id(user_id)
+        if not seller:
+            return jsonify({"error": "User not found"}), 404
+
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Extract required fields
+        name = data.get('name')
+        phone = data.get('phone')
+        
+        # Validate required fields
+        if not name or not phone:
+            return jsonify({"error": "Missing required fields: name and phone are required"}), 400
+
+        # Extract optional fields
+        email = data.get('email')
+        company_name = data.get('company_name')
+        tags = data.get('tags', [])
+        requirements = data.get('requirements')
+        solutions_presented = data.get('solutions_presented')
+        relationship_progression = data.get('relationship_progression')
+        risks = data.get('risks')
+        products_discussed = data.get('products_discussed')
+
+        # Create buyer using BuyerService
+        new_buyer = BuyerService.create_buyer(
+            phone=phone,
+            agency_id=str(seller.agency_id),
+            name=name,
+            email=email,
+            company_name=company_name,
+            tags=tags,
+            requirements=requirements,
+            solutions_presented=solutions_presented,
+            relationship_progression=relationship_progression,
+            risks=risks,
+            products_discussed=products_discussed
+        )
+
+        logging.info(f"Created buyer successfully: {new_buyer.id} for agency: {seller.agency_id}")
+        
+        # Return created buyer data
+        result = {
+            "id": str(new_buyer.id),
+            "name": new_buyer.name,
+            "phone": denormalize_phone_number(new_buyer.phone),
+            "email": new_buyer.email,
+            "company_name": new_buyer.company_name,
+            "agency_id": str(seller.agency_id),
+            "tags": new_buyer.tags,
+            "requirements": new_buyer.requirements,
+            "solutions_presented": new_buyer.solutions_presented,
+            "relationship_progression": new_buyer.relationship_progression,
+            "risks": new_buyer.risks,
+            "products_discussed": new_buyer.products_discussed
+        }
+
+        return jsonify({
+            "message": "Buyer created successfully",
+            "buyer": result
+        }), 201
+
+    except Exception as e:
+        logging.error(f"Failed to create buyer for user {user_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to create buyer: {str(e)}"}), 500

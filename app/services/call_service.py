@@ -355,6 +355,35 @@ class CallService(BaseService):
             raise
     
     @classmethod
+    def get_mobile_app_call_by_app_call_id(cls, mobile_app_call_id: str) -> Optional[MobileAppCall]:
+        """
+        Get a MobileAppCall by its mobile_app_call_id.
+        
+        Args:
+            mobile_app_call_id: The app-specific call ID
+            
+        Returns:
+            MobileAppCall instance or None if not found
+        """
+        try:
+            mobile_call = (
+                MobileAppCall.query
+                .filter_by(mobile_app_call_id=mobile_app_call_id)
+                .first()
+            )
+            
+            if mobile_call:
+                logging.info(f"Found MobileAppCall with app_call_id {mobile_app_call_id}: {mobile_call.id}")
+            else:
+                logging.debug(f"No MobileAppCall found with app_call_id {mobile_app_call_id}")
+                
+            return mobile_call
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get MobileAppCall by app_call_id {mobile_app_call_id}: {str(e)}")
+            raise
+    
+    @classmethod
     def get_unmatched_calls(cls, age_threshold_minutes: int = 30) -> Tuple[List[ExotelCall], List[MobileAppCall]]:
         """
         Get calls that haven't been matched/reconciled and are older than threshold.

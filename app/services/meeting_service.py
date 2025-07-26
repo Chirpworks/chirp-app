@@ -167,13 +167,16 @@ class MeetingService(BaseService):
             raise
     
     @classmethod
-    def get_call_history(cls, user_id: str, team_member_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_call_history(cls, user_id: str, team_member_ids: Optional[List[str]] = None, 
+                        start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
         """
         Get comprehensive call history for a user or team.
         
         Args:
             user_id: Current user's UUID
             team_member_ids: Optional list of team member UUIDs for managers
+            start_date: Optional start date for filtering
+            end_date: Optional end date for filtering
             
         Returns:
             List of call history dictionaries with formatted data
@@ -188,20 +191,35 @@ class MeetingService(BaseService):
                 seller_ids = [user_id]
                 logging.info(f"Fetching call history for user: {user_id}")
             
-            # Get meetings for specified sellers
+            # Get meetings for specified sellers with buyer information
             meetings_query = (
                 cls.model.query
                 .join(Seller)
+                .join(Buyer)  # Join Buyer table to get buyer information
                 .filter(Seller.id.in_(seller_ids))
-                .order_by(cls.model.start_time.desc())
             )
+            
+            # Add date filtering for meetings if provided
+            if start_date:
+                meetings_query = meetings_query.filter(cls.model.start_time >= start_date)
+            if end_date:
+                meetings_query = meetings_query.filter(cls.model.start_time <= end_date)
+            
+            meetings_query = meetings_query.order_by(cls.model.start_time.desc())
             
             # Get mobile app calls for specified sellers
             mobile_app_calls_query = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id.in_(seller_ids))
-                .order_by(MobileAppCall.start_time.desc())
             )
+            
+            # Add date filtering for mobile app calls if provided
+            if start_date:
+                mobile_app_calls_query = mobile_app_calls_query.filter(MobileAppCall.start_time >= start_date)
+            if end_date:
+                mobile_app_calls_query = mobile_app_calls_query.filter(MobileAppCall.start_time <= end_date)
+            
+            mobile_app_calls_query = mobile_app_calls_query.order_by(MobileAppCall.start_time.desc())
             
             meetings = meetings_query.all()
             mobile_app_calls = mobile_app_calls_query.all()
@@ -248,25 +266,51 @@ class MeetingService(BaseService):
             Formatted call record dictionary or None if invalid
         """
         try:
-            # Get seller name
+            # Get seller name and email
             if isinstance(call_record, Meeting):
                 seller_name = call_record.seller.name
+                seller_email = call_record.seller.email
             else:
                 seller = Seller.query.filter_by(phone=call_record.seller_number).first()
                 seller_name = seller.name if seller else "Unknown"
+                seller_email = seller.email if seller else None
+            
+            # Get buyer information
+            buyer_name = None
+            buyer_email = None
+            if isinstance(call_record, Meeting):
+                # For meetings, buyer information is already loaded via join
+                buyer_name = call_record.buyer.name
+                buyer_email = call_record.buyer.email
+                buyer_number = call_record.buyer.phone
+                seller_number = call_record.seller.phone
+            else:  # MobileAppCall
+                # For mobile app calls, need to look up buyer by phone number
+                buyer_number = call_record.buyer_number
+                seller_number = call_record.seller_number
+                
+                # Look up buyer by normalized phone number
+                from app.utils.call_recording_utils import normalize_phone_number
+                normalized_buyer_phone = normalize_phone_number(buyer_number)
+                buyer = Buyer.query.filter_by(phone=normalized_buyer_phone).first()
+                if buyer:
+                    buyer_name = buyer.name
+                    buyer_email = buyer.email
             
             # Determine analysis status and direction
             analysis_status = 'Processing'
             direction = None
-            # Get buyer number based on record type
-            if isinstance(call_record, Meeting):
-                buyer_number = call_record.buyer.phone
-                seller_number = call_record.seller.phone
-            else:  # MobileAppCall
-                buyer_number = call_record.buyer_number
-                seller_number = call_record.seller_number
             
             title = f"Meeting between {denormalize_phone_number(buyer_number)} and {seller_name}"
+
+            # Handle timezone for start/end times
+            call_record_start_time = call_record.start_time
+            if call_record_start_time and call_record_start_time.tzinfo is None:
+                call_record_start_time = call_record_start_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+                
+            call_record_end_time = call_record.end_time
+            if call_record_end_time and call_record_end_time.tzinfo is None:
+                call_record_end_time = call_record_end_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
             
             if isinstance(call_record, Meeting):
                 # Meeting record
@@ -280,7 +324,11 @@ class MeetingService(BaseService):
                 
                 title = call_record.title
                 direction = call_record.direction
-                
+                duration = human_readable_duration(call_record_end_time, call_record_start_time)
+                if duration == "0s":
+                    call_type = "Unanswered"
+                else:
+                    call_type = "Answered"
             elif isinstance(call_record, MobileAppCall):
                 # Mobile app call record
                 analysis_status = call_record.status
@@ -308,30 +356,28 @@ class MeetingService(BaseService):
                         start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
                     if local_now - start_time_local > timedelta(seconds=30):
                         analysis_status = 'Not Recorded'
-            else:
-                return None
-            
-            # Handle timezone for start/end times
-            call_record_start_time = call_record.start_time
-            if call_record_start_time and call_record_start_time.tzinfo is None:
-                call_record_start_time = call_record_start_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
                 
-            call_record_end_time = call_record.end_time
-            if call_record_end_time and call_record_end_time.tzinfo is None:
-                call_record_end_time = call_record_end_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-            
-            # Calculate duration based on call success status
-            if isinstance(call_record, MobileAppCall):
-                # For MobileAppCall records, check if call was successful
                 if call_record.status in [MobileAppCallStatus.MISSED.value, MobileAppCallStatus.REJECTED.value, MobileAppCallStatus.NOT_ANSWERED.value]:
                     # Unsuccessful calls always show 0s duration
                     duration = "0s"
                 else:
-                    # Successful calls (PROCESSING status) show actual duration
-                    duration = human_readable_duration(call_record_end_time, call_record_start_time)
+                    # Successful calls (PROCESSING status) use the original duration field to avoid 3-second inflation
+                    # Use the duration field from the record instead of calculating from start/end times
+                    duration_seconds = call_record.duration if hasattr(call_record, 'duration') else 0
+                    if duration_seconds < 60:
+                        duration = f"{duration_seconds}s"
+                    elif duration_seconds < 3600:
+                        minutes = duration_seconds // 60
+                        seconds = duration_seconds % 60
+                        duration = f"{minutes}m {seconds}s"
+                    else:
+                        hours = duration_seconds // 3600
+                        minutes = (duration_seconds % 3600) // 60
+                        duration = f"{hours}h {minutes}m"
+                
+                call_type = call_record.call_type
             else:
-                # For Meeting records, always show actual duration (these are successful calls)
-                duration = human_readable_duration(call_record_end_time, call_record_start_time)
+                return None                
             
             return {
                 "id": str(call_record.id),
@@ -340,14 +386,16 @@ class MeetingService(BaseService):
                 "start_time": call_record.start_time.isoformat() if call_record.start_time else None,
                 "end_time": call_record.end_time.isoformat() if call_record.end_time else None,
                 "buyer_number": denormalize_phone_number(buyer_number),
+                "buyer_name": buyer_name,
+                "buyer_email": buyer_email,
                 "seller_number": denormalize_phone_number(seller_number),
                 "analysis_status": analysis_status,
                 "duration": duration,
                 "call_notes": getattr(call_record, 'call_notes', None),
                 "user_name": seller_name,
-                "user_email": getattr(call_record.seller, 'email', None) if isinstance(call_record, Meeting) else None,
+                "user_email": seller_email,
                 "call_direction": direction,
-                "call_type": getattr(call_record, 'type', None),
+                "call_type": call_type,
                 "app_call_type": getattr(call_record, "call_type", None),
                 "call_summary": getattr(call_record, 'summary', None)
             }

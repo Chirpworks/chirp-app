@@ -57,13 +57,14 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_actions_for_user(cls, user_id: str, team_member_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    def get_actions_for_user(cls, user_id: str, team_member_ids: Optional[List[str]] = None, status: Optional[ActionStatus] = None) -> List[Dict[str, Any]]:
         """
-        Get all actions for a user or team, formatted for API response.
+        Get actions for a user or team, optionally filtered by status, formatted for API response.
         
         Args:
             user_id: Current user's UUID
             team_member_ids: Optional list of team member UUIDs for managers
+            status: Optional ActionStatus to filter by
             
         Returns:
             List of formatted action dictionaries
@@ -77,23 +78,23 @@ class ActionService(BaseService):
                 seller_ids = [user_id]
                 logging.info(f"Fetching actions for user: {user_id}")
             
-            # Build query based on user access
-            if len(seller_ids) > 1:
-                query = (
-                    cls.model.query
-                    .join(Meeting)
-                    .join(Seller)
-                    .filter(Seller.id.in_(seller_ids))
-                    .order_by(cls.model.due_date.asc())
-                )
+            # Build base query
+            query = (
+                cls.model.query
+                .join(Meeting)
+                .join(Seller)
+                .filter(Seller.id.in_(seller_ids))
+            )
+            
+            # Add status filter if provided
+            if status:
+                query = query.filter(cls.model.status == status)
+                # Sort by created_at when filtering by status
+                query = query.order_by(cls.model.created_at.desc())
+                logging.info(f"Filtering actions by status: {status.value}")
             else:
-                query = (
-                    cls.model.query
-                    .join(Meeting)
-                    .join(Seller)
-                    .filter(Seller.id == user_id)
-                    .order_by(cls.model.due_date.asc())
-                )
+                # Default sorting by due_date when no status filter
+                query = query.order_by(cls.model.due_date.asc())
             
             actions = query.all()
             
@@ -104,11 +105,38 @@ class ActionService(BaseService):
                 if formatted_action:
                     result.append(formatted_action)
             
-            logging.info(f"Retrieved {len(result)} actions")
+            status_filter_msg = f" with status {status.value}" if status else ""
+            logging.info(f"Retrieved {len(result)} actions{status_filter_msg}")
             return result
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get actions for user {user_id}: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_action_by_id(cls, action_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific action by ID without user authorization (for managers).
+        
+        Args:
+            action_id: Action UUID
+            
+        Returns:
+            Formatted action dictionary or None if not found
+        """
+        try:
+            action = cls.model.query.filter_by(id=action_id).first()
+            
+            if not action:
+                logging.warning(f"Action {action_id} not found")
+                return None
+            
+            formatted_action = cls._format_action(action)
+            logging.info(f"Retrieved action {action_id}")
+            return formatted_action
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to get action {action_id}: {str(e)}")
             raise
     
     @classmethod
@@ -167,6 +195,7 @@ class ActionService(BaseService):
                 "meeting_id": str(action.meeting.id),
                 "meeting_title": action.meeting.title,
                 "meeting_buyer_number": denormalize_phone_number(action.meeting.buyer.phone),
+                "meeting_buyer_name": action.meeting.buyer.name,
                 "meeting_seller_name": seller_name,
                 "reasoning": action.reasoning,
                 "signals": action.signals,

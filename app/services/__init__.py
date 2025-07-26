@@ -12,6 +12,7 @@ from .agency_service import AgencyService
 from .product_service import ProductService
 from .token_service import TokenBlocklistService
 from .auth_service import AuthService
+from .call_performance_service import CallPerformanceService
 
 __all__ = [
     'BaseService',
@@ -24,5 +25,6 @@ __all__ = [
     'AgencyService',
     'ProductService',
     'TokenBlocklistService',
-    'AuthService'
+    'AuthService',
+    'CallPerformanceService'
 ] 

@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.external.aws.s3_client import S3Client
 from app.utils.auth_utils import generate_secure_otp, send_otp_email
+from app.config import Config
 
 from app.utils.call_recording_utils import normalize_phone_number
 from app.services import AuthService, SellerService
@@ -198,3 +199,90 @@ def reset_password():
         logging.error(f"Failed to reset password: {str(e)}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Password reset failed"}), 500
+
+
+@auth_bp.route('/generate_test_token', methods=['POST'])
+def generate_test_token():
+    """
+    Generate a test access token for a user by email.
+    This endpoint is protected by a secret value for testing purposes only.
+    
+    Request Body:
+    {
+        "secret": "test_secret_value",
+        "email": "user@example.com"
+    }
+    
+    Response:
+    {
+        "access_token": "jwt_token_here",
+        "refresh_token": "refresh_token_here",
+        "user_id": "user_uuid",
+        "user": {
+            "id": "user_uuid",
+            "name": "User Name",
+            "email": "user@example.com",
+            "phone": "+91 1234567890",
+            "role": "user",
+            "agency_id": "agency_uuid"
+        }
+    }
+    """
+    try:
+        logging.info("Test token generation requested")
+        data = request.get_json()
+        
+        if not data:
+            logging.error("No JSON data provided")
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        secret = data.get('secret')
+        email = data.get('email')
+        
+        if not secret:
+            logging.error("Missing secret parameter")
+            return jsonify({"error": "Missing secret parameter"}), 400
+        
+        if not email:
+            logging.error("Missing email parameter")
+            return jsonify({"error": "Missing email parameter"}), 400
+        
+        # Verify the secret matches the configured test secret
+        if secret != Config.TEST_TOKEN_SECRET:
+            logging.warning(f"Invalid secret provided for test token generation: {secret}")
+            return jsonify({"error": "Invalid secret"}), 403
+        
+        # Find user by email
+        user = SellerService.get_by_email(email)
+        if not user:
+            logging.error(f"User not found with email: {email}")
+            return jsonify({"error": f"User not found with email: {email}"}), 404
+        
+        # Generate tokens using AuthService
+        tokens = AuthService.generate_tokens_for_user(user)
+        if not tokens:
+            logging.error(f"Failed to generate tokens for user: {email}")
+            return jsonify({"error": "Failed to generate tokens"}), 500
+        
+        # Prepare response
+        response_data = {
+            "access_token": tokens['access_token'],
+            "refresh_token": tokens['refresh_token'],
+            "user_id": str(user.id),
+            "user": {
+                "id": str(user.id),
+                "name": user.name,
+                "email": user.email,
+                "phone": user.phone,
+                "role": user.role.value if user.role else None,
+                "agency_id": str(user.agency_id) if user.agency_id else None
+            }
+        }
+        
+        logging.info(f"Test token generated successfully for user: {email}")
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logging.error(f"Failed to generate test token: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": "Test token generation failed"}), 500

@@ -43,3 +43,4 @@ class Meeting(db.Model):
     type = db.Column(db.JSON, nullable=True)
 
     actions = db.relationship('Action', back_populates='meeting', cascade='all, delete-orphan')
+    call_performance = db.relationship('CallPerformance', back_populates='meeting', uselist=False, cascade='all, delete-orphan')
