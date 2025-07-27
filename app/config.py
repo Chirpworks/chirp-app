@@ -7,7 +7,7 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "default_secret")
     # SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", 'postgresql://chirp_user:chirp_password@localhost:5432/chirp_test')
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL",
-                                        'postgresql+psycopg2://postgres:<t>!r60BTABV7]-W#2K~5Ivt8xKF@chirp-db.c1ayu2waec3w.ap-south-1.rds.amazonaws.com:5432/chirp-db')
+                                        'postgresql+psycopg2://postgres:<t>!_tm_FRh2W-Xv1!vb:aYWH#i6h[7@chirp-db-staging-devd.c1ayu2waec3w.ap-south-1.rds.amazonaws.com:5432/chirp-db')
     # SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     WHISPERX_TOKEN = os.getenv("WHISPERX_TOKEN", "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")
