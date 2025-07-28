@@ -133,6 +133,25 @@ def get_meeting_by_id(meeting_id):
             } if meeting_data.job else None,
         }
 
+        # Add call performance data if it exists
+        if meeting_data.call_performance:
+            performance = meeting_data.call_performance
+            performance_dict = {
+                "overall_score": performance.overall_score,
+                "analyzed_at": performance.analyzed_at.isoformat() if performance.analyzed_at else None,
+                "metrics": {}
+            }
+            
+            # Add individual metrics
+            for metric in performance.get_metric_names():
+                metric_data = getattr(performance, metric)
+                if metric_data:
+                    performance_dict['metrics'][metric] = metric_data
+            
+            meeting_dict["call_performance"] = performance_dict
+        else:
+            meeting_dict["call_performance"] = None
+
         return jsonify(meeting_dict), 200
 
     except Exception as e:

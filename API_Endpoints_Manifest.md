@@ -257,12 +257,86 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 ```
 
 #### GET `/meetings/call_data/<meeting_id>`
-**Description:** Get detailed meeting data by ID
+**Description:** Get detailed meeting data by ID including call performance metrics
 **Authentication:** JWT required
 **Input:**
 - Path: `meeting_id` (UUID)
 - Query: `team_member_id` (optional, UUID)
-**Output:** Meeting data with job details
+**Output:**
+```json
+{
+  "id": "uuid",
+  "mobile_app_call_id": "string",
+  "buyer_id": "uuid",
+  "seller_id": "uuid",
+  "source": "string",
+  "start_time": "ISO datetime",
+  "end_time": "ISO datetime",
+  "transcription": "string",
+  "direction": "string",
+  "title": "string",
+  "call_purpose": "string",
+  "key_discussion_points": "object",
+  "buyer_pain_points": "object",
+  "solutions_discussed": "object",
+  "risks": "object",
+  "summary": "object",
+  "type": "object",
+  "job": {
+    "id": "uuid",
+    "status": "string",
+    "start_time": "ISO datetime",
+    "end_time": "ISO datetime"
+  },
+  "call_performance": {
+    "overall_score": 7.5,
+    "analyzed_at": "ISO datetime",
+    "metrics": {
+      "intro": {
+        "score": 8.5,
+        "date": "2024-01-15",
+        "reason": "Excellent value proposition"
+      },
+      "rapport_building": {
+        "score": 7.2,
+        "date": "2024-01-15",
+        "reason": "Good connection established"
+      },
+      "need_realization": {
+        "score": 6.8,
+        "date": "2024-01-15",
+        "reason": "Identified key pain points"
+      },
+      "script_adherance": {
+        "score": 8.0,
+        "date": "2024-01-15",
+        "reason": "Followed script well"
+      },
+      "objection_handling": {
+        "score": 7.5,
+        "date": "2024-01-15",
+        "reason": "Handled objections effectively"
+      },
+      "pricing_and_negotiation": {
+        "score": 6.5,
+        "date": "2024-01-15",
+        "reason": "Room for improvement"
+      },
+      "closure_and_next_steps": {
+        "score": 8.2,
+        "date": "2024-01-15",
+        "reason": "Clear next steps defined"
+      },
+      "conversation_structure_and_flow": {
+        "score": 7.8,
+        "date": "2024-01-15",
+        "reason": "Good flow maintained"
+      }
+    }
+  }
+}
+```
+**Note:** The `call_performance` field will be `null` if no performance analysis has been performed for the meeting.
 
 #### GET `/meetings/call_data/feedback/<meeting_id>`
 **Description:** Get meeting feedback
@@ -477,7 +551,8 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
       "risks": "string",
       "products_discussed": "string",
       "company_name": "string",
-      "last_contacted_at": "ISO datetime"
+      "last_contacted_at": "ISO datetime",
+      "last_contacted_by": "string"
     }
   ],
   "total_count": "number",
@@ -504,7 +579,11 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "solutions_presented": "string",
   "relationship_progression": "string",
   "risks": "string",
-  "products_discussed": "string"
+  "products_discussed": "string",
+  "key_highlights": "object",
+  "last_contacted_at": "ISO datetime",
+  "last_contacted_by": "string",
+  "company_name": "string"
 }
 ```
 
@@ -521,10 +600,26 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "solutions_presented": "string",
   "relationship_progression": "string",
   "risks": "string",
-  "products_discussed": "string"
+  "products_discussed": "string",
+  "key_highlights": "object"
 }
 ```
-**Output:** Updated buyer profile
+**Output:**
+```json
+{
+  "id": "uuid",
+  "phone": "string",
+  "name": "string",
+  "email": "string",
+  "tags": "array",
+  "requirements": "string",
+  "solutions_presented": "string",
+  "relationship_progression": "string",
+  "risks": "string",
+  "products_discussed": "string",
+  "key_highlights": "object"
+}
+```
 
 #### GET `/buyers/call_history/<buyer_id>`
 **Description:** Get call history for a buyer
@@ -589,14 +684,35 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "phone": "string",
   "name": "string",
   "email": "string",
-  "company_name": "string"
+  "company_name": "string",
+  "tags": "array",
+  "requirements": "string",
+  "solutions_presented": "string",
+  "relationship_progression": "string",
+  "risks": "string", 
+  "products_discussed": "string",
+  "key_highlights": "object"
 }
 ```
 **Output:**
 ```json
 {
   "message": "Buyer created successfully",
-  "buyer_id": "uuid"
+  "buyer": {
+    "id": "uuid",
+    "name": "string",
+    "phone": "string",
+    "email": "string",
+    "company_name": "string",
+    "agency_id": "uuid",
+    "tags": "array",
+    "requirements": "string",
+    "solutions_presented": "string",
+    "relationship_progression": "string",
+    "risks": "string",
+    "products_discussed": "string",
+    "key_highlights": "object"
+  }
 }
 ```
 

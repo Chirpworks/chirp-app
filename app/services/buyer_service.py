@@ -91,7 +91,7 @@ class BuyerService(BaseService):
                     tags: Optional[dict] = None, requirements: Optional[dict] = None,
                     solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
                     risks: Optional[dict] = None, products_discussed: Optional[dict] = None, 
-                    company_name: Optional[str] = None) -> Buyer:
+                    company_name: Optional[str] = None, key_highlights: Optional[dict] = None) -> Buyer:
         """
         Create a new buyer with normalized phone number and optional additional fields.
         
@@ -107,6 +107,7 @@ class BuyerService(BaseService):
             risks: Optional risks as JSON
             products_discussed: Optional products discussed as JSON
             company_name: Optional buyer company name
+            key_highlights: Optional key highlights as JSON
             
         Returns:
             Created Buyer instance
@@ -126,7 +127,8 @@ class BuyerService(BaseService):
                 'relationship_progression': relationship_progression,
                 'risks': risks,
                 'products_discussed': products_discussed,
-                'company_name': company_name
+                'company_name': company_name,
+                'key_highlights': key_highlights
             }
             
             buyer = cls.create(**buyer_data)
@@ -174,7 +176,8 @@ class BuyerService(BaseService):
     def update_buyer_info(cls, buyer_id: str, name: Optional[str] = None, email: Optional[str] = None,
                          tags: Optional[dict] = None, requirements: Optional[dict] = None,
                          solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
-                         risks: Optional[dict] = None, products_discussed: Optional[dict] = None) -> Optional[Buyer]:
+                         risks: Optional[dict] = None, products_discussed: Optional[dict] = None, 
+                         key_highlights: Optional[dict] = None) -> Optional[Buyer]:
         """
         Update buyer's information including all available fields.
         
@@ -188,6 +191,7 @@ class BuyerService(BaseService):
             relationship_progression: Optional relationship progression text
             risks: Optional risks as JSON
             products_discussed: Optional products discussed as JSON
+            key_highlights: Optional key highlights as JSON
             
         Returns:
             Updated Buyer instance or None if not found
@@ -210,6 +214,8 @@ class BuyerService(BaseService):
                 update_data['risks'] = risks
             if products_discussed is not None:
                 update_data['products_discussed'] = products_discussed
+            if key_highlights is not None:
+                update_data['key_highlights'] = key_highlights
             
             if not update_data:
                 logging.warning(f"No update data provided for buyer {buyer_id}")
@@ -456,6 +462,7 @@ class BuyerService(BaseService):
                 'relationship_progression': buyer.relationship_progression,
                 'risks': buyer.risks,
                 'products_discussed': buyer.products_discussed,
+                'key_highlights': buyer.key_highlights,
                 'last_contacted_by': last_contacted_by,
                 'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None,
                 'company_name': buyer.company_name

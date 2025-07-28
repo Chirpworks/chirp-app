@@ -103,7 +103,7 @@ def update_buyer_profile(buyer_id):
     """
     Update buyer profile with provided data.
     Accepts JSON with optional fields: tags, requirements, solutions_presented, 
-    relationship_progression, risks, and products_discussed.
+    relationship_progression, risks, products_discussed, and key_highlights.
     """
     try:
         logging.info(f"Updating buyer profile for buyer_id {buyer_id}")
@@ -116,7 +116,7 @@ def update_buyer_profile(buyer_id):
         # Validate allowed fields
         allowed_fields = {
             'tags', 'requirements', 'solutions_presented', 
-            'relationship_progression', 'risks', 'products_discussed'
+            'relationship_progression', 'risks', 'products_discussed', 'key_highlights'
         }
         
         invalid_fields = set(data.keys()) - allowed_fields
@@ -144,7 +144,8 @@ def update_buyer_profile(buyer_id):
             "solutions_presented": updated_buyer.solutions_presented,
             "relationship_progression": updated_buyer.relationship_progression,
             "risks": updated_buyer.risks,
-            "products_discussed": updated_buyer.products_discussed
+            "products_discussed": updated_buyer.products_discussed,
+            "key_highlights": updated_buyer.key_highlights
         }
 
         return jsonify(result), 200
@@ -279,6 +280,7 @@ def create_buyer():
         relationship_progression = data.get('relationship_progression')
         risks = data.get('risks')
         products_discussed = data.get('products_discussed')
+        key_highlights = data.get('key_highlights')
 
         # Create buyer using BuyerService
         new_buyer = BuyerService.create_buyer(
@@ -292,7 +294,8 @@ def create_buyer():
             solutions_presented=solutions_presented,
             relationship_progression=relationship_progression,
             risks=risks,
-            products_discussed=products_discussed
+            products_discussed=products_discussed,
+            key_highlights=key_highlights
         )
 
         logging.info(f"Created buyer successfully: {new_buyer.id} for agency: {seller.agency_id}")
@@ -310,7 +313,8 @@ def create_buyer():
             "solutions_presented": new_buyer.solutions_presented,
             "relationship_progression": new_buyer.relationship_progression,
             "risks": new_buyer.risks,
-            "products_discussed": new_buyer.products_discussed
+            "products_discussed": new_buyer.products_discussed,
+            "key_highlights": new_buyer.key_highlights
         }
 
         return jsonify({
