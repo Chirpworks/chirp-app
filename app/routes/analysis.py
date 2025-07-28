@@ -78,7 +78,7 @@ def trigger_analysis():
         agency_id = str(buyer.agency_id)
         
         # Get RunCloud URL from environment variable or use default
-        runcloud_url = os.getenv("RUNCLOUD_ANALYSIS_URL", "https://call-analysis-pipeline-dev-109365356440.europe-west1.run.app/analyze")
+        runcloud_url = os.getenv("RUNCLOUD_ANALYSIS_URL", "https://analysis-pipeline-staging-109365356440.europe-west1.run.app/analyze")
         logging.info(f"Using RunCloud URL: {runcloud_url}")
         
         try:
