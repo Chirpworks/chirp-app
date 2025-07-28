@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Environment variable for JOB_ID (provided by ECS via container overrides)
 JOB_ID = os.environ.get("JOB_ID")
-DATABASE_URL = os.environ.get("DATABASE_URL")  # e.g., "postgresql://user:password@host/db"
+DATABASE_URL = os.environ.get("STAGING_DATABASE_URL")  # e.g., "postgresql://user:password@host/db"
 FLASK_API_URL = os.getenv("FLASK_STAGING_API_URL")
 
 # Initialize AWS S3 client
