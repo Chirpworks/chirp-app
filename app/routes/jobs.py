@@ -10,6 +10,32 @@ logging = logging.getLogger(__name__)
 jobs_bp = Blueprint("jobs", __name__)
 
 
+@jobs_bp.route("/by_meeting/<uuid:meeting_id>", methods=["GET"])
+def get_job_by_meeting(meeting_id):
+    """
+    Get job by meeting_id.
+    """
+    try:
+        job = JobService.get_by_meeting(str(meeting_id))
+        
+        if not job:
+            return jsonify({"error": f"No job found for meeting {meeting_id}"}), 404
+            
+        return jsonify({
+            "job_id": str(job.id),
+            "meeting_id": str(job.meeting_id),
+            "status": job.status.value,
+            "start_time": job.start_time.isoformat() if job.start_time else None,
+            "end_time": job.end_time.isoformat() if job.end_time else None,
+            "s3_audio_url": job.s3_audio_url
+        }), 200
+        
+    except Exception as e:
+        logging.error(f"Failed to get job by meeting {meeting_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to get job: {str(e)}"}), 500
+
+
 @jobs_bp.route("/update_status", methods=["POST"])
 def update_job_status():
     """
