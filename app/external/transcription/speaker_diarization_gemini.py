@@ -35,6 +35,181 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 
+def get_context_for_transcription(job_id):
+    """Retrieve agency, buyer, seller, and product info for enhanced transcription"""
+    try:
+        # Import models with error handling
+        try:
+            from app.models.agency import Agency
+            from app.models.product import Product
+            from app.models.buyer import Buyer
+            from app.models.seller import Seller
+        except ImportError as import_error:
+            logger.error(f"Failed to import required models: {import_error}")
+            return None, None, None, None
+        
+        job = session.query(Job).filter_by(id=job_id).first()
+        if not job:
+            logger.warning(f"Job {job_id} not found, using default context")
+            return None, None, None, None
+            
+        meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
+        if not meeting:
+            logger.warning(f"Meeting for job {job_id} not found, using default context")
+            return None, None, None, None
+        
+        # Get buyer and seller info
+        buyer = session.query(Buyer).filter_by(id=meeting.buyer_id).first()
+        seller = session.query(Seller).filter_by(id=meeting.seller_id).first()
+        
+        if not buyer:
+            logger.warning(f"Buyer for meeting {meeting.id} not found")
+            return None, None, None, None
+            
+        # Get agency info
+        agency = session.query(Agency).filter_by(id=buyer.agency_id).first()
+        agency_info = {
+            "id": str(agency.id) if agency else None,
+            "name": agency.name if agency else "Unknown Agency",
+            "description": getattr(agency, 'description', '') if agency else ""
+        }
+        
+        # Get product catalogue for the agency
+        products = session.query(Product).filter_by(agency_id=buyer.agency_id).all() if agency else []
+        product_catalogue = []
+        for product in products:
+            product_catalogue.append({
+                "id": str(product.id),
+                "name": getattr(product, 'name', 'Unknown Product'),
+                "description": getattr(product, 'description', ''),
+                "features": getattr(product, 'features', [])
+            })
+        
+        # Get participant info with safe attribute access
+        buyer_info = {
+            "name": getattr(buyer, 'name', None) if buyer and buyer.name else "buyer",
+            "phone": getattr(buyer, 'phone', '') if buyer else "",
+            "company_name": getattr(buyer, 'company_name', '') if buyer else ""
+        }
+        
+        seller_info = {
+            "name": getattr(seller, 'name', None) if seller and seller.name else "seller",
+            "email": getattr(seller, 'email', '') if seller else ""
+        }
+        
+        logger.info(f"Retrieved context for job {job_id}: Agency={agency_info['name']}, Buyer={buyer_info['name']}, Seller={seller_info['name']}, Products={len(product_catalogue)}")
+        return agency_info, buyer_info, seller_info, product_catalogue
+        
+    except Exception as e:
+        logger.error(f"Error retrieving context for job {job_id}: {e}")
+        return None, None, None, None
+
+
+def create_enhanced_prompt(agency_info, buyer_info, seller_info, product_catalogue):
+    """Create an enhanced transcription prompt with agency-specific context"""
+    
+    # Extract context information with defaults
+    agency_name = agency_info.get('name', 'the company') if agency_info else 'the company'
+    agency_description = agency_info.get('description', '') if agency_info else ''
+    
+    buyer_name = buyer_info.get('name', 'buyer') if buyer_info and buyer_info.get('name') else 'buyer'
+    seller_name = seller_info.get('name', 'seller') if seller_info and seller_info.get('name') else 'seller'
+    
+    # Extract product names (limit to prevent prompt bloat)
+    product_names = []
+    if product_catalogue:
+        product_names = [p.get('name', '') for p in product_catalogue if p.get('name')]
+    
+    product_list = ', '.join(product_names) if product_names else 'various products and services'
+    
+    # Generate industry context based on agency description and products
+    industry_terms = []
+    if agency_description:
+        if any(term in agency_description.lower() for term in ['education', 'school', 'student']):
+            industry_terms.extend(['curriculum', 'principal', 'school board', 'academic year', 'enrollment', 'classroom'])
+        if any(term in agency_description.lower() for term in ['technology', 'technical', 'digital']):
+            industry_terms.extend(['installation', 'technical support', 'warranty', 'maintenance', 'specifications'])
+        if any(term in agency_description.lower() for term in ['cultural', 'art', 'music', 'dance']):
+            industry_terms.extend(['workshops', 'competitions', 'performances', 'traditional arts', 'heritage'])
+    
+    industry_context = ', '.join(industry_terms) if industry_terms else 'business terminology'
+    
+    prompt = f"""You are a professional call transcription expert specializing in {agency_name} business calls.
+
+CALL CONTEXT:
+- Agency: {agency_name} - {agency_description}
+- Seller: {seller_name} (sales representative from {agency_name})
+- Buyer: {buyer_name} (potential customer/client)
+- Products discussed may include: {product_list}
+- Industry terminology: {industry_context}
+
+TRANSCRIPTION REQUIREMENTS:
+1. ACCURACY: Transcribe with high precision, handling multiple languages
+2. SPEAKER IDENTIFICATION: Clearly identify {seller_name} vs {buyer_name}
+3. ROLE CLASSIFICATION: Classify speakers as "seller" or "buyer" based on context
+4. LANGUAGE SUPPORT: English, Hindi, Punjabi, Tamil, Telugu, Malayalam with regional variations
+5. TRANSLATION: Provide English translation for non-English segments
+
+ENHANCED LANGUAGE HANDLING:
+- Hindi Business Terms: Recognize व्यापार (vyapar), कारोबार (karobar), धंधा (dhanda), बिजनेस (business), सौदा (sauda), दाम (daam), कीमत (keemat)
+- Punjabi Sales Context: ਵਪਾਰ (vapar), ਕੰਮ (kamm), ਕਾਰੋਬਾਰ (karobar), ਧੰਦਾ (dhanda), ਪੈਸਾ (paisa)
+- PRESERVE English Technical Terms: Keep exact spelling for product names, technical specifications, model numbers
+- Currency Format: Always use ₹X,XXX format, X% for percentages, X lakh/crore for large numbers
+- Mixed Language Fluency: Handle seamless English-Hindi switching common in business calls
+- Regional Variations: Account for different Hindi/Punjabi accents and colloquialisms
+
+AUDIO QUALITY & SYSTEM MESSAGE HANDLING:
+- Unclear Speech: Mark [UNCLEAR] with confidence: "low", provide best guess in brackets
+- Background Noise: Focus on primary conversation, ignore environmental sounds, phone static
+- Overlapping Speech: Create separate entries for simultaneous speakers with [OVERLAPPING] notation
+- Phone Artifacts: Ignore connection sounds, beeps, dial tones, call waiting sounds
+
+CRITICAL - SYSTEM MESSAGE EXCLUSION (DO NOT INCLUDE IN TRANSCRIPT):
+- "The person you are speaking with has put your call on hold. Please stay on the line."
+- "आपको जिस व्यक्ति से बात कर रहे हैं, उसने आपकी कॉल को होल्ड पर रखा है। कृपया लाइन पर बने रहें।"
+- Hold music descriptions, elevator music, background music
+- "Call recording started", "Call recording stopped"
+- "Press 1 for...", "Dial 0 for operator" - any IVR messages
+- Connection establishment sounds, call termination beeps
+- "Please hold while we connect you", "Connecting your call"
+- Mark these as speaker_role: "system" and EXCLUDE from final JSON output
+
+ENHANCED SPEAKER CLASSIFICATION:
+- SELLER ({seller_name}): Product presentations, pricing discussions, benefit explanations, objection handling, follow-up scheduling, technical demonstrations, installation details
+- BUYER ({buyer_name}): Requirements expression, budget inquiries, decision timeline, approval process discussions, stakeholder consultations, technical questions
+- Context Clues for Classification:
+  * Seller: Uses product terminology, discusses pricing, handles objections, proposes solutions
+  * Buyer: Asks questions, expresses concerns, mentions budget/approval, discusses requirements
+
+PRODUCT-SPECIFIC RECOGNITION:
+- Preserve exact product names: {product_list}
+- Technical specifications: sizes, models, features, pricing
+- Installation and support terms specific to {agency_name}
+
+OUTPUT FORMAT - Return ONLY valid JSON array:
+[
+  {{
+    "speaker": "speaker_1|speaker_2",
+    "role": "seller|buyer", 
+    "text": "Exact transliteration with preserved technical terms",
+    "translation": "English translation if non-English original, null if already English",
+    "confidence": "high|medium|low"
+  }}
+]
+
+CRITICAL VALIDATION REQUIREMENTS:
+- Ensure {seller_name} is consistently identified as "seller" role
+- Ensure {buyer_name} is consistently identified as "buyer" role  
+- Preserve all product names exactly as listed: {product_list}
+- Maintain strict chronological order of conversation
+- Return ONLY valid JSON format with no markdown formatting or additional text
+- Exclude all system messages and automated voice prompts
+- Handle currency amounts with proper ₹ formatting
+- Mark unclear audio segments appropriately with low confidence"""
+
+    return prompt
+
+
 def convert_mp3_to_wav(mp3_path):
     wav_path = mp3_path.replace('.mp3', '.wav')
     command = ['ffmpeg', '-y', '-i', mp3_path, '-ar', '16000', '-ac', '1', wav_path]
@@ -180,12 +355,13 @@ def process_audio(job_id, bucket, key):
         local_audio_path = convert_mp3_to_wav(mp3_path)
         logger.info(f"Audio file downloaded to {local_audio_path}")
 
-        transcription, diarization = transcribe_and_diarize(local_audio_path)
+        transcription, diarization = transcribe_and_diarize(local_audio_path, job_id)
+        logger.info(f"Transcription completed with {len(diarization)} segments for job {job_id}")
     except Exception as e:
         logger.error(f"Error while transcribing audio file for job_id: {job_id}. Error: {e}")
         raise e
 
-            # Update the meetings table with the transcript and timestamp
+    # Update the meetings table with the transcript and timestamp
     try:
         # Use API endpoint to update meeting transcription
         api_url = FLASK_API_URL
@@ -244,13 +420,23 @@ def process_audio(job_id, bucket, key):
         raise
 
 
-def transcribe_and_diarize(audio_file_path):
+def transcribe_and_diarize(audio_file_path, job_id=None):
+    """Enhanced transcription with agency-specific context"""
     API_KEY = os.getenv("GEMINI_API_KEY")
     client = genai.Client(api_key=API_KEY)
 
     audio_file = client.files.upload(file=audio_file_path)
 
-    prompt = """You are a professional call transcription and analysis expert. Please transcribe and analyze this business call recording.
+    # Get context information for enhanced transcription
+    agency_info, buyer_info, seller_info, product_catalogue = get_context_for_transcription(job_id)
+    
+    # Create enhanced prompt with context
+    if agency_info or buyer_info or seller_info or product_catalogue:
+        prompt = create_enhanced_prompt(agency_info, buyer_info, seller_info, product_catalogue)
+        logger.info(f"Using enhanced prompt with agency context: {agency_info.get('name') if agency_info else 'Unknown'}")
+    else:
+        # Fallback to original prompt if context retrieval fails
+        prompt = """You are a professional call transcription and analysis expert. Please transcribe and analyze this business call recording.
 
 CONTEXT: This is a business call between a seller (sales representative) and a buyer (potential customer). The call may contain sales discussions, product presentations, negotiations, or customer service interactions.
 
@@ -287,18 +473,19 @@ IMPORTANT:
 - If uncertain about speaker role, use context clues from the conversation
 - Handle overlapping speech by creating separate entries
 - Mark unclear speech with low confidence"""
+        logger.info("Using fallback prompt due to context retrieval failure")
 
     response = client.models.generate_content(
         model="gemini-2.5-flash-preview-05-20", 
         contents=[prompt, audio_file]
     )
 
-    # Improved JSON parsing
+    # Improved JSON parsing with enhanced validation
     response_text = response.text
     if response_text is None:
         raise ValueError("Empty response from Gemini API")
     response_text = response_text.strip()
-    logger.info(f"Raw Gemini response: {response_text}")
+    logger.info(f"Raw Gemini response length: {len(response_text)} characters")
     
     # Remove any markdown formatting if present
     if "```json" in response_text:
@@ -307,30 +494,43 @@ IMPORTANT:
         response_text = response_text.split("```")[1]
     
     response_text = response_text.strip()
-    logger.info(f"Cleaned response text: {response_text}")
+    logger.info(f"Cleaned response text length: {len(response_text)} characters")
     
     try:
         parsed_response = json.loads(response_text)
         
-        # Validate and process the response
+        # Validate and process the response with enhanced filtering
         transcription = ''
         diarization = []
         
         for segment in parsed_response:
+            # Skip system messages and automated voices
+            speaker_role = segment.get('speaker_role', segment.get('role', 'unknown'))
+            if speaker_role == 'system':
+                logger.info("Skipping system message segment")
+                continue
+                
             # Build full transcription
-            transcription += segment.get('text', '') + ' '
+            segment_text = segment.get('text', '')
+            if segment_text and not any(phrase in segment_text.lower() for phrase in [
+                'call on hold', 'stay on the line', 'होल्ड पर रखा है', 'लाइन पर बने रहें'
+            ]):
+                transcription += segment_text + ' '
             
             # Validate and clean segment
             clean_segment = {
-                'speaker': segment.get('speaker_id', 'unknown'),
-                'role': segment.get('speaker_role', 'unknown'),
-                'text': segment.get('text', ''),
+                'speaker': segment.get('speaker_id', segment.get('speaker', 'unknown')),
+                'role': speaker_role,
+                'text': segment_text,
                 'translation': segment.get('translation', ''),
                 'confidence': segment.get('confidence', 'medium')
             }
-            diarization.append(clean_segment)
+            
+            # Only add non-system segments
+            if speaker_role in ['seller', 'buyer'] and segment_text:
+                diarization.append(clean_segment)
         
-        logger.info(f"Successfully processed {len(diarization)} segments")
+        logger.info(f"Successfully processed {len(diarization)} segments (system messages filtered)")
         return transcription.strip(), diarization
         
     except json.JSONDecodeError as e:
