@@ -56,10 +56,10 @@ def trigger_analysis():
         if not meeting:
             logging.error(f"Meeting for job {job_id} not found")
             return jsonify({"error": f"Meeting for job {job_id} not found"}), 404
-        # Check if job is completed and transcription is available
-        if job.status != JobStatus.COMPLETED:
-            logging.error(f"Job with id {job_id} is not completed. Current status: {job.status}")
-            return jsonify({"error": f"Job with id {job_id} is not completed. Current status: {job.status}"}), 400
+        # Check if job has transcription available (allow IN_PROGRESS status after transcription)
+        if job.status not in [JobStatus.COMPLETED, JobStatus.IN_PROGRESS]:
+            logging.error(f"Job with id {job_id} is not ready for analysis. Current status: {job.status}")
+            return jsonify({"error": f"Job with id {job_id} is not ready for analysis. Current status: {job.status}"}), 400
             
         if not meeting.transcription:
             logging.error(f"Meeting with id {str(meeting.id)} is missing transcription data")

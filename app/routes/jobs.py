@@ -228,7 +228,7 @@ def get_job_context(job_id):
                     
                     # Get product catalogue for the agency
                     try:
-                        products = ProductService.get_by_agency_id(str(buyer.agency_id))
+                        products = ProductService.get_products_by_agency(str(buyer.agency_id))
                         for product in products:
                             product_catalogue.append({
                                 "id": str(product.id),

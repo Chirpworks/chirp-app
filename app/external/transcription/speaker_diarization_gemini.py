@@ -337,7 +337,7 @@ def process_audio(job_id, bucket, key):
         
         if response.status_code == 200:
             logger.info(f"Updated meeting transcription for job {job_id} via API")
-            logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
+            logger.info(f"Transcription completed for job {job_id}. Ready for analysis.")
         else:
             logger.error(f"Failed to update meeting transcription for job {job_id} via API. Status: {response.status_code}, Response: {response.text}")
             # Fallback to direct database update if API fails
@@ -350,7 +350,7 @@ def process_audio(job_id, bucket, key):
                 meeting.transcription = json.dumps(diarization)
                 # session.commit() # session is removed
                 logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
-                logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
+                logger.info(f"Transcription completed for job {job_id}. Ready for analysis.")
             else:
                 logger.error(f"Meeting not found for job {job_id}.")
                 update_job_status(job_id, JobStatus.FAILURE)
@@ -368,7 +368,7 @@ def process_audio(job_id, bucket, key):
                 meeting.transcription = json.dumps(diarization)
                 # session.commit() # session is removed
                 logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
-                logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
+                logger.info(f"Transcription completed for job {job_id}. Ready for analysis.")
             else:
                 logger.error(f"Meeting not found for job {job_id}.")
                 update_job_status(job_id, JobStatus.FAILURE)

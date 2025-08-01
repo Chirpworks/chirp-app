@@ -92,6 +92,33 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
+#### POST `/auth/generate_test_token`
+**Description:** Generate a test access token for a user by email (testing purposes only)
+**Authentication:** None (protected by secret value)
+**Input:**
+```json
+{
+  "secret": "string",
+  "email": "string"
+}
+```
+**Output:**
+```json
+{
+  "access_token": "string",
+  "refresh_token": "string",
+  "user_id": "uuid",
+  "user": {
+    "id": "uuid",
+    "name": "string",
+    "email": "string",
+    "phone": "string",
+    "role": "string",
+    "agency_id": "uuid"
+  }
+}
+```
+
 ### 1.2 Google OAuth Integration
 
 #### GET `/google_auth/login`
@@ -151,33 +178,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/user/get_team`
-**Description:** Get team members and their call statistics
-**Authentication:** JWT required
-**Input:** None
-**Output:**
-```json
-{
-  "team_members": [
-    {
-      "name": "string",
-      "email": "string",
-      "id": "uuid",
-      "phone": "string",
-      "total_outgoing_calls": "integer",
-      "total_incoming_calls": "integer", 
-      "unanswered_outgoing_calls": "integer",
-      "unique_leads_engaged": "integer",
-      "unique_leads_called": "integer"
-    }
-  ],
-  "total_outgoing_calls": "integer",
-  "total_incoming_calls": "integer",
-  "total_unanswered_outgoing_calls": "integer", 
-  "total_unique_leads_engaged": "integer",
-  "total_unique_leads_called": "integer"
-}
-```
+
 
 #### POST `/user/set_manager`
 **Description:** Assign a manager to a user
@@ -522,6 +523,24 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 ```json
 {
   "message": "Analysis task completed successfully for job_id: {job_id}"
+}
+```
+
+#### POST `/call_recordings/diarization`
+**Description:** Retry diarization for a job (alternative to main recording endpoint)
+**Authentication:** None
+**Input:**
+```json
+{
+  "job_id": "uuid"
+}
+```
+**Output:**
+```json
+{
+  "message": "Recording received and ECS speaker diarization task started",
+  "job_id": "uuid",
+  "ecs_task_response": "object"
 }
 ```
 
@@ -875,38 +894,479 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ---
 
-## Authentication Types
+## 9. Jobs Management
 
-- **None**: No authentication required
-- **JWT**: Requires valid JWT access token in Authorization header
-- **Refresh Token**: Requires valid refresh token
+### 9.1 Job Operations
 
-## Common Response Formats
-
-### Success Response
+#### GET `/jobs/by_meeting/<meeting_id>`
+**Description:** Get job details by meeting ID
+**Authentication:** None
+**Input:**
+- Path: `meeting_id` (UUID)
+**Output:**
 ```json
 {
-  "message": "Success message",
-  "data": "response data"
+  "job_id": "uuid",
+  "meeting_id": "uuid", 
+  "status": "string",
+  "start_time": "ISO datetime",
+  "end_time": "ISO datetime",
+  "s3_audio_url": "string"
 }
 ```
 
-### Error Response
+#### POST `/jobs/update_status`
+**Description:** Update job status (used by external services like analysis pipeline)
+**Authentication:** None
+**Input:**
 ```json
 {
-  "error": "Error message"
+  "job_id": "uuid",
+  "status": "string"
+}
+```
+**Valid Status Values:** `"init"`, `"in_progress"`, `"completed"`, `"failure"`
+**Output:**
+```json
+{
+  "message": "Job {job_id} status updated to {status}",
+  "job_id": "uuid",
+  "status": "string",
+  "start_time": "ISO datetime",
+  "end_time": "ISO datetime"
 }
 ```
 
-## HTTP Status Codes
+#### GET `/jobs/<job_id>/status`
+**Description:** Get current job status
+**Authentication:** None
+**Input:**
+- Path: `job_id` (UUID)
+**Output:**
+```json
+{
+  "job_id": "uuid",
+  "status": "string",
+  "start_time": "ISO datetime", 
+  "end_time": "ISO datetime",
+  "s3_audio_url": "string"
+}
+```
 
-- **200**: Success
-- **201**: Created
-- **400**: Bad Request
-- **401**: Unauthorized
-- **404**: Not Found
-- **500**: Internal Server Error
-- **501**: Not Implemented
+#### GET `/jobs/<job_id>/audio_url`
+**Description:** Get S3 audio URL for a job
+**Authentication:** None
+**Input:**
+- Path: `job_id` (UUID)
+**Output:**
+```json
+{
+  "job_id": "uuid",
+  "s3_audio_url": "string"
+}
+```
+
+#### PUT `/jobs/<job_id>/meeting/transcription`
+**Description:** Update meeting transcription for a job (used by transcription services)
+**Authentication:** None
+**Input:**
+- Path: `job_id` (UUID)
+- Body:
+```json
+{
+  "transcription": "array or string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Meeting transcription updated for job {job_id}",
+  "job_id": "uuid",
+  "meeting_id": "uuid",
+  "transcription_updated": true
+}
+```
+
+#### GET `/jobs/<job_id>/context`
+**Description:** Get full context for transcription including agency, buyer, seller, and product info (used by enhanced transcription services)
+**Authentication:** None
+**Input:**
+- Path: `job_id` (UUID)
+**Output:**
+```json
+{
+  "job_id": "uuid",
+  "meeting_id": "uuid",
+  "agency_info": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string"
+  },
+  "buyer_info": {
+    "name": "string",
+    "phone": "string", 
+    "company_name": "string"
+  },
+  "seller_info": {
+    "name": "string",
+    "email": "string"
+  },
+  "product_catalogue": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string",
+      "features": "array"
+    }
+  ]
+}
+```
+
+---
+
+## 10. Analytics & Reporting
+
+### 10.1 Call Analytics
+
+#### GET `/analytics/total_call_data`
+**Description:** Get total call analytics data for the agency with time-based filtering
+**Authentication:** JWT required
+**Query Parameters:**
+- `time_frame` (optional): Time period filter - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month" (default: "today")
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "time_frame": "string",
+  "start_date": "ISO date",
+  "end_date": "ISO date", 
+  "granularity": "string",
+  "sales_data": {
+    "0": {
+      "outgoing_calls": "number",
+      "incoming_calls": "number",
+      "unique_leads": "number"
+    }
+  },
+  "total_outgoing_calls": "number",
+  "total_incoming_calls": "number", 
+  "total_unique_leads": "number",
+  "average_calls_per_seller": "number",
+  "top_performers": [
+    {
+      "seller_name": "string",
+      "outgoing_calls": "number"
+    }
+  ]
+}
+```
+
+#### GET `/analytics/team_call_data`
+**Description:** Get team call analytics with individual seller performance
+**Authentication:** JWT required
+**Query Parameters:**
+- `time_frame` (optional): Time period filter - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month" (default: "today")
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "time_frame": "string",
+  "start_date": "ISO date",
+  "end_date": "ISO date",
+  "team_members": [
+    {
+      "name": "string",
+      "email": "string",
+      "id": "uuid",
+      "phone": "string",
+      "total_outgoing_calls": "number",
+      "total_incoming_calls": "number",
+      "unanswered_outgoing_calls": "number",
+      "unique_leads_engaged": "number", 
+      "unique_leads_called": "number"
+    }
+  ],
+  "total_outgoing_calls": "number",
+  "total_incoming_calls": "number",
+  "total_unanswered_outgoing_calls": "number",
+  "total_unique_leads_engaged": "number",
+  "total_unique_leads_called": "number"
+}
+```
+
+#### GET `/analytics/call_data/<seller_uuid>`
+**Description:** Get detailed call analytics for a specific seller
+**Authentication:** JWT required  
+**Input:**
+- Path: `seller_uuid` (UUID)
+- Query: `time_frame` (optional, string, default: "today")
+**Output:**
+```json
+{
+  "seller_info": {
+    "id": "uuid",
+    "name": "string",
+    "email": "string"
+  },
+  "time_frame": "string",
+  "call_analytics": {
+    "total_calls": "number",
+    "outgoing_calls": "number", 
+    "incoming_calls": "number",
+    "answered_calls": "number",
+    "missed_calls": "number",
+    "average_call_duration": "number",
+    "unique_contacts": "number"
+  },
+  "performance_trends": "object"
+}
+```
+
+#### GET `/analytics/seller_call_analytics`
+**Description:** Get seller-specific call analytics summary
+**Authentication:** JWT required
+**Query Parameters:**
+- `time_frame` (optional): Time period filter (default: "today")
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "seller_analytics": {
+    "total_calls_made": "number",
+    "calls_answered": "number",
+    "calls_missed": "number", 
+    "unique_contacts": "number",
+    "call_success_rate": "number",
+    "average_call_duration": "number"
+  },
+  "time_frame": "string",
+  "period_comparison": "object"
+}
+```
+
+#### GET `/analytics/seller_call_data/<seller_uuid>`
+**Description:** Get comprehensive call data for a specific seller with detailed breakdowns
+**Authentication:** JWT required
+**Input:**
+- Path: `seller_uuid` (UUID)
+- Query: `time_frame` (optional, string, default: "today")
+**Output:**
+```json
+{
+  "seller_info": {
+    "id": "uuid", 
+    "name": "string",
+    "email": "string",
+    "phone": "string"
+  },
+  "call_summary": {
+    "total_calls": "number",
+    "outgoing_calls": "number",
+    "incoming_calls": "number",
+    "call_duration_total": "number",
+    "average_call_duration": "number"
+  },
+  "call_status_breakdown": {
+    "answered": "number",
+    "missed": "number",
+    "rejected": "number",
+    "not_answered": "number"
+  },
+  "time_frame": "string",
+  "detailed_calls": "array"
+}
+```
+
+---
+
+## 11. Extended Agency Management
+
+### 11.1 Product Management
+
+#### POST `/agency/create_product`
+**Description:** Create a new product for an agency
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_name": "string",
+  "name": "string",
+  "description": "string",
+  "features": "object"
+}
+```
+**Output:**
+```json
+{
+  "message": "Product created successfully",
+  "product_id": "uuid",
+  "product_name": "string", 
+  "agency_id": "uuid",
+  "agency_name": "string",
+  "description": "string",
+  "features": "object"
+}
+```
+
+#### GET `/agency/product_catalogue`
+**Description:** Get product catalogue for an agency
+**Authentication:** None
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string",
+    "total_products": "number"
+  },
+  "products": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string",
+      "category": "string",
+      "features": "array"
+    }
+  ],
+  "categories": "object",
+  "generated_at": "ISO datetime",
+  "data_source": "string"
+}
+```
+
+#### PUT `/agency/update_product/<product_id>`
+**Description:** Update an existing product
+**Authentication:** None
+**Input:**
+- Path: `product_id` (UUID)
+- Body:
+```json
+{
+  "name": "string",
+  "description": "string", 
+  "features": "object"
+}
+```
+**Output:**
+```json
+{
+  "message": "Product updated successfully",
+  "product": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string",
+    "features": "object",
+    "agency_id": "uuid"
+  }
+}
+```
+
+### 11.2 Agency Information & Management
+
+#### GET `/agency/sellers`
+**Description:** Get all sellers for an agency
+**Authentication:** None
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string"
+  },
+  "sellers": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "email": "string",
+      "phone": "string",
+      "role": "string",
+      "created_at": "ISO datetime"
+    }
+  ],
+  "total_sellers": "number"
+}
+```
+
+#### GET `/agency/details`
+**Description:** Get detailed agency information
+**Authentication:** None  
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Input:** None (parameters in query string)
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string", 
+    "description": "string",
+    "created_at": "ISO datetime"
+  },
+  "statistics": {
+    "total_sellers": "number",
+    "total_products": "number",
+    "total_buyers": "number"
+  }
+}
+```
+
+#### PUT `/agency/update_description`
+**Description:** Update agency description
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_id": "uuid",
+  "description": "string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Agency description updated successfully",
+  "agency": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string"
+  }
+}
+```
+
+#### POST `/agency/add_seller`
+**Description:** Add a seller to an agency
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_id": "uuid",
+  "seller_email": "string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Seller added to agency successfully",
+  "seller": {
+    "id": "uuid", 
+    "email": "string",
+    "name": "string"
+  },
+  "agency": {
+    "id": "uuid",
+    "name": "string"
+  }
+}
+```
 
 ---
 
@@ -1085,6 +1545,41 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ---
 
+## Authentication Types
+
+- **None**: No authentication required
+- **JWT**: Requires valid JWT access token in Authorization header
+- **Refresh Token**: Requires valid refresh token
+
+## Common Response Formats
+
+### Success Response
+```json
+{
+  "message": "Success message",
+  "data": "response data"
+}
+```
+
+### Error Response
+```json
+{
+  "error": "Error message"
+}
+```
+
+## HTTP Status Codes
+
+- **200**: Success
+- **201**: Created
+- **400**: Bad Request
+- **401**: Unauthorized
+- **404**: Not Found
+- **500**: Internal Server Error
+- **501**: Not Implemented
+
+---
+
 ## Notes
 
 1. All UUIDs are returned as strings in JSON responses
@@ -1093,4 +1588,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 4. Some endpoints support bulk operations for efficiency
 5. Google OAuth integration requires proper configuration of client credentials
 6. File uploads and processing are handled asynchronously via ECS tasks
-7. Performance metrics are scored on a 0-10 scale for standardized evaluation 
+7. Performance metrics are scored on a 0-10 scale for standardized evaluation
+8. Jobs are processed through multiple stages: recording → transcription → analysis → completion
+9. External services (transcription, analysis) use dedicated endpoints for status updates and data exchange
+10. Analytics endpoints provide comprehensive reporting with flexible time-based filtering 
