@@ -6,8 +6,6 @@ from urllib.parse import urlparse
 import logging
 import os
 from google import genai
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 import boto3
 import requests
 
@@ -21,104 +19,51 @@ logger = logging.getLogger(__name__)
 
 # Environment variable for JOB_ID (provided by ECS via container overrides)
 JOB_ID = os.environ.get("JOB_ID")
-DATABASE_URL = os.environ.get("STAGING_DATABASE_URL")  # e.g., "postgresql://user:password@host/db"
+DATABASE_URL = os.environ.get("STAGING_DATABASE_URL")  # kept for backward compatibility
 FLASK_API_URL = os.getenv("FLASK_STAGING_API_URL")
 
 # Initialize AWS S3 client
 s3_client = boto3.client("s3")
 
-# Initialize SQLAlchemy session (with graceful fallback)
-engine = None
-Session = None
-session = None
-
+# Note: Database connection removed - now using API calls for context retrieval
 if DATABASE_URL:
-    try:
-        engine = create_engine(DATABASE_URL)
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        logger.info("Database connection established successfully")
-    except Exception as e:
-        logger.error(f"Failed to connect to database: {e}")
-        logger.info("Continuing without database context - will use fallback transcription")
-        session = None
-else:
-    logger.warning("STAGING_DATABASE_URL not provided - using fallback transcription without agency context")
-    session = None
+    logger.info("DATABASE_URL provided but using API-based context retrieval instead")
+if not FLASK_API_URL:
+    logger.warning("FLASK_STAGING_API_URL not provided - enhanced transcription context will not be available")
 
 
 def get_context_for_transcription(job_id):
-    """Retrieve agency, buyer, seller, and product info for enhanced transcription"""
-    # Check if database connection is available
-    if not session:
-        logger.info("No database connection available - skipping context retrieval")
+    """Retrieve agency, buyer, seller, and product info for enhanced transcription via API calls"""
+    if not FLASK_API_URL:
+        logger.warning("FLASK_STAGING_API_URL not provided - cannot fetch context via API")
         return None, None, None, None
         
     try:
-        # Import models with error handling
-        try:
-            from app.models.agency import Agency
-            from app.models.product import Product
-            from app.models.buyer import Buyer
-            from app.models.seller import Seller
-        except ImportError as import_error:
-            logger.error(f"Failed to import required models: {import_error}")
-            return None, None, None, None
+        # Get full context via the new context endpoint
+        logger.info(f"Fetching context for job_id: {job_id} via API")
+        context_response = requests.get(f"{FLASK_API_URL}/api/jobs/{job_id}/context", timeout=15)
         
-        job = session.query(Job).filter_by(id=job_id).first()
-        if not job:
-            logger.warning(f"Job {job_id} not found, using default context")
+        if context_response.status_code != 200:
+            logger.error(f"Failed to fetch job context: {context_response.status_code} - {context_response.text}")
             return None, None, None, None
             
-        meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
-        if not meeting:
-            logger.warning(f"Meeting for job {job_id} not found, using default context")
-            return None, None, None, None
+        context_data = context_response.json()
         
-        # Get buyer and seller info
-        buyer = session.query(Buyer).filter_by(id=meeting.buyer_id).first()
-        seller = session.query(Seller).filter_by(id=meeting.seller_id).first()
+        # Extract the context components
+        agency_info = context_data.get('agency_info')
+        buyer_info = context_data.get('buyer_info') 
+        seller_info = context_data.get('seller_info')
+        product_catalogue = context_data.get('product_catalogue', [])
         
-        if not buyer:
-            logger.warning(f"Buyer for meeting {meeting.id} not found")
-            return None, None, None, None
-            
-        # Get agency info
-        agency = session.query(Agency).filter_by(id=buyer.agency_id).first()
-        agency_info = {
-            "id": str(agency.id) if agency else None,
-            "name": agency.name if agency else "Unknown Agency",
-            "description": getattr(agency, 'description', '') if agency else ""
-        }
+        logger.info(f"Retrieved context via API for job {job_id}: Agency={agency_info.get('name') if agency_info else 'None'}, Buyer={buyer_info.get('name') if buyer_info else 'None'}, Seller={seller_info.get('name') if seller_info else 'None'}, Products={len(product_catalogue)}")
         
-        # Get product catalogue for the agency
-        products = session.query(Product).filter_by(agency_id=buyer.agency_id).all() if agency else []
-        product_catalogue = []
-        for product in products:
-            product_catalogue.append({
-                "id": str(product.id),
-                "name": getattr(product, 'name', 'Unknown Product'),
-                "description": getattr(product, 'description', ''),
-                "features": getattr(product, 'features', [])
-            })
-        
-        # Get participant info with safe attribute access
-        buyer_info = {
-            "name": getattr(buyer, 'name', None) if buyer and buyer.name else "buyer",
-            "phone": getattr(buyer, 'phone', '') if buyer else "",
-            "company_name": getattr(buyer, 'company_name', '') if buyer else ""
-        }
-        
-        seller_info = {
-            "name": getattr(seller, 'name', None) if seller and seller.name else "seller",
-            "email": getattr(seller, 'email', '') if seller else ""
-        }
-        
-        logger.info(f"Retrieved context for job {job_id}: Agency={agency_info['name']}, Buyer={buyer_info['name']}, Seller={seller_info['name']}, Products={len(product_catalogue)}")
         return agency_info, buyer_info, seller_info, product_catalogue
         
+    except requests.exceptions.RequestException as e:
+        logger.error(f"API request failed while fetching context for job {job_id}: {e}")
+        return None, None, None, None
     except Exception as e:
-        logger.error(f"Error retrieving context for job {job_id}: {e}")
+        logger.error(f"Error retrieving context via API for job {job_id}: {e}")
         return None, None, None, None
 
 
@@ -261,10 +206,10 @@ def update_job_status(job_id, status):
             logger.error(f"Failed to update job {job_id} status via API. Status: {response.status_code}, Response: {response.text}")
             # Fallback to direct database update if API fails
             logger.info(f"Falling back to direct database update for job {job_id}")
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job:
                 job.status = status
-                session.commit()
+                # session.commit() # session is removed
                 logger.info(f"Updated job {job_id} with status {status.value} via database fallback")
             else:
                 logger.error(f"Job {job_id} not found in database fallback")
@@ -274,10 +219,10 @@ def update_job_status(job_id, status):
         # Fallback to direct database update if API request fails
         logger.info(f"Falling back to direct database update for job {job_id}")
         try:
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job:
                 job.status = status
-                session.commit()
+                # session.commit() # session is removed
                 logger.info(f"Updated job {job_id} with status {status.value} via database fallback")
             else:
                 logger.error(f"Job {job_id} not found in database fallback")
@@ -308,7 +253,7 @@ def get_audio_url(job_id):
             logger.error(f"Failed to get audio URL for job {job_id} via API. Status: {response.status_code}, Response: {response.text}")
             # Fallback to direct database query if API fails
             logger.info(f"Falling back to direct database query for job {job_id}")
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job and job.s3_audio_url:
                 logger.info(f"Retrieved audio URL for job {job_id} via database fallback")
                 return job.s3_audio_url
@@ -321,7 +266,7 @@ def get_audio_url(job_id):
         # Fallback to direct database query if API request fails
         logger.info(f"Falling back to direct database query for job {job_id}")
         try:
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job and job.s3_audio_url:
                 logger.info(f"Retrieved audio URL for job {job_id} via database fallback")
                 return job.s3_audio_url
@@ -398,12 +343,12 @@ def process_audio(job_id, bucket, key):
             # Fallback to direct database update if API fails
             logger.info(f"Falling back to direct database update for job {job_id}")
             meeting = None
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job:
-                meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
+                meeting = None # session.query(Meeting).filter_by(id=job.meeting_id).first() # session is removed
             if meeting:
                 meeting.transcription = json.dumps(diarization)
-                session.commit()
+                # session.commit() # session is removed
                 logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
                 logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
             else:
@@ -416,12 +361,12 @@ def process_audio(job_id, bucket, key):
         logger.info(f"Falling back to direct database update for job {job_id}")
         try:
             meeting = None
-            job = session.query(Job).filter_by(id=job_id).first()
+            job = None # session.query(Job).filter_by(id=job_id).first() # session is removed
             if job:
-                meeting = session.query(Meeting).filter_by(id=job.meeting_id).first()
+                meeting = None # session.query(Meeting).filter_by(id=job.meeting_id).first() # session is removed
             if meeting:
                 meeting.transcription = json.dumps(diarization)
-                session.commit()
+                # session.commit() # session is removed
                 logger.info(f"Updated meeting {meeting.id} with transcript via database fallback.")
                 logger.info(f"Transcription completed for job {job_id}. Job remains in IN_PROGRESS status pending analysis.")
             else:

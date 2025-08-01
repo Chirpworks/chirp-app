@@ -177,3 +177,91 @@ def update_meeting_transcription(job_id):
         logging.error(f"Failed to update meeting transcription for job {job_id}: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to update meeting transcription: {str(e)}"}), 500
+
+
+@jobs_bp.route("/<job_id>/context", methods=["GET"])
+def get_job_context(job_id):
+    """
+    Get full context for transcription including agency, buyer, seller, and product info.
+    """
+    try:
+        job = JobService.get_by_id(job_id)
+        if not job:
+            return jsonify({"error": f"Job with id {job_id} not found"}), 404
+            
+        if not job.meeting_id:
+            return jsonify({"error": "No meeting associated with this job"}), 404
+        
+        # Import services here to avoid circular imports
+        from app.services.meeting_service import MeetingService
+        from app.services.buyer_service import BuyerService
+        from app.services.seller_service import SellerService
+        from app.services.agency_service import AgencyService
+        from app.services.product_service import ProductService
+        
+        meeting = MeetingService.get_by_id(job.meeting_id)
+        if not meeting:
+            return jsonify({"error": f"Meeting with id {job.meeting_id} not found"}), 404
+        
+        # Get buyer info
+        buyer = BuyerService.get_by_id(str(meeting.buyer_id)) if meeting.buyer_id else None
+        buyer_info = None
+        agency_info = None
+        product_catalogue = []
+        
+        if buyer:
+            buyer_info = {
+                "name": buyer.name if buyer.name else "buyer",
+                "phone": buyer.phone or "",
+                "company_name": buyer.company_name or ""
+            }
+            
+            # Get agency info
+            if buyer.agency_id:
+                agency = AgencyService.get_by_id(str(buyer.agency_id))
+                if agency:
+                    agency_info = {
+                        "id": str(agency.id),
+                        "name": agency.name,
+                        "description": getattr(agency, 'description', '') or ""
+                    }
+                    
+                    # Get product catalogue for the agency
+                    try:
+                        products = ProductService.get_by_agency_id(str(buyer.agency_id))
+                        for product in products:
+                            product_catalogue.append({
+                                "id": str(product.id),
+                                "name": getattr(product, 'name', 'Unknown Product'),
+                                "description": getattr(product, 'description', ''),
+                                "features": getattr(product, 'features', [])
+                            })
+                    except Exception as e:
+                        logging.warning(f"Could not fetch product catalogue: {e}")
+        
+        # Get seller info
+        seller = SellerService.get_by_id(str(meeting.seller_id)) if meeting.seller_id else None
+        seller_info = None
+        if seller:
+            seller_info = {
+                "name": seller.name if seller.name else "seller",
+                "email": seller.email or ""
+            }
+        
+        context = {
+            "job_id": str(job.id),
+            "meeting_id": str(job.meeting_id),
+            "agency_info": agency_info,
+            "buyer_info": buyer_info,
+            "seller_info": seller_info,
+            "product_catalogue": product_catalogue
+        }
+        
+        logging.info(f"Retrieved context for job {job_id}: Agency={agency_info.get('name') if agency_info else 'None'}, Buyer={buyer_info.get('name') if buyer_info else 'None'}, Seller={seller_info.get('name') if seller_info else 'None'}, Products={len(product_catalogue)}")
+        
+        return jsonify(context), 200
+        
+    except Exception as e:
+        logging.error(f"Failed to get context for job {job_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": f"Failed to get context: {str(e)}"}), 500
