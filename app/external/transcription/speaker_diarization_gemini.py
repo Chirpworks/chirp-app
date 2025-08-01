@@ -27,16 +27,33 @@ FLASK_API_URL = os.getenv("FLASK_STAGING_API_URL")
 # Initialize AWS S3 client
 s3_client = boto3.client("s3")
 
-# Initialize SQLAlchemy session
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required")
-engine = create_engine(DATABASE_URL)
-Session = sessionmaker(bind=engine)
-session = Session()
+# Initialize SQLAlchemy session (with graceful fallback)
+engine = None
+Session = None
+session = None
+
+if DATABASE_URL:
+    try:
+        engine = create_engine(DATABASE_URL)
+        Session = sessionmaker(bind=engine)
+        session = Session()
+        logger.info("Database connection established successfully")
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        logger.info("Continuing without database context - will use fallback transcription")
+        session = None
+else:
+    logger.warning("STAGING_DATABASE_URL not provided - using fallback transcription without agency context")
+    session = None
 
 
 def get_context_for_transcription(job_id):
     """Retrieve agency, buyer, seller, and product info for enhanced transcription"""
+    # Check if database connection is available
+    if not session:
+        logger.info("No database connection available - skipping context retrieval")
+        return None, None, None, None
+        
     try:
         # Import models with error handling
         try:
