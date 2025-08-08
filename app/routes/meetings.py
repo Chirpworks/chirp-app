@@ -10,7 +10,7 @@ from app import db
 from app.services import SellerService, MeetingService, CallService, ActionService
 from app.models.seller import SellerRole
 from app.external.google_calendar.google_calendar_user import GoogleCalendarUserService
-from app.utils.time_utils import get_date_range_from_timeframe, validate_time_frame
+from app.utils.time_utils import get_date_range_from_timeframe, validate_time_frame, parse_date_range_params
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -47,10 +47,10 @@ def get_meeting_history():
     try:
         user_id = get_jwt_identity()
 
-        # Get time_frame parameter
-        time_frame = request.args.get("time_frame", "today")
-        if not validate_time_frame(time_frame):
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
+        # Parse date range parameters with backward compatibility
+        start_date, end_date, error = parse_date_range_params(default_days_back=0)
+        if error:
+            return jsonify({"error": error[0]}), error[1]
 
         team_member_ids = request.args.getlist("team_member_ids")
         if team_member_ids:
@@ -71,9 +71,6 @@ def get_meeting_history():
                     logging.error(f"Seller with id {member_id} not found; unauthorized")
                     return jsonify({"error": "Seller not found or unauthorized"}), 404
             logging.info(f"Fetching call history for users {team_member_ids}")
-
-        # Get date range for filtering
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
         
         # Use MeetingService to get call history with time filtering
         call_history = MeetingService.get_call_history(user_id, team_member_ids, start_date, end_date)

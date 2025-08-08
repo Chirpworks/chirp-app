@@ -402,3 +402,4 @@ FodyWeavers.xsd
 .venv/
 .idea/
 __pycache__/
+venv/
