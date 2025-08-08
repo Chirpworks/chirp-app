@@ -45,7 +45,7 @@ def check_if_token_revoked(jwt_header, jwt_payload):
 
 def create_app():
     app = Flask(__name__)
-    CORS(app, supports_credentials=True, origins=["http://localhost:8080", "http://app.staging.chirpworks.ai", "https://app.staging.chirpworks.ai"])
+    CORS(app, supports_credentials=True, origins=["http://localhost:8080", "http://app.chirpworks.ai", "https://app.chirpworks.ai"])
     app.config.from_object(Config)
     app.secret_key = Config.SECRET_KEY
     app.config.update(
