@@ -86,7 +86,8 @@ def trigger_analysis():
             payload = {
                 "buyer_id": buyer_id,
                 "call_id": meeting_id,
-                "agency_id": agency_id
+                "agency_id": agency_id,
+                "job_id": job_id
             }
             logging.info(f"Sending async request to RunCloud API with payload: {payload}")
             
