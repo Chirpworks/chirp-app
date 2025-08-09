@@ -72,7 +72,8 @@ class CallPerformance(db.Model):
         
         return self.overall_score
     
-    def get_metric_names(self):
+    @staticmethod
+    def get_metric_names():
         """Get list of all performance metric names"""
         return [
             'intro', 'rapport_building', 'need_realization',

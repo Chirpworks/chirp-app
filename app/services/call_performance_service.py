@@ -323,7 +323,7 @@ class CallPerformanceService(BaseService):
             period_summary['days_in_range'] = (end_date - start_date).days + 1
             
             # Get all metric names
-            metric_names = CallPerformance().get_metric_names()
+            metric_names = CallPerformance.get_metric_names()
             
             # Initialize accumulators for period averages
             period_totals = {metric: [] for metric in metric_names}
