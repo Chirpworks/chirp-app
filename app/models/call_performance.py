@@ -25,6 +25,11 @@ class CallPerformance(db.Model):
     closure_and_next_steps = db.Column(db.JSON, nullable=True)
     conversation_structure_and_flow = db.Column(db.JSON, nullable=True)
     
+    # Additional analysis fields - JSON structures for detailed insights
+    product_details_analysis = db.Column(db.JSON, nullable=True)
+    objection_handling_analysis = db.Column(db.JSON, nullable=True)
+    overall_performance_summary = db.Column(db.JSON, nullable=True)
+    
     # Overall performance score (can be calculated from individual metrics)
     overall_score = db.Column(db.Float, nullable=True)
     
@@ -45,6 +50,12 @@ class CallPerformance(db.Model):
         self.pricing_and_negotiation = kwargs.get('pricing_and_negotiation')
         self.closure_and_next_steps = kwargs.get('closure_and_next_steps')
         self.conversation_structure_and_flow = kwargs.get('conversation_structure_and_flow')
+        
+        # Initialize additional analysis fields
+        self.product_details_analysis = kwargs.get('product_details_analysis')
+        self.objection_handling_analysis = kwargs.get('objection_handling_analysis')
+        self.overall_performance_summary = kwargs.get('overall_performance_summary')
+        
         self.overall_score = kwargs.get('overall_score')
         
         if kwargs.get('analyzed_at'):
@@ -72,7 +83,8 @@ class CallPerformance(db.Model):
         
         return self.overall_score
     
-    def get_metric_names(self):
+    @staticmethod
+    def get_metric_names():
         """Get list of all performance metric names"""
         return [
             'intro', 'rapport_building', 'need_realization',

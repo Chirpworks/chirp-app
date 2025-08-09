@@ -40,7 +40,10 @@ class Meeting(db.Model):
     solutions_discussed = db.Column(db.JSON, nullable=True)
     risks = db.Column(db.JSON, nullable=True)
     summary = db.Column(db.JSON, nullable=True)
+    overall_summary = db.Column(db.JSON, nullable=True)
     type = db.Column(db.JSON, nullable=True)
+    detected_call_type = db.Column(db.JSON, nullable=True)
+    detected_products = db.Column(db.JSON, nullable=True)
 
     actions = db.relationship('Action', back_populates='meeting', cascade='all, delete-orphan')
     call_performance = db.relationship('CallPerformance', back_populates='meeting', uselist=False, cascade='all, delete-orphan')

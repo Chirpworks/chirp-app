@@ -12,7 +12,7 @@ from app.constants import CallDirection, MobileAppCallStatus
 from app.models.seller import SellerRole
 from sqlalchemy import func
 from app.utils.call_recording_utils import denormalize_phone_number
-from app.utils.time_utils import get_date_range_from_timeframe, get_granularity_from_timeframe, validate_time_frame
+from app.utils.time_utils import get_date_range_from_timeframe, get_granularity_from_timeframe, validate_time_frame, parse_date_range_params
 
 logging = logging.getLogger(__name__)
 
@@ -27,11 +27,18 @@ def get_total_call_data():
         user = SellerService.get_by_id(user_id)
         if not user:
             return jsonify({"error": "Seller not found"}), 404
-        time_frame = request.args.get("time_frame", "today")
-        if time_frame not in ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]:
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
-        granularity = get_granularity_from_timeframe(time_frame)
+        
+        # Parse date range parameters (supports both new date range and legacy time_frame)
+        start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
+        if error_response:
+            return jsonify(error_response[0]), error_response[1]
+        
+        # Determine granularity based on date range (for backward compatibility)
+        date_diff = (end_date - start_date).days
+        if date_diff <= 2:
+            granularity = "hourly"
+        else:
+            granularity = "daily"
         agency_sellers = SellerService.get_by_agency(user.agency_id)
         # Filter out managers for average calculations
         agency_sellers = [seller for seller in agency_sellers if seller.role != SellerRole.MANAGER]
@@ -236,10 +243,11 @@ def get_team_call_data():
         user = SellerService.get_by_id(user_id)
         if not user:
             return jsonify({"error": "Seller not found"}), 404
-        time_frame = request.args.get("time_frame", "today")
-        if time_frame not in ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]:
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
+        
+        # Parse date range parameters (supports both new date range and legacy time_frame)
+        start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
+        if error_response:
+            return jsonify(error_response[0]), error_response[1]
         agency_sellers = SellerService.get_by_agency(user.agency_id)
         # Filter out managers for average calculations
         agency_sellers = [seller for seller in agency_sellers if seller.role != SellerRole.MANAGER]
@@ -332,10 +340,11 @@ def get_call_data(seller_uuid):
         user = SellerService.get_by_id(user_id)
         if not user:
             return jsonify({"error": "Seller not found"}), 404
-        time_frame = request.args.get("time_frame", "today")
-        if time_frame not in ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]:
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
+        
+        # Parse date range parameters (supports both new date range and legacy time_frame)
+        start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
+        if error_response:
+            return jsonify(error_response[0]), error_response[1]
         seller = SellerService.get_by_id(str(seller_uuid))
         if not seller:
             return jsonify({"error": "Seller not found"}), 404
@@ -427,13 +436,15 @@ def get_seller_call_analytics():
         user = SellerService.get_by_id(user_id)
         if not user:
             return jsonify({"error": "Seller not found"}), 404
-        time_frame = request.args.get("time_frame", "today")
-        if time_frame not in ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]:
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
+        
+        # Parse date range parameters (supports both new date range and legacy time_frame)
+        start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
+        if error_response:
+            return jsonify(error_response[0]), error_response[1]
+        
         team_member_ids = request.args.getlist("team_member_ids")
         if not team_member_ids:
             return jsonify({"error": "team_member_ids parameter is required"}), 400
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
         seller_data = []
         for seller_id in team_member_ids:
             seller = SellerService.get_by_id(seller_id)
@@ -539,10 +550,6 @@ def get_seller_call_data(seller_uuid):
         if not user:
             return jsonify({"error": "Seller not found"}), 404
         
-        time_frame = request.args.get("time_frame", "today")
-        if time_frame not in ["today", "yesterday", "this_week", "last_week", "this_month", "last_month"]:
-            return jsonify({"error": "Invalid time_frame. Must be one of: today, yesterday, this_week, last_week, this_month, last_month"}), 400
-        
         # Get and validate the target seller
         seller = SellerService.get_by_id(str(seller_uuid))
         if not seller:
@@ -552,8 +559,17 @@ def get_seller_call_data(seller_uuid):
         if seller.agency_id != user.agency_id:
             return jsonify({"error": "Unauthorized access to seller data"}), 403
         
-        start_date, end_date = get_date_range_from_timeframe(time_frame)
-        granularity = get_granularity_from_timeframe(time_frame)
+        # Parse date range parameters (supports both new date range and legacy time_frame)
+        start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
+        if error_response:
+            return jsonify(error_response[0]), error_response[1]
+        
+        # Determine granularity based on date range (for backward compatibility)
+        date_diff = (end_date - start_date).days
+        if date_diff <= 2:
+            granularity = "hourly"
+        else:
+            granularity = "daily"
         
         if granularity == "hourly":
             sales_data = {}

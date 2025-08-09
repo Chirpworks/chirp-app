@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Environment variable for JOB_ID (provided by ECS via container overrides)
 JOB_ID = os.environ.get("JOB_ID")
 DATABASE_URL = os.environ.get("STAGING_DATABASE_URL")  # kept for backward compatibility
-FLASK_API_URL = os.getenv("FLASK_API_URL")
+FLASK_API_URL = os.getenv("FLASK_STAGING_API_URL")
 
 # Initialize AWS S3 client
 s3_client = boto3.client("s3")
@@ -29,13 +29,13 @@ s3_client = boto3.client("s3")
 if DATABASE_URL:
     logger.info("DATABASE_URL provided but using API-based context retrieval instead")
 if not FLASK_API_URL:
-    logger.warning("FLASK_API_URL not provided - enhanced transcription context will not be available")
+    logger.warning("FLASK_STAGING_API_URL not provided - enhanced transcription context will not be available")
 
 
 def get_context_for_transcription(job_id):
     """Retrieve agency, buyer, seller, and product info for enhanced transcription via API calls"""
     if not FLASK_API_URL:
-        logger.warning("FLASK_API_URL not provided - cannot fetch context via API")
+        logger.warning("FLASK_STAGING_API_URL not provided - cannot fetch context via API")
         return None, None, None, None
         
     try:

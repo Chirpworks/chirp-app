@@ -3,8 +3,6 @@ import uuid
 from sqlalchemy import UUID
 
 from app import db
-from flask_login import UserMixin
-
 from enum import Enum
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -20,7 +18,7 @@ class SellerRole(Enum):
     GUEST = "guest"
 
 
-class Seller(db.Model, UserMixin):
+class Seller(db.Model):
     __tablename__ = 'sellers'
     id = db.Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username = db.Column(db.String(150), nullable=True, unique=True)
