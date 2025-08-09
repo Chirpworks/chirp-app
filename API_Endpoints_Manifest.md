@@ -230,7 +230,11 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 **Authentication:** JWT required
 **Input:**
 - Query: `team_member_ids` (optional, array of UUIDs)
-- Query: `time_frame` (optional, string, default: "today") - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
+- Query: `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- Query: `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- Query: `time_frame` (optional, string, default: "today", **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
+
+**Note:** Use `start_date` and `end_date` for precise date filtering. The `time_frame` parameter is maintained for backward compatibility but is deprecated in favor of the new date parameters.
 **Output:** Call history data
 ```json
 [
