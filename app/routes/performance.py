@@ -3,6 +3,7 @@ import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from datetime import datetime, date, timedelta
 
 from app.services.call_performance_service import CallPerformanceService
 from app.services.seller_service import SellerService
@@ -258,5 +259,96 @@ def get_user_performance_metrics(user_id):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logging.error(f"Unexpected error in get_user_performance_metrics: {str(e)}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({"error": "Internal server error occurred"}), 500
+
+
+@performance_bp.route('/user/<uuid:user_id>/calls', methods=['GET'])
+@jwt_required()
+def get_user_performance_calls(user_id):
+    """
+    Get detailed per-call performance metrics for a specific seller within a date range.
+    Returns a list of individual call performance data rather than aggregated metrics.
+    
+    Query Parameters:
+    - start_date (optional): Start date in YYYY-MM-DD format (default: 30 days ago)
+    - end_date (optional): End date in YYYY-MM-DD format (default: today)
+    
+    Returns:
+    List of dictionaries containing:
+    - Performance metrics (intro, rapport_building, etc.)
+    - Call title, buyer info, start time, duration
+    - Detected products
+    """
+    try:
+        logging.info(f"Getting detailed call performance metrics for user {user_id}")
+        
+        # Check if target user exists
+        target_user = SellerService.get_by_id(str(user_id))
+        if not target_user:
+            return jsonify({"error": "Target user not found"}), 404
+        
+        # Parse and validate date parameters
+        today = date.today()
+        thirty_days_ago = today - timedelta(days=30)
+        
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        
+        # Parse start_date
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({"error": "start_date must be in YYYY-MM-DD format"}), 400
+        else:
+            start_date = thirty_days_ago
+        
+        # Parse end_date
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify({"error": "end_date must be in YYYY-MM-DD format"}), 400
+        else:
+            end_date = today
+        
+        # Validate date range
+        if start_date > end_date:
+            return jsonify({"error": "start_date cannot be after end_date"}), 400
+        
+        # Check for reasonable date range (max 365 days)
+        if (end_date - start_date).days > 365:
+            return jsonify({"error": "Date range cannot exceed 365 days"}), 400
+        
+        logging.info(f"Getting detailed call performance for user {target_user.email} from {start_date} to {end_date}")
+        
+        # Get detailed call performance data
+        call_details = CallPerformanceService.get_user_performance_calls(
+            seller_id=str(user_id),
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        return jsonify({
+            "message": "User performance calls retrieved successfully",
+            "user_info": {
+                "user_id": str(user_id),
+                "name": target_user.name,
+                "email": target_user.email
+            },
+            "date_range": {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat()
+            },
+            "calls": call_details,
+            "total_calls": len(call_details)
+        }), 200
+        
+    except ValueError as e:
+        logging.error(f"Validation error in get_user_performance_calls: {str(e)}")
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"Unexpected error in get_user_performance_calls: {str(e)}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": "Internal server error occurred"}), 500

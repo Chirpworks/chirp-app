@@ -9,6 +9,8 @@ from app import db
 from app.models.call_performance import CallPerformance
 from app.models.meeting import Meeting
 from app.models.seller import Seller
+from app.models.buyer import Buyer
+from app.models.job import Job, JobStatus
 from .base_service import BaseService
 
 logging = logging.getLogger(__name__)
@@ -50,9 +52,13 @@ class CallPerformanceService(BaseService):
             
             if existing_performance:
                 # Update existing record
+                analysis_fields_updated = []
                 for metric, value in validated_data.items():
                     if hasattr(existing_performance, metric):
                         setattr(existing_performance, metric, value)
+                        # Track analysis fields being updated
+                        if metric in ['product_details_analysis', 'objection_handling_analysis', 'overall_performance_summary']:
+                            analysis_fields_updated.append(metric)
                 
                 # Update timestamps
                 existing_performance.updated_at = datetime.now(ZoneInfo("Asia/Kolkata"))
@@ -64,6 +70,8 @@ class CallPerformanceService(BaseService):
                 
                 db.session.commit()
                 logging.info(f"Updated CallPerformance for meeting ID: {meeting_id}")
+                if analysis_fields_updated:
+                    logging.info(f"Updated analysis fields: {analysis_fields_updated}")
                 return existing_performance
             else:
                 # Create new record
@@ -73,12 +81,17 @@ class CallPerformanceService(BaseService):
                 if 'analyzed_at' not in validated_data:
                     validated_data['analyzed_at'] = datetime.now(ZoneInfo("Asia/Kolkata"))
                 
+                # Track analysis fields being created
+                analysis_fields_created = [field for field in ['product_details_analysis', 'objection_handling_analysis', 'overall_performance_summary'] if field in validated_data]
+                
                 instance = CallPerformance(**validated_data)
                 instance.calculate_overall_score()
                 
                 db.session.add(instance)
                 db.session.commit()
                 logging.info(f"Created CallPerformance for meeting ID: {meeting_id}")
+                if analysis_fields_created:
+                    logging.info(f"Created with analysis fields: {analysis_fields_created}")
                 return instance
                 
         except SQLAlchemyError as e:
@@ -193,6 +206,17 @@ class CallPerformanceService(BaseService):
                 else:
                     raise ValueError("analyzed_at must be a datetime or ISO string")
         
+        # Validate new analysis fields (JSON data)
+        analysis_fields = ['product_details_analysis', 'objection_handling_analysis', 'overall_performance_summary']
+        for field in analysis_fields:
+            if field in data and data[field] is not None:
+                field_data = data[field]
+                # Basic validation - ensure it's a dictionary that can be stored as JSON
+                if not isinstance(field_data, dict):
+                    raise ValueError(f"{field} must be a dictionary/JSON object")
+                validated_data[field] = field_data
+                logging.info(f"Validated {field} with keys: {list(field_data.keys())}")
+        
         return validated_data
     
     @classmethod
@@ -273,14 +297,22 @@ class CallPerformanceService(BaseService):
             'meeting_id': str(performance.meeting_id),
             'overall_score': performance.overall_score,
             'analyzed_at': performance.analyzed_at.isoformat() if performance.analyzed_at else None,
-            'metrics': {}
+            'metrics': {},
+            'analysis': {}
         }
         
         # Add individual metrics
-        for metric in performance.get_metric_names():
+        for metric in CallPerformance.get_metric_names():
             metric_data = getattr(performance, metric)
             if metric_data:
                 summary['metrics'][metric] = metric_data
+        
+        # Add new analysis fields
+        analysis_fields = ['product_details_analysis', 'objection_handling_analysis', 'overall_performance_summary']
+        for field in analysis_fields:
+            field_data = getattr(performance, field, None)
+            if field_data:
+                summary['analysis'][field] = field_data
         
         return summary
     
@@ -421,4 +453,98 @@ class CallPerformanceService(BaseService):
             raise
         except Exception as e:
             logging.error(f"Error in get_user_performance_metrics: {str(e)}")
+            raise
+    
+    @classmethod
+    def get_user_performance_calls(cls, seller_id: str, start_date: date, end_date: date) -> list:
+        """
+        Get detailed per-call performance metrics for a seller within a date range.
+        Only returns calls that have been fully analyzed (job.status = COMPLETED).
+        
+        Args:
+            seller_id: UUID of the seller
+            start_date: Start date for filtering meetings
+            end_date: End date for filtering meetings
+            
+        Returns:
+            List of dictionaries containing detailed call performance data
+            
+        Raises:
+            SQLAlchemyError: If database operation fails
+        """
+        try:
+            logging.info(f"Getting detailed call performance for seller {seller_id} from {start_date} to {end_date}")
+            
+            # Convert dates to datetime range for database query
+            start_datetime = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            end_datetime = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            
+            # Query for meetings with completed analysis and performance data
+            query = db.session.query(
+                Meeting, CallPerformance, Buyer, Job
+            ).join(
+                CallPerformance, Meeting.id == CallPerformance.meeting_id
+            ).join(
+                Buyer, Meeting.buyer_id == Buyer.id
+            ).join(
+                Job, Meeting.id == Job.meeting_id
+            ).filter(
+                and_(
+                    Meeting.seller_id == seller_id,
+                    Meeting.start_time >= start_datetime,
+                    Meeting.start_time <= end_datetime,
+                    Job.status == JobStatus.COMPLETED  # Only fully analyzed calls
+                )
+            ).order_by(Meeting.start_time.desc())
+            
+            results = query.all()
+            
+            call_details = []
+            for meeting, performance, buyer, job in results:
+                # Calculate call duration in minutes
+                duration_minutes = None
+                if meeting.start_time and meeting.end_time:
+                    duration_delta = meeting.end_time - meeting.start_time
+                    duration_minutes = round(duration_delta.total_seconds() / 60, 2)
+                
+                # Build performance metrics dictionary
+                metrics = {}
+                for metric_name in CallPerformance.get_metric_names():
+                    metric_data = getattr(performance, metric_name)
+                    if metric_data:
+                        metrics[metric_name] = metric_data
+                
+                # Build analysis data dictionary
+                analysis = {}
+                analysis_fields = ['product_details_analysis', 'objection_handling_analysis', 'overall_performance_summary']
+                for field in analysis_fields:
+                    field_data = getattr(performance, field)
+                    if field_data:
+                        analysis[field] = field_data
+                
+                # Construct call detail dictionary
+                call_detail = {
+                    "meeting_id": str(meeting.id),
+                    "call_title": meeting.title,
+                    "buyer_name": buyer.name,
+                    "buyer_phone": buyer.phone,
+                    "call_start_time": meeting.start_time.isoformat() if meeting.start_time else None,
+                    "duration_minutes": duration_minutes,
+                    "detected_products": meeting.detected_products,
+                    "overall_score": performance.overall_score,
+                    "analyzed_at": performance.analyzed_at.isoformat() if performance.analyzed_at else None,
+                    "metrics": metrics,
+                    "analysis": analysis
+                }
+                
+                call_details.append(call_detail)
+            
+            logging.info(f"Found {len(call_details)} analyzed calls for seller {seller_id}")
+            return call_details
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Database error in get_user_performance_calls: {str(e)}")
+            raise
+        except Exception as e:
+            logging.error(f"Error in get_user_performance_calls: {str(e)}")
             raise

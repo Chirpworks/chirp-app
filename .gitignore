@@ -403,3 +403,8 @@ FodyWeavers.xsd
 .idea/
 __pycache__/
 venv/
+
+# Backup directories
+app_backup_*/
+migrations_backup_*/
+*_backup_*

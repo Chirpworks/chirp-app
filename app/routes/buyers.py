@@ -112,6 +112,11 @@ def update_buyer_profile(buyer_id):
         data = request.get_json()
         if not data:
             return jsonify({"error": "No data provided"}), 400
+        
+        # Log raw data being sent for processing
+        logging.info(f"[BUYER_UPDATE] Raw data received for buyer_id {buyer_id}: {data}")
+        logging.info(f"[BUYER_UPDATE] Data keys: {list(data.keys())}")
+        logging.info(f"[BUYER_UPDATE] Data types: {[(key, type(value).__name__) for key, value in data.items()]}")
 
         # Validate allowed fields
         allowed_fields = {
@@ -121,17 +126,27 @@ def update_buyer_profile(buyer_id):
         
         invalid_fields = set(data.keys()) - allowed_fields
         if invalid_fields:
+            logging.warning(f"[BUYER_UPDATE] Invalid fields rejected for buyer_id {buyer_id}: {list(invalid_fields)}")
             return jsonify({"error": f"Invalid fields: {', '.join(invalid_fields)}"}), 400
+
+        # Log validated data being processed
+        logging.info(f"[BUYER_UPDATE] Validated data for buyer_id {buyer_id}: {data}")
+        logging.info(f"[BUYER_UPDATE] Fields being updated: {list(data.keys())}")
 
         # Get buyer by ID and verify access
         buyer = BuyerService.get_by_id(buyer_id)
         if not buyer:
+            logging.error(f"[BUYER_UPDATE] Buyer not found: {buyer_id}")
             return jsonify({"error": "Buyer not found"}), 404
 
         # Update buyer profile using BuyerService
+        logging.info(f"[BUYER_UPDATE] Calling BuyerService.update_buyer_info with data: {data}")
         updated_buyer = BuyerService.update_buyer_info(buyer_id, **data)
         if not updated_buyer:
+            logging.error(f"[BUYER_UPDATE] Failed to update buyer profile for buyer_id {buyer_id}")
             return jsonify({"error": "Failed to update buyer profile"}), 500
+
+        logging.info(f"[BUYER_UPDATE] Successfully updated buyer profile for buyer_id {buyer_id}")
 
         # Return updated profile
         result = {
