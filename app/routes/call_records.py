@@ -260,13 +260,6 @@ def post_app_call_record():
                 logging.error("all required fields were not sent in the request parameter")
                 return jsonify({"error": "Missing required fields"}), 400
 
-            # Check if a record with this mobile_app_call_id already exists
-            if call_id:
-                existing_record = CallService.get_mobile_app_call_by_app_call_id(call_id)
-                if existing_record:
-                    logging.info(f"Record with appCallId {call_id} already exists. Skipping processing.")
-                    continue
-
             user = SellerService.get_by_phone(seller_number)
 
             if not user:
@@ -281,6 +274,13 @@ def post_app_call_record():
             start_time = start_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
             end_time_str = datetime.strptime(end_time_str.replace("Z", ""), "%Y-%m-%dT%H:%M:%S")
             end_time = end_time_str.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+
+            # Check for duplicate based on seller_number, buyer_number, and start_time
+            existing_record = CallService.get_mobile_app_call_by_details(seller_number, buyer_number, start_time)
+            if existing_record:
+                logging.info(f"Duplicate call found: seller={seller_number}, buyer={buyer_number}, "
+                           f"start_time={start_time}, existing_call_id={existing_record.id}. Skipping processing.")
+                continue
 
             call_status = calculate_call_status(call_type_str, duration)
 

@@ -384,6 +384,51 @@ class CallService(BaseService):
             raise
     
     @classmethod
+    def get_mobile_app_call_by_details(cls, seller_number: str, buyer_number: str, start_time: datetime) -> Optional[MobileAppCall]:
+        """
+        Get a MobileAppCall by seller_number, buyer_number, and start_time to check for duplicates.
+        Uses a time window of ±30 seconds to account for minor time differences.
+        
+        Args:
+            seller_number: Normalized seller phone number
+            buyer_number: Normalized buyer phone number
+            start_time: Call start time
+            
+        Returns:
+            MobileAppCall instance or None if not found
+        """
+        try:
+            # Define a time window of ±30 seconds to account for minor timing differences
+            time_window = timedelta(seconds=30)
+            start_window = start_time - time_window
+            end_window = start_time + time_window
+            
+            mobile_call = (
+                MobileAppCall.query
+                .filter(
+                    and_(
+                        MobileAppCall.seller_number == seller_number,
+                        MobileAppCall.buyer_number == buyer_number,
+                        MobileAppCall.start_time >= start_window,
+                        MobileAppCall.start_time <= end_window
+                    )
+                )
+                .first()
+            )
+            
+            if mobile_call:
+                logging.info(f"Found duplicate MobileAppCall: seller={seller_number}, buyer={buyer_number}, "
+                           f"start_time={start_time}, existing_id={mobile_call.id}, existing_start_time={mobile_call.start_time}")
+            else:
+                logging.debug(f"No duplicate MobileAppCall found for seller={seller_number}, buyer={buyer_number}, start_time={start_time}")
+                
+            return mobile_call
+            
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to check for duplicate MobileAppCall: seller={seller_number}, buyer={buyer_number}, start_time={start_time}, error={str(e)}")
+            raise
+    
+    @classmethod
     def get_unmatched_calls(cls, age_threshold_minutes: int = 30) -> Tuple[List[ExotelCall], List[MobileAppCall]]:
         """
         Get calls that haven't been matched/reconciled and are older than threshold.
