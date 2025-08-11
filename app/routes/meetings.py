@@ -106,7 +106,6 @@ def get_meeting_by_id(meeting_id):
         # Convert Meeting model to dictionary for JSON serialization
         meeting_dict = {
             "id": str(meeting_data.id),
-            "mobile_app_call_id": meeting_data.mobile_app_call_id,
             "buyer_id": str(meeting_data.buyer_id),
             "seller_id": str(meeting_data.seller_id),
             "source": meeting_data.source.value if meeting_data.source else None,
@@ -193,50 +192,6 @@ def get_meeting_transcription_by_id(meeting_id):
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch meeting transcription: {str(e)}"}), 500
 
-
-@meetings_bp.route("/last_synced_call", methods=["GET"])
-def get_last_synced_call_id():
-    try:
-        seller_number = request.args.get("sellerNumber")
-        if not seller_number:
-            return jsonify({"error": "Missing sellerNumber parameter"}), 400
-            
-        logging.info(f"getting last synced call id for phone: {seller_number}")
-
-        user = SellerService.get_by_phone(seller_number)
-        if not user:
-            logging.info(f"user not found for phone {seller_number}")
-            return jsonify({"message": f"No user with phone number {seller_number} found"}), 404
-
-        last_app_call = CallService.get_last_mobile_app_call_by_seller(seller_number)
-
-        last_meeting = MeetingService.get_last_meeting_by_seller(user.id)
-
-        if last_app_call and not last_meeting:
-            logging.info(f"last synced call id returned: {last_app_call.mobile_app_call_id}")
-            return jsonify(
-                {"source": "mobile_app_call", "last_synced_call_id": str(last_app_call.mobile_app_call_id)}
-            ), 200
-        elif last_meeting and not last_app_call:
-            logging.info(f"last synced call id returned: {last_meeting.mobile_app_call_id}")
-            return jsonify({"source": "meeting", "last_synced_call_id": str(last_meeting.mobile_app_call_id)}), 200
-        elif last_app_call and last_meeting:
-            if last_app_call.start_time > last_meeting.start_time:
-                logging.info(f"last synced call id returned: {last_app_call.mobile_app_call_id}")
-                return jsonify(
-                    {"source": "mobile_app_call", "last_synced_call_id": str(last_app_call.mobile_app_call_id)}
-                ), 200
-            else:
-                logging.info(f"last synced call id returned: {last_meeting.mobile_app_call_id}")
-                return jsonify({"source": "meeting", "last_synced_call_id": str(last_meeting.mobile_app_call_id)}), 200
-        else:
-            logging.info("No synced calls found")
-            return jsonify({"message": "No synced calls found", "last_synced_call_id": None}), 200
-
-    except Exception as e:
-        logging.error(f"Failed to fetch last synced call id: {e}")
-        logging.error(f"Traceback: {traceback.format_exc()}")
-        return jsonify({"error": f"Failed to fetch last synced call id: {str(e)}"}), 500
 
 
 @meetings_bp.route("/last_synced_call_timestamp", methods=["GET"])

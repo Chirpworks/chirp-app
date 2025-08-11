@@ -192,8 +192,7 @@ def post_exotel_recording():
                 start_time=matching_app_call.start_time,
                 end_time=corrected_end_time,
                 source=MeetingSource.PHONE,
-                direction=meeting_direction,
-                mobile_app_call_id=matching_app_call.mobile_app_call_id
+                direction=meeting_direction
             )
             
             # Create Job using JobService
@@ -203,7 +202,7 @@ def post_exotel_recording():
                 start_time=call_start_time
             )
 
-            # Delete reconciled records using CallService
+            # Delete only the Exotel call - keep mobile app call for sync purposes
             CallService.delete_exotel_call(exotel_call)
             CallService.delete_mobile_app_call(matching_app_call)
 
@@ -359,8 +358,7 @@ def post_app_call_record():
                     start_time=start_time,
                     end_time=original_end_time,
                     source=MeetingSource.PHONE,
-                    direction=meeting_direction,
-                    mobile_app_call_id=call_id
+                    direction=meeting_direction
                 )
 
                 # Create Job using JobService  
@@ -369,9 +367,9 @@ def post_app_call_record():
                     s3_audio_url=s3_url
                 )
 
-                # Delete reconciled records
-                db.session.delete(matching_exotel_call)
-                db.session.delete(mobile_call)
+                # Delete reconciled records using service methods
+                CallService.delete_exotel_call(matching_exotel_call)
+                CallService.delete_mobile_app_call(mobile_call)
 
                 logging.info("Initializing ECS task for diarization.")
                 # Initialize ECS task for speaker diarization
@@ -399,7 +397,7 @@ def post_app_call_record():
                 else:
                     logging.error("RUNPOD_DIARIZATION_URL environment variable not set")
 
-                logging.info(f"Intialized task for diarization for appcallID: {meeting.mobile_app_call_id}")
+                logging.info(f"Initialized task for diarization for meeting ID: {meeting.id}")
             else:
                 logging.info(
                     f"No matching Exotel call found. Mobile call saved for future reconciliation with id: {mobile_call.id}"

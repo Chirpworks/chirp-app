@@ -369,19 +369,6 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/meetings/last_synced_call`
-**Description:** Get last synced call ID for a seller
-**Authentication:** None
-**Input:**
-- Query: `sellerNumber` (string)
-**Output:**
-```json
-{
-  "source": "string",
-  "last_synced_call_id": "string"
-}
-```
-
 #### GET `/meetings/last_synced_call_timestamp`
 **Description:** Get last synced call timestamp for a seller
 **Authentication:** None
