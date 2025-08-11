@@ -1,36 +1,80 @@
+# ===== MULTI-STAGE BUILD =====
+# Stage 1: Build dependencies
+FROM --platform=linux/amd64 python:3.11-slim as builder
+
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc \
+        libpq-dev \
+        build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy only requirements first (for better caching)
+COPY requirements_optimized.txt /tmp/
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r /tmp/requirements_optimized.txt
+
+# ===== Stage 2: Runtime image =====
 FROM --platform=linux/amd64 python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
     CELERY_BROKER_URL=sqs:// \
     CELERY_RESULT_BACKEND=db+sqlite:///results.sqlite
 
-# Set working directory
+# Install only runtime dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        netcat-openbsd \
+        ffmpeg && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get clean
+
+# Copy virtual environment from builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app
 WORKDIR /app
 
-COPY . .
+# Copy application code (order matters for caching)
+COPY --chown=app:app wsgi.py ./
+COPY --chown=app:app run.py ./
+COPY --chown=app:app app/ ./app/
+COPY --chown=app:app migrations/ ./migrations/
 
-# Install system dependencies and Python requirements
-RUN echo 'Acquire::AllowInsecureRepositories "true";' > /etc/apt/apt.conf.d/99insecure && \
-    apt-get update && \
-    apt-get install -y gcc libpq-dev netcat-openbsd ffmpeg && \
-    rm -rf /var/lib/apt/lists/* && \
-    pip install --upgrade pip && \
-    pip install -r requirements_optimized.txt
+# Switch to non-root user
+USER app
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:5000/api/health || exit 1
 
 EXPOSE 5000
 
-# This command will:
-# - Wait until DB is reachable
-# - Run DB migrations
-# - Start the Flask app using Gunicorn
-CMD bash -c "\
-  echo 'Waiting for database...'; \
-  until nc -z -v -w30 \$DB_HOST \$DB_PORT; do \
-    echo 'Waiting for Postgres at '\$DB_HOST':'\$DB_PORT'...'; \
-    sleep 5; \
-  done; \
-  echo 'Running migrations...'; \
-  flask db upgrade; \
-  echo 'Starting app...'; \
-  exec gunicorn wsgi:app --bind 0.0.0.0:5000 --timeout 60"
+# Optimized startup script
+CMD ["bash", "-c", "\
+    echo 'Waiting for database...'; \
+    until nc -z -v -w30 $DB_HOST $DB_PORT; do \
+        echo 'Waiting for Postgres at '$DB_HOST':'$DB_PORT'...'; \
+        sleep 5; \
+    done; \
+    echo 'Running migrations...'; \
+    flask db upgrade; \
+    echo 'Starting app...'; \
+    exec gunicorn wsgi:app \
+        --bind 0.0.0.0:5000 \
+        --timeout 60 \
+        --workers 2 \
+        --worker-class sync \
+        --max-requests 1000 \
+        --max-requests-jitter 100 \
+        --preload"]
