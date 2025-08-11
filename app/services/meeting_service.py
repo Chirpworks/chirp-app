@@ -358,11 +358,52 @@ class MeetingService(BaseService):
                     else:
                         direction = None  # Fallback for unknown call types
                     
-                    start_time_local = call_record.start_time
-                    if start_time_local.tzinfo is None:
-                        start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-                    if local_now - start_time_local > timedelta(seconds=30):
-                        analysis_status = 'Not Recorded'
+                    # Check if this mobile call was reconciled into a Meeting
+                    potential_meeting = None
+                    if hasattr(call_record, 'user_id') and call_record.user_id:
+                        potential_meeting = Meeting.query.filter(
+                            Meeting.seller_id == call_record.user_id,
+                            Meeting.start_time >= call_record.start_time - timedelta(minutes=5),
+                            Meeting.start_time <= call_record.start_time + timedelta(minutes=5)
+                        ).first()
+                    
+                    if potential_meeting:
+                        # Use Meeting's analysis status logic
+                        if potential_meeting.recording_url:
+                            if potential_meeting.transcript and potential_meeting.analysis:
+                                analysis_status = 'Completed'
+                            elif potential_meeting.transcript:
+                                analysis_status = 'In Progress'
+                            else:
+                                analysis_status = 'Processing'
+                        else:
+                            analysis_status = 'Not Recorded'
+                    else:
+                        # For non-reconciled calls, use more reasonable timeout
+                        start_time_local = call_record.start_time
+                        if start_time_local.tzinfo is None:
+                            start_time_local = start_time_local.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+                        
+                        # If call has significant duration (>10 seconds), it was answered
+                        # For calls with good duration, be more lenient with timeout
+                        if call_record.duration and call_record.duration > 10:
+                            # Calls with >10 seconds duration were definitely answered
+                            # Use much longer timeout (24 hours) for reconciliation
+                            if local_now - start_time_local > timedelta(hours=24):
+                                analysis_status = 'Not Recorded'
+                            else:
+                                # Check if it's a very recent call (< 15 minutes) - show as Processing
+                                # Otherwise show as 'Completed' since it was answered but not reconciled
+                                if local_now - start_time_local < timedelta(minutes=15):
+                                    analysis_status = 'Processing'
+                                else:
+                                    analysis_status = 'Completed'  # Call was answered, just not reconciled
+                        else:
+                            # Very short calls might genuinely be not recorded
+                            if local_now - start_time_local > timedelta(minutes=5):
+                                analysis_status = 'Not Recorded'
+                            else:
+                                analysis_status = 'Processing'
                 
                 if call_record.status in [MobileAppCallStatus.MISSED.value, MobileAppCallStatus.REJECTED.value, MobileAppCallStatus.NOT_ANSWERED.value]:
                     # Unsuccessful calls always show 0s duration
