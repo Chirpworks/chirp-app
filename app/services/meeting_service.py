@@ -224,13 +224,16 @@ class MeetingService(BaseService):
             meetings = meetings_query.all()
             mobile_app_calls = mobile_app_calls_query.all()
             
-            # Combine and sort all call records
+            # Combine all call records
             all_calls = []
             all_calls.extend(meetings)
             all_calls.extend(mobile_app_calls)
             
+            # Deduplicate records (prioritize meetings over mobile app calls)
+            deduplicated_calls = cls._deduplicate_call_records(all_calls)
+            
             # Sort by start time
-            all_calls.sort(
+            deduplicated_calls.sort(
                 key=lambda x: x.start_time.replace(
                     tzinfo=ZoneInfo("Asia/Kolkata")
                 ) if x.start_time and x.start_time.tzinfo is None else x.start_time,
@@ -241,12 +244,12 @@ class MeetingService(BaseService):
             local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
             result = []
             
-            for call_record in all_calls:
+            for call_record in deduplicated_calls:
                 formatted_call = cls._format_call_record(call_record, local_now)
                 if formatted_call:
                     result.append(formatted_call)
             
-            logging.info(f"Retrieved {len(result)} call history records")
+            logging.info(f"Retrieved {len(result)} call history records (after deduplication)")
             return result
             
         except SQLAlchemyError as e:
@@ -326,7 +329,7 @@ class MeetingService(BaseService):
                 direction = call_record.direction
                 duration = human_readable_duration(call_record_end_time, call_record_start_time)
                 if duration == "0s":
-                    call_type = "Unanswered"
+                    call_type = "Not Answered"
                 else:
                     call_type = "Answered"
             elif isinstance(call_record, MobileAppCall):
@@ -334,15 +337,19 @@ class MeetingService(BaseService):
                 analysis_status = call_record.status
                 
                 if call_record.status == MobileAppCallStatus.MISSED.value:
-                    title = 'Missed Call'
+                    title = f'Missed Call from {denormalize_phone_number(buyer_number)}'
                     direction = CallDirection.INCOMING.value
+                    call_type = "Missed"
                 elif call_record.status == MobileAppCallStatus.REJECTED.value:
+                    call_type = "Rejected"
                     title = f'Rejected Call from {denormalize_phone_number(buyer_number)}'
                     direction = CallDirection.INCOMING.value
                 elif call_record.status == MobileAppCallStatus.NOT_ANSWERED.value:
+                    call_type = "Not Answered"
                     title = f'{denormalize_phone_number(buyer_number)} did not answer'
                     direction = CallDirection.OUTGOING.value
                 elif call_record.status == MobileAppCallStatus.PROCESSING.value:
+                    call_type = "Answered"
                     # Set direction based on call_type field
                     if call_record.call_type == "incoming":
                         direction = CallDirection.INCOMING.value
@@ -375,7 +382,6 @@ class MeetingService(BaseService):
                         minutes = (duration_seconds % 3600) // 60
                         duration = f"{hours}h {minutes}m"
                 
-                call_type = call_record.call_type
             else:
                 return None                
             
@@ -618,4 +624,93 @@ class MeetingService(BaseService):
             
         except SQLAlchemyError as e:
             logging.error(f"Failed to get meeting analytics for user {user_id}: {str(e)}")
-            raise 
+            raise
+    
+    @classmethod
+    def _deduplicate_call_records(cls, all_calls: List) -> List:
+        """
+        Remove duplicate call records, prioritizing meetings over mobile app calls.
+        
+        Args:
+            all_calls: List containing both Meeting and MobileAppCall instances
+            
+        Returns:
+            Deduplicated list with mobile app calls removed if corresponding meetings exist
+        """
+        try:
+            # Separate record types
+            meetings = [call for call in all_calls if isinstance(call, Meeting)]
+            mobile_calls = [call for call in all_calls if isinstance(call, MobileAppCall)]
+            
+            # Find duplicates to remove
+            duplicates_to_remove = set()
+            duplicate_count = 0
+            
+            for mobile_call in mobile_calls:
+                for meeting in meetings:
+                    if cls._is_duplicate_call(meeting, mobile_call):
+                        duplicates_to_remove.add(mobile_call.id)
+                        duplicate_count += 1
+                        logging.info(f"Duplicate detected: Mobile call {mobile_call.id} matches meeting {meeting.id}")
+                        break  # One mobile call can only match one meeting
+            
+            # Filter out duplicates
+            deduplicated_calls = []
+            for call in all_calls:
+                if isinstance(call, MobileAppCall) and call.id in duplicates_to_remove:
+                    continue  # Skip this mobile app call
+                deduplicated_calls.append(call)
+            
+            if duplicate_count > 0:
+                logging.info(f"Removed {duplicate_count} duplicate mobile app calls from call history")
+            
+            return deduplicated_calls
+            
+        except Exception as e:
+            logging.error(f"Error during call record deduplication: {str(e)}")
+            # Return original list if deduplication fails
+            return all_calls
+    
+    @classmethod
+    def _is_duplicate_call(cls, meeting: Meeting, mobile_call: MobileAppCall) -> bool:
+        """
+        Check if a meeting and mobile app call represent the same call.
+        
+        Args:
+            meeting: Meeting instance
+            mobile_call: MobileAppCall instance
+            
+        Returns:
+            True if they represent the same call, False otherwise
+        """
+        try:
+            # Check 1: Same seller
+            if str(meeting.seller_id) != str(mobile_call.user_id):
+                return False
+            
+            # Check 2: Same buyer (normalize phone numbers for comparison)
+            meeting_buyer_phone = normalize_phone_number(meeting.buyer.phone)
+            mobile_buyer_phone = normalize_phone_number(mobile_call.buyer_number)
+            if meeting_buyer_phone != mobile_buyer_phone:
+                return False
+            
+            # Check 3: Similar timing (±2 minutes tolerance)
+            # Ensure both times are timezone-aware for comparison
+            meeting_time = meeting.start_time
+            if meeting_time.tzinfo is None:
+                meeting_time = meeting_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            
+            mobile_time = mobile_call.start_time
+            if mobile_time.tzinfo is None:
+                mobile_time = mobile_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            
+            time_diff = abs((meeting_time - mobile_time).total_seconds())
+            if time_diff > 120:  # 2 minutes in seconds
+                return False
+            
+            # All checks passed - this is a duplicate
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error checking duplicate call: {str(e)}")
+            return False  # Conservative approach - don't remove if unsure 
