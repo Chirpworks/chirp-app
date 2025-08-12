@@ -508,22 +508,31 @@ class BuyerService(BaseService):
                 if not detected:
                     continue
 
-                # Normalize detected_products to a list
-                items = detected if isinstance(detected, list) else [detected]
+                items: List[Any] = []
+                # Current schema: detected_products is a single object per meeting
+                if isinstance(detected, dict):
+                    items = [detected]
+                # Back-compat: detected_products could be a list of product dicts/strings
+                elif isinstance(detected, list):
+                    items = detected
+                # Back-compat: single string value
+                else:
+                    items = [detected]
 
                 for item in items:
                     product_id: Any = None
                     product_name: Any = None
 
                     if isinstance(item, dict):
-                        # Try multiple common key variants
+                        # Prefer current schema keys
                         product_id = (
                             item.get('product_id') or
-                            item.get('id') or
-                            item.get('productId')
+                            item.get('productId') or
+                            item.get('id')
                         )
                         product_name = (
                             item.get('product_name') or
+                            item.get('productName') or
                             item.get('name') or
                             item.get('title')
                         )
