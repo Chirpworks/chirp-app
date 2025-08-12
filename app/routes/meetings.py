@@ -367,6 +367,14 @@ def update_meeting_summary(meeting_id):
                 logging.info(f"[UPDATE_SUMMARY] Processing {len(actions_to_create)} actions for meeting {meeting_id}")
                 kolkata_tz = ZoneInfo("Asia/Kolkata")
 
+                # Replace existing actions with the new set provided
+                try:
+                    deleted_count = ActionService.delete_actions_for_meeting(str(meeting_id))
+                    logging.info(f"[UPDATE_SUMMARY] Deleted {deleted_count} existing actions for meeting {meeting_id}")
+                except Exception as delete_err:
+                    logging.error(f"[UPDATE_SUMMARY] Failed to delete existing actions for meeting {meeting_id}: {delete_err}")
+                    # Continue to recreate new actions to avoid blocking the update
+
                 for i, action_item in enumerate(actions_to_create):
                     logging.info(f"[UPDATE_SUMMARY] Processing action {i+1}/{len(actions_to_create)}: {action_item}")
                     

@@ -55,6 +55,31 @@ class ActionService(BaseService):
         except SQLAlchemyError as e:
             logging.error(f"Failed to create action {title}: {str(e)}")
             raise
+
+    @classmethod
+    def delete_actions_for_meeting(cls, meeting_id: str) -> int:
+        """
+        Delete all actions associated with a specific meeting.
+
+        Args:
+            meeting_id: Meeting UUID whose actions should be removed
+
+        Returns:
+            Number of actions deleted
+        """
+        try:
+            deleted_count = (
+                db.session.query(Action)
+                .filter(Action.meeting_id == meeting_id)
+                .delete(synchronize_session=False)
+            )
+            db.session.commit()
+            logging.info(f"Deleted {deleted_count} actions for meeting {meeting_id}")
+            return deleted_count
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to delete actions for meeting {meeting_id}: {str(e)}")
+            db.session.rollback()
+            raise
     
     @classmethod
     def get_actions_for_user(cls, user_id: str, team_member_ids: Optional[List[str]] = None, status: Optional[ActionStatus] = None) -> List[Dict[str, Any]]:
