@@ -22,13 +22,16 @@ def get_actions():
     Query parameters:
     - team_member_ids: List of team member IDs (managers only)
     - status: Filter by action status - 'pending' or 'completed' (optional)
+    - meeting_id: Optional meeting UUID to fetch actions for a specific meeting
     
-    When status is provided, actions are sorted by creation date (newest first).
-    When no status is provided, actions are sorted by due date (earliest first).
+    Sorting:
+    - Actions with due_date first, sorted by due_date asc (nulls last)
+    - Then actions without due_date, sorted by created_at desc
     """
     try:
         user_id = get_jwt_identity()
         team_member_ids = request.args.getlist("team_member_ids")
+        meeting_id = request.args.get("meeting_id")
         status_param = request.args.get("status")
 
         # Authorization check for team member access
@@ -63,12 +66,13 @@ def get_actions():
                 }), 400
 
         # Use ActionService to get actions with optional status filter
-        actions = ActionService.get_actions_for_user(user_id, team_member_ids, status_filter)
+        actions = ActionService.get_actions_for_user(user_id, team_member_ids, status_filter, meeting_id)
         
         response = {
             "actions": actions,
             "total_count": len(actions),
-            "filtered_by_status": status_filter.value if status_filter else None
+            "filtered_by_status": status_filter.value if status_filter else None,
+            "filtered_by_meeting": meeting_id or None
         }
         
         return jsonify(response), 200

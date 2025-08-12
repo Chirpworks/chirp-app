@@ -82,7 +82,13 @@ class ActionService(BaseService):
             raise
     
     @classmethod
-    def get_actions_for_user(cls, user_id: str, team_member_ids: Optional[List[str]] = None, status: Optional[ActionStatus] = None) -> List[Dict[str, Any]]:
+    def get_actions_for_user(
+        cls,
+        user_id: str,
+        team_member_ids: Optional[List[str]] = None,
+        status: Optional[ActionStatus] = None,
+        meeting_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Get actions for a user or team, optionally filtered by status, formatted for API response.
         
@@ -111,6 +117,11 @@ class ActionService(BaseService):
                 .filter(Seller.id.in_(seller_ids))
             )
             
+            # Optional filter by meeting_id
+            if meeting_id:
+                query = query.filter(cls.model.meeting_id == meeting_id)
+                logging.info(f"Filtering actions by meeting_id: {meeting_id}")
+
             # Add status filter if provided
             if status:
                 query = query.filter(cls.model.status == status)
