@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import db
@@ -451,6 +451,9 @@ class BuyerService(BaseService):
                 last_contacted_by = seller.name if seller else None
                 last_contacted_at = latest_meeting.start_time
             
+            # Compute products_discussed from all meetings' detected_products for this buyer
+            computed_products_discussed: List[Dict[str, Any]] = cls._compute_products_discussed_from_buyer_meetings(buyer_id)
+
             buyer_with_contact = {
                 'id': str(buyer.id),
                 'name': buyer.name,
@@ -461,7 +464,8 @@ class BuyerService(BaseService):
                 'solutions_presented': buyer.solutions_presented,
                 'relationship_progression': buyer.relationship_progression,
                 'risks': buyer.risks,
-                'products_discussed': buyer.products_discussed,
+                # Use computed products discussed based on meetings rather than raw buyer field
+                'products_discussed': computed_products_discussed,
                 'key_highlights': buyer.key_highlights,
                 'last_contacted_by': last_contacted_by,
                 'last_contacted_at': last_contacted_at.isoformat() if last_contacted_at else None,
@@ -474,3 +478,80 @@ class BuyerService(BaseService):
         except SQLAlchemyError as e:
             logging.error(f"Failed to get buyer with last contact for {buyer_id}: {str(e)}")
             raise
+
+    @classmethod
+    def _compute_products_discussed_from_buyer_meetings(cls, buyer_id: str) -> List[Dict[str, Any]]:
+        """
+        Aggregate unique products discussed across all meetings for a buyer based on
+        each meeting's detected_products field.
+
+        Returns a list of dictionaries with keys: "product_name" and "product_id".
+        """
+        try:
+            from app.models.meeting import Meeting  # Local import to avoid circular import
+
+            meetings_with_products: List[Meeting] = (
+                Meeting.query
+                .filter(
+                    Meeting.buyer_id == buyer_id,
+                    Meeting.detected_products.isnot(None)
+                )
+                .all()
+            )
+
+            # Use a set to deduplicate by (product_id or name)
+            seen_keys: set = set()
+            unique_products: List[Dict[str, Any]] = []
+
+            for meeting in meetings_with_products:
+                detected = meeting.detected_products
+                if not detected:
+                    continue
+
+                # Normalize detected_products to a list
+                items = detected if isinstance(detected, list) else [detected]
+
+                for item in items:
+                    product_id: Any = None
+                    product_name: Any = None
+
+                    if isinstance(item, dict):
+                        # Try multiple common key variants
+                        product_id = (
+                            item.get('product_id') or
+                            item.get('id') or
+                            item.get('productId')
+                        )
+                        product_name = (
+                            item.get('product_name') or
+                            item.get('name') or
+                            item.get('title')
+                        )
+                    elif isinstance(item, str):
+                        product_name = item
+
+                    # Skip if we could not extract a usable name or id
+                    if not product_id and (not product_name or not str(product_name).strip()):
+                        continue
+
+                    # Build a dedupe key: prefer id, else normalized name
+                    dedupe_key = (
+                        f"id::{str(product_id).strip()}" if product_id is not None and str(product_id).strip() != ''
+                        else f"name::{str(product_name).strip().lower()}"
+                    )
+
+                    if dedupe_key in seen_keys:
+                        continue
+                    seen_keys.add(dedupe_key)
+
+                    unique_products.append({
+                        'product_name': str(product_name).strip() if product_name is not None else None,
+                        'product_id': product_id
+                    })
+
+            return unique_products
+
+        except SQLAlchemyError as e:
+            logging.error(f"Failed to compute products_discussed from meetings for buyer {buyer_id}: {str(e)}")
+            # On error, fall back to empty list to avoid breaking the endpoint
+            return []
