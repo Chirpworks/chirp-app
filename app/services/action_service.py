@@ -114,12 +114,15 @@ class ActionService(BaseService):
             # Add status filter if provided
             if status:
                 query = query.filter(cls.model.status == status)
-                # Sort by created_at when filtering by status
-                query = query.order_by(cls.model.created_at.desc())
                 logging.info(f"Filtering actions by status: {status.value}")
-            else:
-                # Default sorting by due_date when no status filter
-                query = query.order_by(cls.model.due_date.asc())
+
+            # Sorting rule (applies regardless of status filter):
+            # - Actions with due_date come first, ordered by due_date ascending
+            # - Actions without due_date follow, ordered by created_at descending
+            query = query.order_by(
+                cls.model.due_date.asc().nulls_last(),
+                cls.model.created_at.desc()
+            )
             
             actions = query.all()
             
