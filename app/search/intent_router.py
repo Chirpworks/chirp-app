@@ -170,7 +170,7 @@ class IntentRouter:
             return Intent(kind="analytics_count_products", params={"start": start, "end": end, "mode": mode})
 
         # Top sellers/products (check before rates to avoid capturing 'answered rate' within this phrase)
-        if re.search(r"\b(top|best)\s+(sellers|agents|reps|users)\b.*\b(by|for)\s+(number of\s+)?calls\b", lower):
+        if re.search(r"\b(top|best)\s+(sellers|agents|reps|users|performers)\b.*\b(by|for)\s+(number of\s+)?calls\b", lower):
             metric = "total"
             lim = 5
             m = re.search(r"\btop\s+(\d{1,2})\b", lower)
@@ -180,7 +180,7 @@ class IntentRouter:
                 except Exception:
                     lim = 5
             return Intent(kind="analytics_top_sellers", params={"start": start, "end": end, "metric": metric, "limit": lim})
-        if re.search(r"\b(top|best)\s+(sellers|agents|reps|users)\b", lower):
+        if re.search(r"\b(top|best)\s+(sellers|agents|reps|users|performers)\b", lower):
             metric = "answered" if re.search(r"\b(answered|connected)\b", lower) else "total"
             lim = 5
             m = re.search(r"\btop\s+(\d{1,2})\b", lower)

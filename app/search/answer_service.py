@@ -228,47 +228,16 @@ class SemanticAnswerService:
             if isinstance(res, dict) and res.get("mode") == "analytics" and isinstance(res.get("params"), dict):
                 try:
                     ai_kind = res.get("kind") or "analytics_count_calls"
-                    intent = Intent(kind=ai_kind, params=res["params"])  # type: ignore[arg-type]
-                except Exception:
-                    intent = intent
-                # Re-run analytics handling immediately (LLM-SQL preferred)
-                if os.getenv("ANALYTICS_LLM_SQL", "off").lower() in ("1", "true", "yes", "on") and intent.kind.startswith("analytics_"):
-                    start = intent.params.get("start")
-                    end = intent.params.get("end")
-                    llm_sql = LLMSQLRunner()
-                    sql_result = llm_sql.run(
-                        question=query,
-                        agency_id=agency_id,
-                        start=start.isoformat() if start else None,
-                        end=end.isoformat() if end else None,
-                    )
-                    if isinstance(sql_result, dict) and sql_result.get("data") is not None:
-                        if sql_result.get("suggest_fallback"):
-                            det2 = self._dispatch_analytics(intent=intent, agency_id=agency_id)
-                            if det2 is not None:
-                                return det2
-                        try:
-                            rows_preview = sql_result["data"][:50]
-                            sql_text = sql_result.get("sql")
-                            summary_prompt = (
-                                "You are an expert data analyst.\n"
-                                "Task: Given the user's question, the executed SQL, and the first rows of the result,\n"
-                                "produce a concise natural-language answer.\n"
-                                "- Be precise and avoid fluff.\n"
-                                "- If data is empty or insufficient, say so.\n"
-                                "- Do NOT output code or SQL.\n\n"
-                                f"Question: {query}\n\nSQL:\n{sql_text}\n\nRows (preview):\n{json.dumps(rows_preview, indent=2)}\n"
-                            )
-                            raw = self.llm.send_prompt_raw(prompt=summary_prompt, model=model)
-                            if raw:
-                                answer_txt = self._sanitize_summary_text(raw.strip())
-                                return {"answer": answer_txt, "sources": [{"type": "sql", "sql": sql_text, "rows": len(sql_result.get("data", []))}]}
-                        except Exception:
-                            pass
-                # Deterministic fallback if LLM-SQL failed or not enabled
-                det = self._dispatch_analytics(intent=intent, agency_id=agency_id)
-                if det is not None:
-                    return det
+                    # Correctly create the new intent
+                    new_intent = Intent(kind=ai_kind, params=res.get("params", {}))
+                    # Immediately dispatch to the correct analytics path
+                    analytics_result = self._dispatch_analytics(intent=new_intent, agency_id=agency_id)
+                    if analytics_result:
+                        return analytics_result
+                except Exception as e:
+                    logger.error(f"Error dispatching LLM-classified analytics intent: {e}")
+                    # Fall through to RAG if dispatch fails
+                    pass
 
         # Default: RAG
         results = self.search.search(
