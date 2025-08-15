@@ -28,3 +28,4 @@ pydub==0.25.1
 runpod==1.7.9
 numpy
 pandas
+pgvector==0.2.5

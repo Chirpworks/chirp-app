@@ -11,6 +11,7 @@ from app.models.meeting import Meeting
 from app.models.seller import Seller
 from app.utils.call_recording_utils import denormalize_phone_number
 from .base_service import BaseService
+from app.search.index_helpers import index_action
 
 logging = logging.getLogger(__name__)
 
@@ -50,6 +51,10 @@ class ActionService(BaseService):
             
             action = cls.create(**action_data)
             logging.info(f"Created action: {title} with ID: {action.id}")
+            try:
+                index_action(action)
+            except Exception as ie:
+                logging.error(f"Failed to index action {action.id}: {ie}")
             return action
             
         except SQLAlchemyError as e:
@@ -283,6 +288,10 @@ class ActionService(BaseService):
             
             action.status = status
             db.session.commit()  # Commit the transaction
+            try:
+                index_action(action)
+            except Exception as ie:
+                logging.error(f"Failed to index action {action_id} after status update: {ie}")
             
             logging.info(f"Updated action {action_id} status to {status.value}")
             return action
@@ -332,6 +341,11 @@ class ActionService(BaseService):
                 updated_count += 1
             
             db.session.commit()  # Commit the transaction
+            try:
+                for a in accessible_actions:
+                    index_action(a)
+            except Exception as ie:
+                logging.error(f"Failed to index actions after bulk update: {ie}")
             logging.info(f"Bulk updated {updated_count} actions for user {user_id}")
             return updated_count
             

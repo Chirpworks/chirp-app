@@ -6,6 +6,7 @@ from app import db
 from app.models.buyer import Buyer
 from app.utils.call_recording_utils import normalize_phone_number
 from .base_service import BaseService
+from app.search.index_helpers import index_buyer
 
 logging = logging.getLogger(__name__)
 
@@ -79,6 +80,10 @@ class BuyerService(BaseService):
                 name=None,  # Will be populated later via LLM or manual entry
                 email=None  # Will be populated later via LLM or manual entry
             )
+            try:
+                index_buyer(buyer)
+            except Exception as ie:
+                logging.error(f"Failed to index buyer {buyer.id}: {ie}")
             
             return buyer
             
@@ -133,6 +138,10 @@ class BuyerService(BaseService):
             
             buyer = cls.create(**buyer_data)
             logging.info(f"Created buyer with phone {normalized_phone} and ID: {buyer.id}")
+            try:
+                index_buyer(buyer)
+            except Exception as ie:
+                logging.error(f"Failed to index buyer {buyer.id}: {ie}")
             return buyer
             
         except SQLAlchemyError as e:
@@ -224,6 +233,10 @@ class BuyerService(BaseService):
             buyer = cls.update(buyer_id, **update_data)
             if buyer:
                 logging.info(f"Updated buyer {buyer_id} info: {update_data}")
+                try:
+                    index_buyer(buyer)
+                except Exception as ie:
+                    logging.error(f"Failed to index buyer {buyer_id} after update: {ie}")
             return buyer
             
         except SQLAlchemyError as e:

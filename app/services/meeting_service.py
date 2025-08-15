@@ -13,6 +13,9 @@ from app.models.job import JobStatus
 from app.constants import CallDirection, MeetingSource, MobileAppCallStatus
 from app.utils.call_recording_utils import denormalize_phone_number, normalize_phone_number
 from .base_service import BaseService
+from app.models.action import Action
+from app.models.call_performance import CallPerformance
+from app.search.index_helpers import index_meeting_transcript
 
 logging = logging.getLogger(__name__)
 
@@ -71,6 +74,11 @@ class MeetingService(BaseService):
             
             meeting = cls.create(**meeting_data)
             logging.info(f"Created meeting: {title} with ID: {meeting.id}")
+            # Index minimal structured meeting doc (fields may be sparse initially)
+            try:
+                cls._index_meeting_structured(meeting)
+            except Exception as ie:
+                logging.error(f"Failed to index meeting {meeting.id}: {ie}")
             return meeting
             
         except SQLAlchemyError as e:
@@ -426,6 +434,11 @@ class MeetingService(BaseService):
             meeting = cls.update(meeting_id, **analysis_data)
             if meeting:
                 logging.info(f"Updated LLM analysis for meeting: {meeting_id}")
+                # Re-index meeting structured doc after analysis updates
+                try:
+                    cls._index_meeting_structured(meeting)
+                except Exception as ie:
+                    logging.error(f"Failed to index meeting {meeting_id} after LLM analysis update: {ie}")
             return meeting
         except SQLAlchemyError as e:
             logging.error(f"Failed to update LLM analysis for meeting {meeting_id}: {str(e)}")
@@ -447,6 +460,11 @@ class MeetingService(BaseService):
             meeting = cls.update(meeting_id, transcription=transcription)
             if meeting:
                 logging.info(f"Updated transcription for meeting: {meeting_id}")
+                # Index transcript chunks (guarded by env flag in service)
+                try:
+                    index_meeting_transcript(meeting)
+                except Exception as ie:
+                    logging.error(f"Failed to index transcript for meeting {meeting_id}: {ie}")
             return meeting
         except SQLAlchemyError as e:
             logging.error(f"Failed to update transcription for meeting {meeting_id}: {str(e)}")
@@ -714,3 +732,101 @@ class MeetingService(BaseService):
         except Exception as e:
             logging.error(f"Error checking duplicate call: {str(e)}")
             return False  # Conservative approach - don't remove if unsure 
+
+    @classmethod
+    def _index_meeting_structured(cls, meeting: Meeting) -> None:
+        """Build a structured text for meeting and upsert into semantic index.
+
+        Indexed fields (as text + meta): title, summary, detected_products, detected_call_type,
+        actions, call_performance, start_time, seller_id, direction.
+        """
+        from app.services.semantic_index_service import SemanticIndexService
+
+        # Safe fetch related entities
+        try:
+            actions = getattr(meeting, 'actions', []) or []
+        except Exception:
+            actions = []
+        try:
+            call_perf = getattr(meeting, 'call_performance', None)
+        except Exception:
+            call_perf = None
+
+        def _to_text(val):
+            if val is None:
+                return ''
+            if isinstance(val, (list, dict)):
+                try:
+                    import json
+                    return json.dumps(val, ensure_ascii=False)
+                except Exception:
+                    return str(val)
+            return str(val)
+
+        action_lines = []
+        for a in actions:
+            try:
+                action_lines.append(
+                    f"- Action: {getattr(a, 'title', '')} | Status: {getattr(a, 'status', '')} | Due: {getattr(a, 'due_date', '')}"
+                )
+            except Exception:
+                continue
+        actions_text = '\n'.join(action_lines)
+
+        call_perf_text = ''
+        if call_perf is not None:
+            parts = []
+            for key in [
+                'overall_score',
+                'overall_performance_summary',
+                'intro', 'rapport_building', 'need_realization', 'script_adherance',
+                'objection_handling', 'pricing_and_negotiation', 'closure_and_next_steps',
+                'conversation_structure_and_flow', 'product_details_analysis', 'objection_handling_analysis'
+            ]:
+                if hasattr(call_perf, key):
+                    parts.append(f"{key}: {_to_text(getattr(call_perf, key))}")
+            call_perf_text = '\n'.join(parts)
+
+        text = "\n".join(filter(None, [
+            f"Title: {meeting.title}",
+            f"Summary: {_to_text(getattr(meeting, 'summary', None))}",
+            f"Detected Products: {_to_text(getattr(meeting, 'detected_products', None))}",
+            f"Detected Call Type: {_to_text(getattr(meeting, 'detected_call_type', None))}",
+            f"Direction: {getattr(meeting, 'direction', None)}",
+            f"Start Time: {getattr(meeting, 'start_time', None)}",
+            ("Actions:\n" + actions_text) if actions_text else '',
+            ("Call Performance:\n" + call_perf_text) if call_perf_text else '',
+        ]))
+
+        meta = {
+            'seller_id': str(getattr(meeting, 'seller_id', '')),
+            'direction': getattr(meeting, 'direction', None),
+            'start_time': getattr(meeting, 'start_time', None).isoformat() if getattr(meeting, 'start_time', None) else None,
+            'detected_call_type': getattr(meeting, 'detected_call_type', None),
+            'detected_products': getattr(meeting, 'detected_products', None),
+        }
+
+        agency_id = str(getattr(meeting.seller, 'agency_id', getattr(meeting.buyer, 'agency_id', '')))
+
+        svc = SemanticIndexService()
+        svc.upsert_documents(
+            doc_type='meeting.structured',
+            entity_id=str(meeting.id),
+            agency_id=agency_id,
+            text_chunks=[text],
+            meta=meta,
+            entity_refs={
+                'meeting_id': str(meeting.id),
+                'buyer_id': str(getattr(meeting, 'buyer_id', '')),
+                'product_id': None,  # products are captured in text; can add per-product docs later
+                'seller_id': str(getattr(meeting, 'seller_id', '')),
+            },
+        )
+        # Emit structured nuggets (key points from summary, qa_pairs, facts)
+        try:
+            from app.search.index_helpers import index_meeting_key_points, index_meeting_qa, index_meeting_facts
+            index_meeting_key_points(meeting)
+            index_meeting_qa(meeting)
+            index_meeting_facts(meeting)
+        except Exception as e:
+            logging.error(f"Failed to index meeting nuggets {getattr(meeting, 'id', None)}: {e}")

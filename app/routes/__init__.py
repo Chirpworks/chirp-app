@@ -14,6 +14,7 @@ def register_routes(app):
     from .analytics import analytics_bp
     from .jobs import jobs_bp
     from .performance import performance_bp
+    from .search import search_bp
 
     app.register_blueprint(user_bp, url_prefix="/api/user")
     app.register_blueprint(meetings_bp, url_prefix="/api/meetings")
@@ -28,3 +29,4 @@ def register_routes(app):
     app.register_blueprint(analytics_bp, url_prefix='/api/analytics')
     app.register_blueprint(jobs_bp, url_prefix='/api/jobs')
     app.register_blueprint(performance_bp, url_prefix='/api/performance')
+    app.register_blueprint(search_bp, url_prefix='/api/search')

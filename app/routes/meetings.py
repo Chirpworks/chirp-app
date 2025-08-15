@@ -344,6 +344,14 @@ def update_meeting_summary(meeting_id):
         logging.info(f"[UPDATE_SUMMARY] Final update_data keys: {list(update_data.keys())}")
         logging.info(f"[UPDATE_SUMMARY] Will update {len(update_data)} meeting fields")
 
+        # Accept qa_pairs and facts directly when provided
+        if isinstance(data.get("qa_pairs"), list):
+            update_data["qa_pairs"] = data["qa_pairs"]
+            logging.info(f"[UPDATE_SUMMARY] Will update qa_pairs: {len(update_data['qa_pairs'])} items")
+        if isinstance(data.get("facts"), list):
+            update_data["facts"] = data["facts"]
+            logging.info(f"[UPDATE_SUMMARY] Will update facts: {len(update_data['facts'])} items")
+
         # Start transaction for atomic operations
         updated_meeting = None
         created_action_ids = []

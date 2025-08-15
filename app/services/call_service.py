@@ -11,6 +11,7 @@ from app.models.mobile_app_calls import MobileAppCall
 from app.utils.call_recording_utils import normalize_phone_number, calculate_call_status
 from app.constants import MobileAppCallStatus
 from .base_service import BaseService
+from app.search.index_helpers import index_mobile_app_call
 
 logging = logging.getLogger(__name__)
 
@@ -100,6 +101,10 @@ class CallService(BaseService):
             db.session.commit()  # Commit the transaction
             
             logging.info(f"Created MobileAppCall with ID: {mobile_call.id}")
+            try:
+                index_mobile_app_call(mobile_call)
+            except Exception as ie:
+                logging.error(f"Failed to index mobile app call {mobile_call.id}: {ie}")
             return mobile_call
             
         except SQLAlchemyError as e:
@@ -399,7 +404,7 @@ class CallService(BaseService):
         """
         try:
             # Define a time window of ±30 seconds to account for minor timing differences
-            time_window = timedelta(seconds=30)
+            time_window = timedelta(seconds=2)
             start_window = start_time - time_window
             end_window = start_time + time_window
             
