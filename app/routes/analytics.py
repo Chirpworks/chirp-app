@@ -33,15 +33,12 @@ def get_total_call_data():
         if error_response:
             return jsonify(error_response[0]), error_response[1]
         
-        # Determine granularity based on date range (for backward compatibility)
+        # Determine granularity
         date_diff = (end_date - start_date).days
-        if date_diff <= 2:
-            granularity = "hourly"
-        else:
-            granularity = "daily"
+        granularity = "hourly" if date_diff <= 2 else "daily"
         agency_sellers = SellerService.get_by_agency(user.agency_id)
-        # Filter out managers for average calculations
         agency_sellers = [seller for seller in agency_sellers if seller.role != SellerRole.MANAGER]
+        
         if granularity == "hourly":
             sales_data = {}
             total_outgoing_calls = 0
@@ -51,8 +48,8 @@ def get_total_call_data():
                 hour_start = start_date.replace(hour=hour)
                 hour_end = hour_start.replace(minute=59, second=59, microsecond=999999)
                 
-                # Count outgoing calls that resulted in meetings (answered)
-                outgoing_calls_answered_in_hour = (
+                # Meetings answered
+                outgoing_meet = (
                     Meeting.query
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.direction == CallDirection.OUTGOING.value)
@@ -60,9 +57,7 @@ def get_total_call_data():
                     .filter(Meeting.start_time <= hour_end)
                     .count()
                 )
-                
-                # Count incoming calls that resulted in meetings (answered)
-                incoming_calls_answered_in_hour = (
+                incoming_meet = (
                     Meeting.query
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.direction == CallDirection.INCOMING.value)
@@ -70,9 +65,27 @@ def get_total_call_data():
                     .filter(Meeting.start_time <= hour_end)
                     .count()
                 )
-                
-                # Count unanswered outgoing calls from MobileAppCall table
-                outgoing_calls_unanswered_in_hour = (
+                # Mobile processing treated as answered
+                outgoing_proc = (
+                    MobileAppCall.query
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.call_type == "outgoing")
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= hour_start)
+                    .filter(MobileAppCall.start_time <= hour_end)
+                    .count()
+                )
+                incoming_proc = (
+                    MobileAppCall.query
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.call_type == "incoming")
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= hour_start)
+                    .filter(MobileAppCall.start_time <= hour_end)
+                    .count()
+                )
+                # Unanswered
+                outgoing_unans = (
                     MobileAppCall.query
                     .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
                     .filter(MobileAppCall.call_type == "outgoing")
@@ -81,9 +94,7 @@ def get_total_call_data():
                     .filter(MobileAppCall.start_time <= hour_end)
                     .count()
                 )
-                
-                # Count incoming unanswered calls (missed and rejected) from MobileAppCall table
-                incoming_calls_unanswered_in_hour = (
+                incoming_unans = (
                     MobileAppCall.query
                     .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
                     .filter(MobileAppCall.call_type == "incoming")
@@ -95,13 +106,9 @@ def get_total_call_data():
                     .filter(MobileAppCall.start_time <= hour_end)
                     .count()
                 )
+                outgoing_calls_in_hour = outgoing_meet + outgoing_proc + outgoing_unans
+                incoming_calls_in_hour = incoming_meet + incoming_proc + incoming_unans
                 
-                # Total calls by direction
-                outgoing_calls_in_hour = outgoing_calls_answered_in_hour + outgoing_calls_unanswered_in_hour
-                incoming_calls_in_hour = incoming_calls_answered_in_hour + incoming_calls_unanswered_in_hour
-                
-                # Get unique buyer phone numbers only from Meeting table (actual conversations)
-                # Only count buyers who had actual meetings/conversations
                 unique_leads_in_hour = (
                     db.session.query(func.count(func.distinct(Buyer.phone)))
                     .join(Meeting, Meeting.buyer_id == Buyer.id)
@@ -118,8 +125,6 @@ def get_total_call_data():
                 total_outgoing_calls += outgoing_calls_in_hour
                 total_incoming_calls += incoming_calls_in_hour
                 total_unique_leads += unique_leads_in_hour
-            
-            # Calculate unique leads for the entire time period (fix double counting)
             total_unique_leads_corrected = (
                 db.session.query(func.count(func.distinct(Buyer.phone)))
                 .join(Meeting, Meeting.buyer_id == Buyer.id)
@@ -138,9 +143,7 @@ def get_total_call_data():
             while current_date <= end_date:
                 day_start = current_date.replace(hour=0, minute=0, second=0, microsecond=0)
                 day_end = current_date.replace(hour=23, minute=59, second=59, microsecond=999999)
-                
-                # Count outgoing calls that resulted in meetings (answered)
-                outgoing_calls_answered_in_day = (
+                outgoing_meet = (
                     Meeting.query
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.direction == CallDirection.OUTGOING.value)
@@ -148,9 +151,7 @@ def get_total_call_data():
                     .filter(Meeting.start_time <= day_end)
                     .count()
                 )
-                
-                # Count incoming calls that resulted in meetings (answered)
-                incoming_calls_answered_in_day = (
+                incoming_meet = (
                     Meeting.query
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.direction == CallDirection.INCOMING.value)
@@ -158,9 +159,25 @@ def get_total_call_data():
                     .filter(Meeting.start_time <= day_end)
                     .count()
                 )
-                
-                # Count unanswered outgoing calls from MobileAppCall table
-                outgoing_calls_unanswered_in_day = (
+                outgoing_proc = (
+                    MobileAppCall.query
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.call_type == "outgoing")
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= day_start)
+                    .filter(MobileAppCall.start_time <= day_end)
+                    .count()
+                )
+                incoming_proc = (
+                    MobileAppCall.query
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.call_type == "incoming")
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= day_start)
+                    .filter(MobileAppCall.start_time <= day_end)
+                    .count()
+                )
+                outgoing_unans = (
                     MobileAppCall.query
                     .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
                     .filter(MobileAppCall.call_type == "outgoing")
@@ -169,9 +186,7 @@ def get_total_call_data():
                     .filter(MobileAppCall.start_time <= day_end)
                     .count()
                 )
-                
-                # Count incoming unanswered calls (missed and rejected) from MobileAppCall table
-                incoming_calls_unanswered_in_day = (
+                incoming_unans = (
                     MobileAppCall.query
                     .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
                     .filter(MobileAppCall.call_type == "incoming")
@@ -183,13 +198,8 @@ def get_total_call_data():
                     .filter(MobileAppCall.start_time <= day_end)
                     .count()
                 )
-                
-                # Total calls by direction
-                outgoing_calls_in_day = outgoing_calls_answered_in_day + outgoing_calls_unanswered_in_day
-                incoming_calls_in_day = incoming_calls_answered_in_day + incoming_calls_unanswered_in_day
-                
-                # Get unique buyer phone numbers only from Meeting table (actual conversations)
-                # Only count buyers who had actual meetings/conversations
+                outgoing_calls_in_day = outgoing_meet + outgoing_proc + outgoing_unans
+                incoming_calls_in_day = incoming_meet + incoming_proc + incoming_unans
                 unique_leads_in_day = (
                     db.session.query(func.count(func.distinct(Buyer.phone)))
                     .join(Meeting, Meeting.buyer_id == Buyer.id)
@@ -208,17 +218,14 @@ def get_total_call_data():
                 total_unique_leads += unique_leads_in_day
                 current_date += timedelta(days=1)
                 day_count += 1
-        
-        # Calculate unique leads for the entire time period (fix double counting)
-        total_unique_leads_corrected = (
-            db.session.query(func.count(func.distinct(Buyer.phone)))
-            .join(Meeting, Meeting.buyer_id == Buyer.id)
-            .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
-            .filter(Meeting.start_time >= start_date)
-            .filter(Meeting.start_time <= end_date)
-            .scalar() or 0
-        )
-        
+            total_unique_leads_corrected = (
+                db.session.query(func.count(func.distinct(Buyer.phone)))
+                .join(Meeting, Meeting.buyer_id == Buyer.id)
+                .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
+                .filter(Meeting.start_time >= start_date)
+                .filter(Meeting.start_time <= end_date)
+                .scalar() or 0
+            )
         result = {
             "sales_data": sales_data,
             "total_data": {
@@ -254,7 +261,7 @@ def get_team_call_data():
         seller_data = []
         for seller in agency_sellers:
             # Count outgoing calls that resulted in meetings (answered)
-            outgoing_calls_answered = (
+            outgoing_calls_answered_meetings = (
                 Meeting.query
                 .filter(Meeting.seller_id == seller.id)
                 .filter(Meeting.direction == CallDirection.OUTGOING.value)
@@ -262,9 +269,20 @@ def get_team_call_data():
                 .filter(Meeting.start_time <= end_date)
                 .count()
             )
+            # Include MobileAppCall Processing as answered (outgoing)
+            outgoing_calls_answered_processing = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == seller.id)
+                .filter(MobileAppCall.call_type == "outgoing")
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .count()
+            )
+            outgoing_calls_answered = outgoing_calls_answered_meetings + outgoing_calls_answered_processing
             
             # Count incoming calls that resulted in meetings (answered)
-            incoming_calls_answered = (
+            incoming_calls_answered_meetings = (
                 Meeting.query
                 .filter(Meeting.seller_id == seller.id)
                 .filter(Meeting.direction == CallDirection.INCOMING.value)
@@ -272,6 +290,17 @@ def get_team_call_data():
                 .filter(Meeting.start_time <= end_date)
                 .count()
             )
+            # Include MobileAppCall Processing as answered (incoming)
+            incoming_calls_answered_processing = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == seller.id)
+                .filter(MobileAppCall.call_type == "incoming")
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .count()
+            )
+            incoming_calls_answered = incoming_calls_answered_meetings + incoming_calls_answered_processing
             
             # Count unanswered outgoing calls from MobileAppCall table
             outgoing_calls_unanswered = (
@@ -298,7 +327,7 @@ def get_team_call_data():
                 .count()
             )
             
-            # Total calls by direction
+            # Total calls by direction (answered + unanswered)
             outgoing_calls = outgoing_calls_answered + outgoing_calls_unanswered
             incoming_calls = incoming_calls_answered + incoming_calls_unanswered
             total_calls = outgoing_calls + incoming_calls
@@ -350,8 +379,8 @@ def get_call_data(seller_uuid):
             return jsonify({"error": "Seller not found"}), 404
         if seller.agency_id != user.agency_id:
             return jsonify({"error": "Unauthorized access to seller data"}), 403
-        # Count outgoing calls that resulted in meetings (answered)
-        outgoing_calls_answered = (
+        
+        outgoing_meet = (
             Meeting.query
             .filter(Meeting.seller_id == seller_uuid)
             .filter(Meeting.direction == CallDirection.OUTGOING.value)
@@ -359,9 +388,7 @@ def get_call_data(seller_uuid):
             .filter(Meeting.start_time <= end_date)
             .count()
         )
-        
-        # Count incoming calls that resulted in meetings (answered)
-        incoming_calls_answered = (
+        incoming_meet = (
             Meeting.query
             .filter(Meeting.seller_id == seller_uuid)
             .filter(Meeting.direction == CallDirection.INCOMING.value)
@@ -369,8 +396,25 @@ def get_call_data(seller_uuid):
             .filter(Meeting.start_time <= end_date)
             .count()
         )
+        outgoing_proc = (
+            MobileAppCall.query
+            .filter(MobileAppCall.user_id == seller_uuid)
+            .filter(MobileAppCall.call_type == "outgoing")
+            .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+            .filter(MobileAppCall.start_time >= start_date)
+            .filter(MobileAppCall.start_time <= end_date)
+            .count()
+        )
+        incoming_proc = (
+            MobileAppCall.query
+            .filter(MobileAppCall.user_id == seller_uuid)
+            .filter(MobileAppCall.call_type == "incoming")
+            .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+            .filter(MobileAppCall.start_time >= start_date)
+            .filter(MobileAppCall.start_time <= end_date)
+            .count()
+        )
         
-        # Count unanswered outgoing calls from MobileAppCall table
         outgoing_calls_unanswered = (
             MobileAppCall.query
             .filter(MobileAppCall.user_id == seller_uuid)
@@ -380,11 +424,6 @@ def get_call_data(seller_uuid):
             .filter(MobileAppCall.start_time <= end_date)
             .count()
         )
-        
-        # Total outgoing calls = answered + unanswered
-        outgoing_calls = outgoing_calls_answered + outgoing_calls_unanswered
-        
-        # Count incoming unanswered calls (missed and rejected) from MobileAppCall table
         incoming_calls_unanswered = (
             MobileAppCall.query
             .filter(MobileAppCall.user_id == seller_uuid)
@@ -398,28 +437,25 @@ def get_call_data(seller_uuid):
             .count()
         )
         
-        # Total incoming calls = answered + unanswered
-        incoming_calls = incoming_calls_answered + incoming_calls_unanswered
-        
-        # Calculate unique leads engaged - only count buyers who had actual meetings/conversations
-        unique_leads_engaged = (
-            db.session.query(func.count(func.distinct(Buyer.phone)))
-            .join(Meeting, Meeting.buyer_id == Buyer.id)
-            .filter(Meeting.seller_id == seller_uuid)
-            .filter(Meeting.start_time >= start_date)
-            .filter(Meeting.start_time <= end_date)
-            .scalar() or 0
-        )
+        outgoing_calls = outgoing_meet + outgoing_proc + outgoing_calls_unanswered
+        incoming_calls = incoming_meet + incoming_proc + incoming_calls_unanswered
         
         result = {
             "outgoing_calls": outgoing_calls,
-            "outgoing_calls_answered": outgoing_calls_answered,
+            "outgoing_calls_answered": outgoing_meet + outgoing_proc,
             "outgoing_calls_unanswered": outgoing_calls_unanswered,
             "incoming_calls": incoming_calls,
-            "incoming_calls_answered": incoming_calls_answered,
+            "incoming_calls_answered": incoming_meet + incoming_proc,
             "incoming_calls_unanswered": incoming_calls_unanswered,
             "total_calls": outgoing_calls + incoming_calls,
-            "unique_leads_engaged": unique_leads_engaged
+            "unique_leads_engaged": (
+                db.session.query(func.count(func.distinct(Buyer.phone)))
+                .join(Meeting, Meeting.buyer_id == Buyer.id)
+                .filter(Meeting.seller_id == seller_uuid)
+                .filter(Meeting.start_time >= start_date)
+                .filter(Meeting.start_time <= end_date)
+                .scalar() or 0
+            )
         }
         return jsonify(result), 200
     except Exception as e:
@@ -437,7 +473,6 @@ def get_seller_call_analytics():
         if not user:
             return jsonify({"error": "Seller not found"}), 404
         
-        # Parse date range parameters (supports both new date range and legacy time_frame)
         start_date, end_date, error_response = parse_date_range_params(default_days_back=7, max_days_range=90)
         if error_response:
             return jsonify(error_response[0]), error_response[1]
@@ -448,16 +483,9 @@ def get_seller_call_analytics():
         seller_data = []
         for seller_id in team_member_ids:
             seller = SellerService.get_by_id(seller_id)
-            if not seller:
+            if not seller or seller.agency_id != user.agency_id or seller.role == SellerRole.MANAGER:
                 continue
-            if seller.agency_id != user.agency_id:
-                continue
-            # Skip managers for average calculations
-            if seller.role == SellerRole.MANAGER:
-                continue
-            
-            # Count outgoing calls that resulted in meetings (answered)
-            outgoing_calls_answered = (
+            outgoing_meet = (
                 Meeting.query
                 .filter(Meeting.seller_id == seller_id)
                 .filter(Meeting.direction == CallDirection.OUTGOING.value)
@@ -465,9 +493,7 @@ def get_seller_call_analytics():
                 .filter(Meeting.start_time <= end_date)
                 .count()
             )
-            
-            # Count incoming calls that resulted in meetings (answered)
-            incoming_calls_answered = (
+            incoming_meet = (
                 Meeting.query
                 .filter(Meeting.seller_id == seller_id)
                 .filter(Meeting.direction == CallDirection.INCOMING.value)
@@ -475,8 +501,24 @@ def get_seller_call_analytics():
                 .filter(Meeting.start_time <= end_date)
                 .count()
             )
-            
-            # Count unanswered outgoing calls from MobileAppCall table
+            outgoing_proc = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == seller_id)
+                .filter(MobileAppCall.call_type == "outgoing")
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .count()
+            )
+            incoming_proc = (
+                MobileAppCall.query
+                .filter(MobileAppCall.user_id == seller_id)
+                .filter(MobileAppCall.call_type == "incoming")
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .count()
+            )
             unanswered_outgoing_calls = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id == seller_id)
@@ -486,8 +528,6 @@ def get_seller_call_analytics():
                 .filter(MobileAppCall.start_time <= end_date)
                 .count()
             )
-            
-            # Count incoming unanswered calls (missed and rejected) from MobileAppCall table
             incoming_calls_unanswered = (
                 MobileAppCall.query
                 .filter(MobileAppCall.user_id == seller_id)
@@ -500,34 +540,28 @@ def get_seller_call_analytics():
                 .filter(MobileAppCall.start_time <= end_date)
                 .count()
             )
-            
-            # Total calls = answered + unanswered for each direction
-            outgoing_calls = outgoing_calls_answered + unanswered_outgoing_calls
-            incoming_calls = incoming_calls_answered + incoming_calls_unanswered
-            
-            # Calculate unique leads engaged - only count buyers who had actual meetings/conversations
-            unique_leads_engaged = (
-                db.session.query(func.count(func.distinct(Buyer.phone)))
-                .join(Meeting, Meeting.buyer_id == Buyer.id)
-                .filter(Meeting.seller_id == seller_id)
-                .filter(Meeting.start_time >= start_date)
-                .filter(Meeting.start_time <= end_date)
-                .scalar() or 0
-            )
-            
+            outgoing_calls = outgoing_meet + outgoing_proc + unanswered_outgoing_calls
+            incoming_calls = incoming_meet + incoming_proc + incoming_calls_unanswered
             seller_data.append({
                 "seller_id": seller_id,
                 "seller_name": seller.name,
                 "seller_phone": seller.phone,
                 "seller_email": seller.email,
                 "outgoing_calls": outgoing_calls,
-                "outgoing_calls_answered": outgoing_calls_answered,
+                "outgoing_calls_answered": outgoing_meet + outgoing_proc,
                 "outgoing_calls_unanswered": unanswered_outgoing_calls,
                 "incoming_calls": incoming_calls,
-                "incoming_calls_answered": incoming_calls_answered,
+                "incoming_calls_answered": incoming_meet + incoming_proc,
                 "incoming_calls_unanswered": incoming_calls_unanswered,
                 "total_calls": outgoing_calls + incoming_calls,
-                "unique_leads_engaged": unique_leads_engaged
+                "unique_leads_engaged": (
+                    db.session.query(func.count(func.distinct(Buyer.phone)))
+                    .join(Meeting, Meeting.buyer_id == Buyer.id)
+                    .filter(Meeting.seller_id == seller_id)
+                    .filter(Meeting.start_time >= start_date)
+                    .filter(Meeting.start_time <= end_date)
+                    .scalar() or 0
+                )
             })
         result = {"seller_data": seller_data}
         return jsonify(result), 200
