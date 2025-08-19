@@ -740,7 +740,7 @@ class MeetingService(BaseService):
         Indexed fields (as text + meta): title, summary, detected_products, detected_call_type,
         actions, call_performance, start_time, seller_id, direction.
         """
-        from app.services.semantic_index_service import SemanticIndexService
+        from app.search import SemanticIndexService
 
         # Safe fetch related entities
         try:
