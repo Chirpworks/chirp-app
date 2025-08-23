@@ -170,11 +170,8 @@ def index_buyer(buyer) -> None:
             f"Email: {_to_text(getattr(buyer, 'email', None))}",
             f"Phone: {_to_text(getattr(buyer, 'phone', None))}",
             f"Company: {_to_text(getattr(buyer, 'company_name', None))}",
-            f"Tags: {_to_text(getattr(buyer, 'tags', None))}",
-            f"Requirements: {_to_text(getattr(buyer, 'requirements', None))}",
             f"Key Highlights: {_to_text(getattr(buyer, 'key_highlights', None))}",
             f"Products Discussed: {_to_text(getattr(buyer, 'products_discussed', None))}",
-            f"Relationship Progression: {_to_text(getattr(buyer, 'relationship_progression', None))}",
             f"Risks: {_to_text(getattr(buyer, 'risks', None))}",
         ]))
         svc.upsert_documents(

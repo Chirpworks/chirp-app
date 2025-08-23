@@ -568,24 +568,27 @@ class MeetingService(BaseService):
             meetings = meetings_query.all()
             mobile_app_calls = mobile_app_calls_query.all()
             
-            # Combine and sort all call records
+            # Combine all call records
             all_calls = []
             all_calls.extend(meetings)
             all_calls.extend(mobile_app_calls)
-            
+
+            # Deduplicate records (prioritize meetings over mobile app calls)
+            deduplicated_calls = cls._deduplicate_call_records(all_calls)
+
             # Sort by start time
-            all_calls.sort(
+            deduplicated_calls.sort(
                 key=lambda x: x.start_time.replace(
                     tzinfo=ZoneInfo("Asia/Kolkata")
                 ) if x.start_time and x.start_time.tzinfo is None else x.start_time,
                 reverse=True
             )
-            
+
             # Format call history
             local_now = datetime.now(ZoneInfo("Asia/Kolkata"))
             result = []
             
-            for call_record in all_calls:
+            for call_record in deduplicated_calls:
                 formatted_call = cls._format_call_record(call_record, local_now)
                 if formatted_call:
                     result.append(formatted_call)
@@ -723,7 +726,7 @@ class MeetingService(BaseService):
                 mobile_time = mobile_time.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
             
             time_diff = abs((meeting_time - mobile_time).total_seconds())
-            if time_diff > 120:  # 2 minutes in seconds
+            if time_diff > 5:  # 5 seconds tolerance
                 return False
             
             # All checks passed - this is a duplicate

@@ -27,7 +27,7 @@ def get_sql_registry() -> Dict[str, Dict[str, List[str]]]:
             "meetings": {
                 "columns": [
                     "id", "buyer_id", "seller_id", "source", "start_time", "end_time",
-                    "transcription", "direction", "title", "summary", "overall_summary",
+                    "transcription", "direction", "title", "summary",
                     "type", "detected_call_type", "detected_products"
                 ],
                 "semantics": "Answered calls/conversations. direction in ('incoming','outgoing'). detected_products is JSON/text of mentioned products."

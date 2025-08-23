@@ -95,7 +95,7 @@ def trigger_analysis():
             response = requests.post(
                 runcloud_url, 
                 json=payload,
-                timeout=5,  # Short timeout just to ensure request is sent
+                timeout=2,  # Shorter timeout to fire-and-forget
                 verify=True,  # Verify SSL certificates
                 stream=True  # Don't wait for full response
             )

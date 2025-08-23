@@ -93,8 +93,6 @@ class BuyerService(BaseService):
     
     @classmethod
     def create_buyer(cls, phone: str, agency_id: str, name: Optional[str] = None, email: Optional[str] = None,
-                    tags: Optional[dict] = None, requirements: Optional[dict] = None,
-                    solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
                     risks: Optional[dict] = None, products_discussed: Optional[dict] = None, 
                     company_name: Optional[str] = None, key_highlights: Optional[dict] = None) -> Buyer:
         """
@@ -105,10 +103,6 @@ class BuyerService(BaseService):
             agency_id: Agency UUID
             name: Optional buyer name
             email: Optional buyer email
-            tags: Optional buyer tags as JSON
-            requirements: Optional buyer requirements as JSON
-            solutions_presented: Optional solutions presented as JSON
-            relationship_progression: Optional relationship progression text
             risks: Optional risks as JSON
             products_discussed: Optional products discussed as JSON
             company_name: Optional buyer company name
@@ -126,10 +120,6 @@ class BuyerService(BaseService):
                 'agency_id': agency_id,
                 'name': name,
                 'email': email,
-                'tags': tags,
-                'requirements': requirements,
-                'solutions_presented': solutions_presented,
-                'relationship_progression': relationship_progression,
                 'risks': risks,
                 'products_discussed': products_discussed,
                 'company_name': company_name,
@@ -183,8 +173,6 @@ class BuyerService(BaseService):
     
     @classmethod
     def update_buyer_info(cls, buyer_id: str, name: Optional[str] = None, email: Optional[str] = None,
-                         tags: Optional[dict] = None, requirements: Optional[dict] = None,
-                         solutions_presented: Optional[dict] = None, relationship_progression: Optional[str] = None,
                          risks: Optional[dict] = None, products_discussed: Optional[dict] = None, 
                          key_highlights: Optional[dict] = None) -> Optional[Buyer]:
         """
@@ -194,10 +182,6 @@ class BuyerService(BaseService):
             buyer_id: Buyer UUID
             name: Optional new name
             email: Optional new email
-            tags: Optional buyer tags as JSON
-            requirements: Optional buyer requirements as JSON
-            solutions_presented: Optional solutions presented as JSON
-            relationship_progression: Optional relationship progression text
             risks: Optional risks as JSON
             products_discussed: Optional products discussed as JSON
             key_highlights: Optional key highlights as JSON
@@ -211,14 +195,6 @@ class BuyerService(BaseService):
                 update_data['name'] = name
             if email is not None:
                 update_data['email'] = email
-            if tags is not None:
-                update_data['tags'] = tags
-            if requirements is not None:
-                update_data['requirements'] = requirements
-            if solutions_presented is not None:
-                update_data['solutions_presented'] = solutions_presented
-            if relationship_progression is not None:
-                update_data['relationship_progression'] = relationship_progression
             if risks is not None:
                 update_data['risks'] = risks
             if products_discussed is not None:
@@ -472,10 +448,6 @@ class BuyerService(BaseService):
                 'name': buyer.name,
                 'email': buyer.email,
                 'phone': buyer.phone,
-                'tags': buyer.tags,
-                'requirements': buyer.requirements,
-                'solutions_presented': buyer.solutions_presented,
-                'relationship_progression': buyer.relationship_progression,
                 'risks': buyer.risks,
                 # Use computed products discussed based on meetings rather than raw buyer field
                 'products_discussed': computed_products_discussed,

@@ -392,19 +392,19 @@ class CallService(BaseService):
     def get_mobile_app_call_by_details(cls, seller_number: str, buyer_number: str, start_time: datetime) -> Optional[MobileAppCall]:
         """
         Get a MobileAppCall by seller_number, buyer_number, and start_time to check for duplicates.
-        Uses a time window of ±30 seconds to account for minor time differences.
-        
+        Uses a time window of ±5 seconds to account for minor time differences.
+
         Args:
             seller_number: Normalized seller phone number
             buyer_number: Normalized buyer phone number
             start_time: Call start time
-            
+
         Returns:
             MobileAppCall instance or None if not found
         """
         try:
-            # Define a time window of ±30 seconds to account for minor timing differences
-            time_window = timedelta(seconds=2)
+            # Define a time window of ±5 seconds to account for minor timing differences
+            time_window = timedelta(seconds=5)
             start_window = start_time - time_window
             end_window = start_time + time_window
             

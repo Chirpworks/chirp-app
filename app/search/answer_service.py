@@ -3,7 +3,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.external.llm.open_ai.chat_gpt import OpenAIClient
-from app.search.intent_router import IntentRouter
+from app.search.intent_router import IntentRouter, Intent
 from app.analytics import AnalyticsTool
 from app.search.search_service import SemanticSearchService
 from app.analytics.llm_sql import LLMSQLRunner

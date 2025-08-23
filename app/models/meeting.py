@@ -33,13 +33,8 @@ class Meeting(db.Model):
 
     # following fields populated by LLM
     title = db.Column(db.String(300), nullable=False)
-    call_purpose = db.Column(db.String, nullable=True)
     key_discussion_points = db.Column(db.JSON, nullable=True)
-    buyer_pain_points = db.Column(db.JSON, nullable=True)
-    solutions_discussed = db.Column(db.JSON, nullable=True)
-    risks = db.Column(db.JSON, nullable=True)
     summary = db.Column(db.JSON, nullable=True)
-    overall_summary = db.Column(db.JSON, nullable=True)
     type = db.Column(db.JSON, nullable=True)
     detected_call_type = db.Column(db.JSON, nullable=True)
     detected_products = db.Column(db.JSON, nullable=True)
