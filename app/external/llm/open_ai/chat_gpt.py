@@ -16,7 +16,7 @@ class OpenAIClient:
             raise ValueError("OpenAI API key is required.")
         self.client = OpenAI(api_key=self.api_key)
 
-    def send_prompt(self, prompt: str, model: str = "gpt-4o", max_tokens: int = 2000):
+    def send_prompt(self, prompt: str, model: str = "gpt-4.1-mini", max_tokens: int = 2000):
         """Send a prompt to OpenAI and return the response."""
         try:
             response = self.client.chat.completions.create(
@@ -33,33 +33,62 @@ class OpenAIClient:
             content = self.clean_json_content(raw_response)
             return content
         except Exception as e:
-            logger.error(f"Error communicating with OpenAI: {e}")
+            logger.error("Error communicating with OpenAI: %s", e)
             raise e
 
-    def clean_json_content(self, raw_response_string: str):
-        # Step 1: Remove Markdown-style ```json and ```
-        if raw_response_string.startswith("```json"):
-            raw_response_string = raw_response_string.lstrip("`json").strip()
-        if raw_response_string.endswith("```"):
-            raw_response_string = raw_response_string[:-3].strip()
-
-        # Step 2: Remove escaped newline and literal newline characters
-        raw_response_string = raw_response_string.replace("\\n", "").replace("\n", "")
-
-        # Step 3: Unescape quotes (\" → ")
-        raw_response_string = raw_response_string.replace('\\"', '"')
-
-        # Step 4: Remove double '"' symbols
-        raw_response_string = raw_response_string.replace('""', '"')
-
-        logger.info(f"raw response string: {raw_response_string}")
-        # Step 4: Parse JSON
+    def send_prompt_raw(self, prompt: str, model: str = "gpt-4.1-mini", max_tokens: int = 1000) -> Optional[str]:
+        """Send a prompt and return the raw assistant message content (no JSON parsing)."""
         try:
-            r = json.loads(raw_response_string)
-            logger.info(f"OpenAI returned {r}")
-            return r
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            if not response:
+                logger.info("OpenAI response was empty or failed")
+                return None
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error("Error communicating with OpenAI (raw): %s", e)
+            return None
+
+    def clean_json_content(self, raw_response_string: str):
+        # Normalize whitespace for robust parsing
+        raw = raw_response_string.strip()
+        logger.info("raw response string: %s", raw)
+
+        # If content is fenced as ```sql ... ``` or ``` ... ``` extract inner
+        if raw.startswith("```") and raw.endswith("```"):
+            inner = raw.strip("`")
+            # handle leading language tag like sql
+            if inner.lower().startswith("sql"):
+                inner = inner[3:]
+            inner = inner.strip()
+            # If inner looks like SQL (starts with SELECT), return as dict
+            if inner[:6].lower() == "select":
+                return {"sql": inner}
+            raw = inner
+
+        # If content contains a SELECT, try to extract SQL substring
+        low = raw.lower()
+        if "select" in low and (" from " in low or low.startswith("select")):
+            try:
+                import re
+                m = re.search(r"select[\s\S]*", raw, flags=re.IGNORECASE)
+                if m:
+                    sql_text = m.group(0).strip()
+                    # strip trailing fences if any leftovers
+                    sql_text = sql_text.replace("```", "").strip()
+                    return {"sql": sql_text}
+            except Exception:
+                pass
+
+        # Try strict JSON parsing
+        try:
+            parsed = json.loads(raw)
+            logger.info("OpenAI returned %s", parsed)
+            return parsed
         except json.JSONDecodeError as e:
-            logger.error("Failed to parse response JSON from OpenAI:", e)
+            logger.error("Failed to parse response JSON from OpenAI: %s", e)
             return None
 
     def polish_with_gpt(self, diarization) -> str:

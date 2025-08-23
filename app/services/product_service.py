@@ -6,6 +6,7 @@ from sqlalchemy import or_
 from app.models.product import Product
 from app.models.agency import Agency
 from .base_service import BaseService
+from app.search.index_helpers import index_product
 
 logging = logging.getLogger(__name__)
 
@@ -41,6 +42,10 @@ class ProductService(BaseService):
             
             product = cls.create(**product_data)
             logging.info(f"Created product: {name} for agency {agency_id} with ID: {product.id}")
+            try:
+                index_product(product)
+            except Exception as ie:
+                logging.error(f"Failed to index product {product.id}: {ie}")
             return product
             
         except SQLAlchemyError as e:
@@ -144,6 +149,10 @@ class ProductService(BaseService):
             if update_data:
                 updated_product = cls.update(product_id, **update_data)
                 logging.info(f"Updated product {product_id}: {update_data}")
+                try:
+                    index_product(updated_product)
+                except Exception as ie:
+                    logging.error(f"Failed to index product {product_id} after update: {ie}")
                 return updated_product
             
             return product

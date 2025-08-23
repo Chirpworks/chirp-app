@@ -114,13 +114,8 @@ def get_meeting_by_id(meeting_id):
             "transcription": meeting_data.transcription,
             "direction": meeting_data.direction,
             "title": meeting_data.title,
-            "call_purpose": meeting_data.call_purpose,
             "key_discussion_points": meeting_data.key_discussion_points,
-            "buyer_pain_points": meeting_data.buyer_pain_points,
-            "solutions_discussed": meeting_data.solutions_discussed,
-            "risks": meeting_data.risks,
             "summary": meeting_data.summary,
-            "overall_summary": meeting_data.overall_summary,
             "type": meeting_data.type,
             "detected_call_type": getattr(meeting_data, 'detected_call_type', None),
             "detected_products": getattr(meeting_data, 'detected_products', None),
@@ -324,8 +319,7 @@ def update_meeting_summary(meeting_id):
                 
                 # Extract specific keys for individual columns and remove them from the summary dict
                 llm_fields_to_extract = [
-                    "call_purpose", "key_discussion_points", "buyer_pain_points",
-                    "solutions_discussed", "risks", "overall_summary"
+                    "key_discussion_points"
                 ]
                 extracted_fields = {}
                 for field in llm_fields_to_extract:
@@ -343,6 +337,14 @@ def update_meeting_summary(meeting_id):
 
         logging.info(f"[UPDATE_SUMMARY] Final update_data keys: {list(update_data.keys())}")
         logging.info(f"[UPDATE_SUMMARY] Will update {len(update_data)} meeting fields")
+
+        # Accept qa_pairs and facts directly when provided
+        if isinstance(data.get("qa_pairs"), list):
+            update_data["qa_pairs"] = data["qa_pairs"]
+            logging.info(f"[UPDATE_SUMMARY] Will update qa_pairs: {len(update_data['qa_pairs'])} items")
+        if isinstance(data.get("facts"), list):
+            update_data["facts"] = data["facts"]
+            logging.info(f"[UPDATE_SUMMARY] Will update facts: {len(update_data['facts'])} items")
 
         # Start transaction for atomic operations
         updated_meeting = None

@@ -9,6 +9,7 @@ from app.models.seller import Seller, SellerRole
 from app.utils.auth_utils import generate_user_claims
 from app.utils.call_recording_utils import normalize_phone_number
 from .base_service import BaseService
+from app.search.index_helpers import index_seller
 
 logging = logging.getLogger(__name__)
 
@@ -63,6 +64,10 @@ class SellerService(BaseService):
             db.session.commit()
             
             logging.info(f"Created seller: {email} with ID: {seller.id}")
+            try:
+                index_seller(seller)
+            except Exception as ie:
+                logging.error(f"Failed to index seller {seller.id}: {ie}")
             return seller
             
         except SQLAlchemyError as e:

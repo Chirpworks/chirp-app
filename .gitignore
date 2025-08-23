@@ -408,3 +408,4 @@ venv/
 app_backup_*/
 migrations_backup_*/
 *_backup_*
+Dockerfile_chirp_app_backup

@@ -109,14 +109,26 @@ def get_total_call_data():
                 outgoing_calls_in_hour = outgoing_meet + outgoing_proc + outgoing_unans
                 incoming_calls_in_hour = incoming_meet + incoming_proc + incoming_unans
                 
-                unique_leads_in_hour = (
-                    db.session.query(func.count(func.distinct(Buyer.phone)))
+                # Unique leads engaged = distinct buyer phones from Meetings (answered)
+                # UNION distinct buyer_number from MobileAppCall with Processing status (answered not yet reconciled)
+                meeting_phones_q = (
+                    db.session.query(Buyer.phone.label('phone'))
                     .join(Meeting, Meeting.buyer_id == Buyer.id)
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.start_time >= hour_start)
                     .filter(Meeting.start_time <= hour_end)
-                    .scalar() or 0
+                    .distinct()
                 )
+                mac_phones_q = (
+                    db.session.query(MobileAppCall.buyer_number.label('phone'))
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= hour_start)
+                    .filter(MobileAppCall.start_time <= hour_end)
+                    .distinct()
+                )
+                union_phones_hour = meeting_phones_q.union(mac_phones_q).subquery()
+                unique_leads_in_hour = db.session.query(func.count()).select_from(union_phones_hour).scalar() or 0
                 sales_data[f"hour{hour}"] = {
                     "outgoing_calls": outgoing_calls_in_hour,
                     "incoming_calls": incoming_calls_in_hour,
@@ -125,14 +137,24 @@ def get_total_call_data():
                 total_outgoing_calls += outgoing_calls_in_hour
                 total_incoming_calls += incoming_calls_in_hour
                 total_unique_leads += unique_leads_in_hour
-            total_unique_leads_corrected = (
-                db.session.query(func.count(func.distinct(Buyer.phone)))
+            meeting_phones_total_q = (
+                db.session.query(Buyer.phone.label('phone'))
                 .join(Meeting, Meeting.buyer_id == Buyer.id)
                 .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                 .filter(Meeting.start_time >= start_date)
                 .filter(Meeting.start_time <= end_date)
-                .scalar() or 0
+                .distinct()
             )
+            mac_phones_total_q = (
+                db.session.query(MobileAppCall.buyer_number.label('phone'))
+                .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .distinct()
+            )
+            union_phones_total = meeting_phones_total_q.union(mac_phones_total_q).subquery()
+            total_unique_leads_corrected = db.session.query(func.count()).select_from(union_phones_total).scalar() or 0
         else:
             sales_data = {}
             total_outgoing_calls = 0
@@ -200,14 +222,24 @@ def get_total_call_data():
                 )
                 outgoing_calls_in_day = outgoing_meet + outgoing_proc + outgoing_unans
                 incoming_calls_in_day = incoming_meet + incoming_proc + incoming_unans
-                unique_leads_in_day = (
-                    db.session.query(func.count(func.distinct(Buyer.phone)))
+                meeting_phones_day_q = (
+                    db.session.query(Buyer.phone.label('phone'))
                     .join(Meeting, Meeting.buyer_id == Buyer.id)
                     .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                     .filter(Meeting.start_time >= day_start)
                     .filter(Meeting.start_time <= day_end)
-                    .scalar() or 0
+                    .distinct()
                 )
+                mac_phones_day_q = (
+                    db.session.query(MobileAppCall.buyer_number.label('phone'))
+                    .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                    .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                    .filter(MobileAppCall.start_time >= day_start)
+                    .filter(MobileAppCall.start_time <= day_end)
+                    .distinct()
+                )
+                union_phones_day = meeting_phones_day_q.union(mac_phones_day_q).subquery()
+                unique_leads_in_day = db.session.query(func.count()).select_from(union_phones_day).scalar() or 0
                 sales_data[f"day{day_count}"] = {
                     "outgoing_calls": outgoing_calls_in_day,
                     "incoming_calls": incoming_calls_in_day,
@@ -218,14 +250,24 @@ def get_total_call_data():
                 total_unique_leads += unique_leads_in_day
                 current_date += timedelta(days=1)
                 day_count += 1
-            total_unique_leads_corrected = (
-                db.session.query(func.count(func.distinct(Buyer.phone)))
+            meeting_phones_total_q = (
+                db.session.query(Buyer.phone.label('phone'))
                 .join(Meeting, Meeting.buyer_id == Buyer.id)
                 .filter(Meeting.seller_id.in_([s.id for s in agency_sellers]))
                 .filter(Meeting.start_time >= start_date)
                 .filter(Meeting.start_time <= end_date)
-                .scalar() or 0
+                .distinct()
             )
+            mac_phones_total_q = (
+                db.session.query(MobileAppCall.buyer_number.label('phone'))
+                .filter(MobileAppCall.user_id.in_([s.id for s in agency_sellers]))
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .distinct()
+            )
+            union_phones_total = meeting_phones_total_q.union(mac_phones_total_q).subquery()
+            total_unique_leads_corrected = db.session.query(func.count()).select_from(union_phones_total).scalar() or 0
         result = {
             "sales_data": sales_data,
             "total_data": {
@@ -332,16 +374,26 @@ def get_team_call_data():
             incoming_calls = incoming_calls_answered + incoming_calls_unanswered
             total_calls = outgoing_calls + incoming_calls
             
-            # Get unique buyer phone numbers only from Meeting table (actual conversations)
-            # Only count buyers who had actual meetings/conversations
-            unique_leads = (
-                db.session.query(func.count(func.distinct(Buyer.phone)))
+            # Unique leads engaged per seller = distinct buyer phones from Meetings
+            # UNION distinct MobileAppCall.buyer_number with Processing
+            meeting_phones_q = (
+                db.session.query(Buyer.phone.label('phone'))
                 .join(Meeting, Meeting.buyer_id == Buyer.id)
                 .filter(Meeting.seller_id == seller.id)
                 .filter(Meeting.start_time >= start_date)
                 .filter(Meeting.start_time <= end_date)
-                .scalar() or 0
+                .distinct()
             )
+            mac_phones_q = (
+                db.session.query(MobileAppCall.buyer_number.label('phone'))
+                .filter(MobileAppCall.user_id == seller.id)
+                .filter(MobileAppCall.status == MobileAppCallStatus.PROCESSING.value)
+                .filter(MobileAppCall.start_time >= start_date)
+                .filter(MobileAppCall.start_time <= end_date)
+                .distinct()
+            )
+            union_phones = meeting_phones_q.union(mac_phones_q).subquery()
+            unique_leads = db.session.query(func.count()).select_from(union_phones).scalar() or 0
             seller_data.append({
                 "seller_id": str(seller.id),
                 "seller_name": seller.name,
