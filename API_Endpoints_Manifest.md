@@ -9,7 +9,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ### 1.1 User Registration & Login
 
-#### POST `/auth/signup`
+#### POST `/api/auth/signup`
 **Description:** Register a new seller account
 **Authentication:** None
 **Input:**
@@ -31,7 +31,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/auth/login`
+#### POST `/api/auth/login`
 **Description:** Authenticate user and get access tokens
 **Authentication:** None
 **Input:**
@@ -50,7 +50,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/auth/refresh`
+#### POST `/api/auth/refresh`
 **Description:** Refresh access token using refresh token
 **Authentication:** Refresh token required
 **Input:** None
@@ -62,7 +62,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/auth/logout`
+#### POST `/api/auth/logout`
 **Description:** Logout user and invalidate tokens
 **Authentication:** JWT required
 **Input:** None
@@ -73,7 +73,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/auth/reset_password`
+#### POST `/api/auth/reset_password`
 **Description:** Reset user password with old password validation
 **Authentication:** None
 **Input:**
@@ -92,7 +92,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/auth/generate_test_token`
+#### POST `/api/auth/generate_test_token`
 **Description:** Generate a test access token for a user by email (testing purposes only)
 **Authentication:** None (protected by secret value)
 **Input:**
@@ -159,9 +159,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 2. User Management
 
-### 2.1 User Profile & Team Management
-
-#### GET `/user/get_user`
+#### GET `/api/user/get_user`
 **Description:** Get current user profile information
 **Authentication:** JWT required
 **Input:** None
@@ -178,9 +176,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-
-
-#### POST `/user/set_manager`
+#### POST `/api/user/set_manager`
 **Description:** Assign a manager to a user
 **Authentication:** None
 **Input:**
@@ -201,9 +197,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 3. Meeting & Call Management
 
-### 3.1 Meeting Operations
-
-#### GET `/meetings/get_next/<user_id>`
+#### GET `/api/meetings/get_next/<user_id>`
 **Description:** Get upcoming meetings for a user
 **Authentication:** None
 **Input:** 
@@ -214,7 +208,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 []
 ```
 
-#### POST `/meetings/create`
+#### POST `/api/meetings/create`
 **Description:** Create a new meeting
 **Authentication:** None
 **Input:** Not implemented
@@ -225,48 +219,59 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/meetings/call_history`
-**Description:** Get call history for user or team members
+#### GET `/api/meetings/call_history`
+**Description:** Get call history for user or team members with pagination support
 **Authentication:** JWT required
-**Input:**
-- Query: `team_member_ids` (optional, array of UUIDs)
-- Query: `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
-- Query: `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
-- Query: `time_frame` (optional, string, default: "today", **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
+**Query Parameters:**
+- `team_member_ids` (optional, array of UUIDs)
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `page` (optional, integer, default: 1) - Page number (1-based)
+- `limit` (optional, integer, default: 50, max: 100) - Number of records per page
+- `time_frame` (optional, string, default: "today", **DEPRECATED**)
+ - `analysis_status` (optional, string) - When set to `analyzed`, returns only meetings with analysis completed (job status `COMPLETED`)
 
-**Note:** Use `start_date` and `end_date` for precise date filtering. The `time_frame` parameter is maintained for backward compatibility but is deprecated in favor of the new date parameters.
-**Output:** Call history data
+**Output:** Call history data with pagination metadata
 ```json
-[
-  {
-    "id": "string",
-    "title": "string",
-    "source": "string",  // "phone" or "google_meets"
-    "start_time": "ISO datetime",
-    "end_time": "ISO datetime",
-    "buyer_number": "string",
-    "buyer_name": "string",
-    "buyer_email": "string",
-    "seller_number": "string",
-    "analysis_status": "string",  // "Processing", "Completed", "Not Recorded", "Missed", "Rejected"
-    "duration": "string",
-    "call_notes": "string",
-    "user_name": "string",
-    "user_email": "string",
-    "call_direction": "string",  // "incoming", "outgoing"
-    "call_type": "string",
-    "app_call_type": "string",
-    "call_summary": "string"
+{
+  "data": [
+    {
+      "id": "string",
+      "title": "string",
+      "source": "string",
+      "start_time": "ISO datetime",
+      "end_time": "ISO datetime",
+      "buyer_number": "string",
+      "buyer_name": "string",
+      "buyer_email": "string",
+      "seller_number": "string",
+      "analysis_status": "string",
+      "duration": "string",
+      "call_notes": "string",
+      "user_name": "string",
+      "user_email": "string",
+      "call_direction": "string",
+      "call_type": "string",
+      "app_call_type": "string",
+      "call_summary": "string"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 10,
+    "total_count": 500,
+    "limit": 50,
+    "has_next": true,
+    "has_previous": false
   }
-]
+}
 ```
 
-#### GET `/meetings/call_data/<meeting_id>`
+#### GET `/api/meetings/call_data/<uuid:meeting_id>`
 **Description:** Get detailed meeting data by ID including call performance metrics
 **Authentication:** JWT required
-**Input:**
-- Path: `meeting_id` (UUID)
-- Query: `team_member_id` (optional, UUID)
+**Query Parameters:**
+- `team_member_id` (optional, UUID)
 **Output:**
 ```json
 {
@@ -301,53 +306,15 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
         "score": 8.5,
         "date": "2024-01-15",
         "reason": "Excellent value proposition"
-      },
-      "rapport_building": {
-        "score": 7.2,
-        "date": "2024-01-15",
-        "reason": "Good connection established"
-      },
-      "need_realization": {
-        "score": 6.8,
-        "date": "2024-01-15",
-        "reason": "Identified key pain points"
-      },
-      "script_adherance": {
-        "score": 8.0,
-        "date": "2024-01-15",
-        "reason": "Followed script well"
-      },
-      "objection_handling": {
-        "score": 7.5,
-        "date": "2024-01-15",
-        "reason": "Handled objections effectively"
-      },
-      "pricing_and_negotiation": {
-        "score": 6.5,
-        "date": "2024-01-15",
-        "reason": "Room for improvement"
-      },
-      "closure_and_next_steps": {
-        "score": 8.2,
-        "date": "2024-01-15",
-        "reason": "Clear next steps defined"
-      },
-      "conversation_structure_and_flow": {
-        "score": 7.8,
-        "date": "2024-01-15",
-        "reason": "Good flow maintained"
       }
     }
   }
 }
 ```
-**Note:** The `call_performance` field will be `null` if no performance analysis has been performed for the meeting.
 
-#### GET `/meetings/call_data/feedback/<meeting_id>`
+#### GET `/api/meetings/call_data/feedback/<uuid:meeting_id>`
 **Description:** Get meeting feedback
 **Authentication:** JWT required
-**Input:**
-- Path: `meeting_id` (UUID)
 **Output:**
 ```json
 {
@@ -356,11 +323,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/meetings/call_data/transcription/<meeting_id>`
+#### GET `/api/meetings/call_data/transcription/<uuid:meeting_id>`
 **Description:** Get meeting transcription
 **Authentication:** JWT required
-**Input:**
-- Path: `meeting_id` (UUID)
 **Output:**
 ```json
 {
@@ -369,11 +334,11 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/meetings/last_synced_call_timestamp`
+#### GET `/api/meetings/last_synced_call_timestamp`
 **Description:** Get last synced call timestamp for a seller
 **Authentication:** None
-**Input:**
-- Query: `sellerNumber` (string)
+**Query Parameters:**
+- `sellerNumber` (string)
 **Output:**
 ```json
 {
@@ -382,12 +347,10 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### PUT `/meetings/call_data/summary/<meeting_id>`
+#### PUT `/api/meetings/call_data/summary/<uuid:meeting_id>`
 **Description:** Update meeting summary
 **Authentication:** None
 **Input:**
-- Path: `meeting_id` (UUID)
-- Body:
 ```json
 {
   "callSummary": "string"
@@ -405,9 +368,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 4. Call Recording & Processing
 
-### 4.1 Recording Management
-
-#### POST `/call_records/post_recording`
+#### POST `/api/call_records/post_recording`
 **Description:** Process recording from mobile app
 **Authentication:** None
 **Input:**
@@ -427,21 +388,20 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/call_records/post_exotel_recording`
+#### GET `/api/call_records/post_exotel_recording`
 **Description:** Process Exotel webhook recording
 **Authentication:** None
-**Input:**
-- Query parameters:
-  - `CallSid`: string
-  - `CallFrom`: string
-  - `CallTo`: string
-  - `CallStatus`: string
-  - `Direction`: string
-  - `Created`: string
-  - `DialCallDuration`: string
-  - `StartTime`: string
-  - `EndTime`: string
-  - `RecordingUrl`: string
+**Query Parameters:**
+- `CallSid`: string
+- `CallFrom`: string
+- `CallTo`: string
+- `CallStatus`: string
+- `Direction`: string
+- `Created`: string
+- `DialCallDuration`: string
+- `StartTime`: string
+- `EndTime`: string
+- `RecordingUrl`: string
 **Output:**
 ```json
 {
@@ -449,7 +409,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/call_records/post_app_call_record`
+#### POST `/api/call_records/post_app_call_record`
 **Description:** Process mobile app call records
 **Authentication:** None
 **Input:**
@@ -459,7 +419,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
     "sellerNumber": "string",
     "appCallId": "string",
     "buyerNumber": "string",
-    "callType": "string",  // "incoming", "outgoing", "missed", "rejected"
+    "callType": "string",
     "startTime": "string",
     "endTime": "string",
     "duration": "string"
@@ -473,17 +433,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-**Call Type Status Mapping:**
-- `"missed"` → Status: "Missed"
-- `"rejected"` → Status: "Rejected" 
-- `"incoming"` with duration "0" → Status: "Missed"
-- `"outgoing"` with duration "0" → Status: "Not Answered"
-- `"incoming"` with duration > 0 → Status: "Processing"
-- `"outgoing"` with duration > 0 → Status: "Processing"
-
-### 4.2 Diarization & Analysis
-
-#### POST `/call_recordings/diarization`
+#### POST `/api/call_recordings/diarization`
 **Description:** Retry diarization for a job
 **Authentication:** None
 **Input:**
@@ -501,7 +451,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/analysis/trigger_analysis`
+#### POST `/api/analysis/trigger_analysis`
 **Description:** Trigger call analysis for a job
 **Authentication:** None
 **Input:**
@@ -517,34 +467,68 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/call_recordings/diarization`
-**Description:** Retry diarization for a job (alternative to main recording endpoint)
-**Authentication:** None
-**Input:**
-```json
-{
-  "job_id": "uuid"
-}
-```
-**Output:**
-```json
-{
-  "message": "Recording received and ECS speaker diarization task started",
-  "job_id": "uuid",
-  "ecs_task_response": "object"
-}
-```
-
 ---
 
 ## 5. Buyer Management
 
-### 5.1 Buyer Operations
-
-#### GET `/buyers/all`
-**Description:** Get all buyers from the current seller's agency
+#### GET `/api/buyers/search`
+**Description:** Search buyers with fuzzy matching and suggestions
 **Authentication:** JWT required
-**Input:** None
+**Query Parameters:**
+- `q` (required, string, min: 2 chars) - Search query
+- `limit` (optional, integer, default: 20, max: 50) - Maximum number of results
+- `suggestion_limit` (optional, integer, default: 5, max: 10) - Maximum number of suggestions
+**Rate Limiting:** 10 searches per minute per user
+**Output:**
+```json
+{
+  "results": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "phone": "string", 
+      "email": "string",
+      "company_name": "string",
+      "products_discussed": [
+        {
+          "product_id": "uuid",
+          "product_name": "string",
+          "interest_level": "high|medium|low"
+        }
+      ],
+      "last_contacted_at": "ISO datetime",
+      "last_contacted_by": "string",
+      "match_score": 0.95,
+      "match_field": "name|phone|email|company_name"
+    }
+  ],
+  "suggestions": [
+    "John Doe",
+    "John Smith", 
+    "+91 9876543210"
+  ],
+  "total_count": 45,
+  "query": "john",
+  "search_time_ms": 150,
+  "cached": false,
+  "rate_limit": {
+    "requests_made": 1,
+    "requests_remaining": 9,
+    "reset_time": "ISO datetime"
+  }
+}
+```
+**Error Responses:**
+- `400` - Invalid query (too short, missing, etc.)
+- `429` - Rate limit exceeded
+- `500` - Search service temporarily unavailable
+
+#### GET `/api/buyers/all`
+**Description:** Get all buyers from the current seller's agency with pagination support
+**Authentication:** JWT required
+**Query Parameters:**
+- `page` (optional, integer, default: 1) - Page number (1-based)
+- `limit` (optional, integer, default: 50, max: 100) - Number of records per page
 **Output:**
 ```json
 {
@@ -565,18 +549,21 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
       "last_contacted_by": "string"
     }
   ],
-  "total_count": "number",
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 10,
+    "total_count": 500,
+    "limit": 50,
+    "has_next": true,
+    "has_previous": false
+  },
   "agency_id": "uuid"
 }
 ```
 
-### 5.2 Buyer Profile Operations
-
-#### GET `/buyers/profile/<buyer_id>`
+#### GET `/api/buyers/profile/<uuid:buyer_id>`
 **Description:** Get buyer profile by ID
 **Authentication:** None
-**Input:**
-- Path: `buyer_id` (UUID)
 **Output:**
 ```json
 {
@@ -589,7 +576,13 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "solutions_presented": "string",
   "relationship_progression": "string",
   "risks": "string",
-  "products_discussed": "string",
+  "products_discussed": [
+    {
+      "product_name": "string",
+      "product_id": "uuid",
+      "interest_level": "high|medium|low"
+    }
+  ],
   "key_highlights": "object",
   "last_contacted_at": "ISO datetime",
   "last_contacted_by": "string",
@@ -597,12 +590,10 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### PUT `/buyers/profile/<buyer_id>`
+#### PUT `/api/buyers/profile/<uuid:buyer_id>`
 **Description:** Update buyer profile
 **Authentication:** None
 **Input:**
-- Path: `buyer_id` (UUID)
-- Body:
 ```json
 {
   "tags": "array",
@@ -631,19 +622,15 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/buyers/call_history/<buyer_id>`
+#### GET `/api/buyers/call_history/<uuid:buyer_id>`
 **Description:** Get call history for a buyer
 **Authentication:** JWT required
-**Input:**
-- Path: `buyer_id` (UUID)
 **Output:** Call history data
 
-#### GET `/buyers/actions/<buyer_id>`
+#### GET `/api/buyers/actions/<uuid:buyer_id>`
 **Description:** Get all actions for a specific buyer
 **Authentication:** JWT required
-**Input:**
-- Path: `buyer_id` (UUID)
-**Output:** Actions data
+**Output:**
 ```json
 {
   "buyer_id": "uuid",
@@ -672,11 +659,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/buyers/actions/count/<buyer_id>`
+#### GET `/api/buyers/actions/count/<uuid:buyer_id>`
 **Description:** Get count of pending actions for a buyer
 **Authentication:** JWT required
-**Input:**
-- Path: `buyer_id` (UUID)
 **Output:**
 ```json
 {
@@ -685,7 +670,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/buyers/create`
+#### POST `/api/buyers/create`
 **Description:** Create a new buyer
 **Authentication:** JWT required
 **Input:**
@@ -726,16 +711,20 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/buyers/product_catalogue/<buyer_id>`
+#### GET `/api/buyers/product_catalogue/<uuid:buyer_id>`
 **Description:** Get products catalogue for a buyer
 **Authentication:** None
-**Input:**
-- Path: `buyer_id` (UUID)
 **Output:**
 ```json
 {
   "id": "uuid",
-  "products_discussed": "string"
+  "products_discussed": [
+    {
+      "product_name": "string",
+      "product_id": "uuid",
+      "interest_level": "high|medium|low"
+    }
+  ]
 }
 ```
 
@@ -743,16 +732,16 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 6. Action Management
 
-### 6.1 Action Operations
-
-#### GET `/actions/`
-**Description:** Get actions for user or team members with optional status filtering
+#### GET `/api/actions/`
+**Description:** Get actions for user or team members with optional status filtering and pagination support
 **Authentication:** JWT required
 **Query Parameters:**
 - `team_member_ids` (optional): Array of team member UUIDs (managers only)
 - `status` (optional): Filter by action status - 'pending' or 'completed'
-**Input:** None (parameters in query string)
-**Output:** Actions data
+- `meeting_id` (optional): UUID to fetch actions for a specific meeting
+- `page` (optional, integer, default: 1) - Page number (1-based)
+- `limit` (optional, integer, default: 50, max: 100) - Number of records per page
+**Output:**
 ```json
 {
   "actions": [
@@ -776,21 +765,23 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
       "buyer_company_name": "string"
     }
   ],
-  "total_count": "number",
-  "filtered_by_status": "string or null"
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 10,
+    "total_count": 500,
+    "limit": 50,
+    "has_next": true,
+    "has_previous": false
+  },
+  "filtered_by_status": "string or null",
+  "filtered_by_meeting": "string or null"
 }
 ```
 
-**Sorting Behavior:**
-- When `status` parameter is provided: Actions are sorted by creation date (newest first)
-- When no `status` parameter: Actions are sorted by due date (earliest first)
-
-#### GET `/actions/<action_id>`
+#### GET `/api/actions/<uuid:action_id>`
 **Description:** Get specific action by ID
 **Authentication:** JWT required
-**Input:**
-- Path: `action_id` (UUID)
-**Output:** Action data
+**Output:**
 ```json
 {
   "id": "uuid",
@@ -813,7 +804,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/actions/update`
+#### POST `/api/actions/update`
 **Description:** Bulk update action statuses
 **Authentication:** JWT required
 **Input:**
@@ -836,12 +827,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 7. Agency Management
 
-### 7.1 Agency Operations
-
-#### GET `/agency/get_agency_names`
+#### GET `/api/agency/get_agency_names`
 **Description:** Get list of available agency names
 **Authentication:** None
-**Input:** None
 **Output:**
 ```json
 {
@@ -849,7 +837,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/agency/create_agency`
+#### POST `/api/agency/create_agency`
 **Description:** Create a new agency
 **Authentication:** None
 **Input:**
@@ -866,16 +854,191 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
+#### POST `/api/agency/create_product`
+**Description:** Create a new product for an agency
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_name": "string",
+  "name": "string",
+  "description": "string",
+  "features": "object"
+}
+```
+**Output:**
+```json
+{
+  "message": "Product created successfully",
+  "product_id": "uuid",
+  "product_name": "string", 
+  "agency_id": "uuid",
+  "agency_name": "string",
+  "description": "string",
+  "features": "object"
+}
+```
+
+#### GET `/api/agency/product_catalogue`
+**Description:** Get product catalogue for an agency
+**Authentication:** None
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string",
+    "total_products": "number"
+  },
+  "products": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "description": "string",
+      "category": "string",
+      "features": "array"
+    }
+  ],
+  "categories": "object",
+  "generated_at": "ISO datetime",
+  "data_source": "string"
+}
+```
+
+#### GET `/api/agency/sellers`
+**Description:** Get all sellers for an agency
+**Authentication:** None
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string"
+  },
+  "sellers": [
+    {
+      "id": "uuid",
+      "name": "string",
+      "email": "string",
+      "phone": "string",
+      "role": "string",
+      "created_at": "ISO datetime"
+    }
+  ],
+  "total_sellers": "number"
+}
+```
+
+#### GET `/api/agency/details`
+**Description:** Get detailed agency information
+**Authentication:** None  
+**Query Parameters:**
+- `agency_id` (optional): Agency UUID
+- `agency_name` (optional): Agency name
+**Output:**
+```json
+{
+  "agency": {
+    "id": "uuid",
+    "name": "string", 
+    "description": "string",
+    "created_at": "ISO datetime"
+  },
+  "statistics": {
+    "total_sellers": "number",
+    "total_products": "number",
+    "total_buyers": "number"
+  }
+}
+```
+
+#### PUT `/api/agency/update_description`
+**Description:** Update agency description
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_id": "uuid",
+  "description": "string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Agency description updated successfully",
+  "agency": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string"
+  }
+}
+```
+
+#### PUT `/api/agency/update_product/<uuid:product_id>`
+**Description:** Update an existing product
+**Authentication:** None
+**Input:**
+```json
+{
+  "name": "string",
+  "description": "string", 
+  "features": "object"
+}
+```
+**Output:**
+```json
+{
+  "message": "Product updated successfully",
+  "product": {
+    "id": "uuid",
+    "name": "string",
+    "description": "string",
+    "features": "object",
+    "agency_id": "uuid"
+  }
+}
+```
+
+#### POST `/api/agency/add_seller`
+**Description:** Add a seller to an agency
+**Authentication:** None
+**Input:**
+```json
+{
+  "agency_id": "uuid",
+  "seller_email": "string"
+}
+```
+**Output:**
+```json
+{
+  "message": "Seller added to agency successfully",
+  "seller": {
+    "id": "uuid", 
+    "email": "string",
+    "name": "string"
+  },
+  "agency": {
+    "id": "uuid",
+    "name": "string"
+  }
+}
+```
+
 ---
 
 ## 8. Health & Monitoring
 
-### 8.1 Health Check
-
-#### GET `/health/hello`
+#### GET `/api/health/hello`
 **Description:** Basic health check endpoint
 **Authentication:** None
-**Input:** None
 **Output:**
 ```json
 {
@@ -887,13 +1050,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 9. Jobs Management
 
-### 9.1 Job Operations
-
-#### GET `/jobs/by_meeting/<meeting_id>`
+#### GET `/api/jobs/by_meeting/<uuid:meeting_id>`
 **Description:** Get job details by meeting ID
 **Authentication:** None
-**Input:**
-- Path: `meeting_id` (UUID)
 **Output:**
 ```json
 {
@@ -906,7 +1065,7 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### POST `/jobs/update_status`
+#### POST `/api/jobs/update_status`
 **Description:** Update job status (used by external services like analysis pipeline)
 **Authentication:** None
 **Input:**
@@ -928,11 +1087,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/jobs/<job_id>/status`
+#### GET `/api/jobs/<job_id>/status`
 **Description:** Get current job status
 **Authentication:** None
-**Input:**
-- Path: `job_id` (UUID)
 **Output:**
 ```json
 {
@@ -944,11 +1101,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/jobs/<job_id>/audio_url`
+#### GET `/api/jobs/<job_id>/audio_url`
 **Description:** Get S3 audio URL for a job
 **Authentication:** None
-**Input:**
-- Path: `job_id` (UUID)
 **Output:**
 ```json
 {
@@ -957,12 +1112,10 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### PUT `/jobs/<job_id>/meeting/transcription`
+#### PUT `/api/jobs/<job_id>/meeting/transcription`
 **Description:** Update meeting transcription for a job (used by transcription services)
 **Authentication:** None
 **Input:**
-- Path: `job_id` (UUID)
-- Body:
 ```json
 {
   "transcription": "array or string"
@@ -978,11 +1131,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/jobs/<job_id>/context`
+#### GET `/api/jobs/<job_id>/context`
 **Description:** Get full context for transcription including agency, buyer, seller, and product info (used by enhanced transcription services)
 **Authentication:** None
-**Input:**
-- Path: `job_id` (UUID)
 **Output:**
 ```json
 {
@@ -1017,355 +1168,140 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ## 10. Analytics & Reporting
 
-### 10.1 Call Analytics
-
-#### GET `/analytics/total_call_data`
+#### GET `/api/analytics/total_call_data`
 **Description:** Get total call analytics data for the agency with time-based filtering
 **Authentication:** JWT required
 **Query Parameters:**
-- `time_frame` (optional): Time period filter - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month" (default: "today")
-**Input:** None (parameters in query string)
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `time_frame` (optional, string, **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
 **Output:**
 ```json
 {
-  "time_frame": "string",
-  "start_date": "ISO date",
-  "end_date": "ISO date", 
-  "granularity": "string",
   "sales_data": {
-    "0": {
+    "hour0": {
       "outgoing_calls": "number",
       "incoming_calls": "number",
-      "unique_leads": "number"
+      "unique_leads_engaged": "number"
     }
   },
-  "total_outgoing_calls": "number",
-  "total_incoming_calls": "number", 
-  "total_unique_leads": "number",
-  "average_calls_per_seller": "number",
-  "top_performers": [
+  "total_data": {
+    "total_outgoing_calls": "number",
+    "total_incoming_calls": "number", 
+    "total_calls": "number",
+    "unique_leads_engaged": "number"
+  }
+}
+```
+
+#### GET `/api/analytics/team_call_data`
+**Description:** Get team call analytics with individual seller performance
+**Authentication:** JWT required
+**Query Parameters:**
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `time_frame` (optional, string, **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
+**Output:**
+```json
+{
+  "seller_data": [
     {
+      "seller_id": "uuid",
       "seller_name": "string",
-      "outgoing_calls": "number"
+      "seller_phone": "string",
+      "metrics": {
+        "total_calls_made": "number",
+        "outgoing_calls": "number",
+        "incoming_calls": "number",
+        "leads_engaged": "number"
+      }
     }
   ]
 }
 ```
 
-#### GET `/analytics/team_call_data`
-**Description:** Get team call analytics with individual seller performance
-**Authentication:** JWT required
-**Query Parameters:**
-- `time_frame` (optional): Time period filter - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month" (default: "today")
-**Input:** None (parameters in query string)
-**Output:**
-```json
-{
-  "time_frame": "string",
-  "start_date": "ISO date",
-  "end_date": "ISO date",
-  "team_members": [
-    {
-      "name": "string",
-      "email": "string",
-      "id": "uuid",
-      "phone": "string",
-      "total_outgoing_calls": "number",
-      "total_incoming_calls": "number",
-      "unanswered_outgoing_calls": "number",
-      "unique_leads_engaged": "number", 
-      "unique_leads_called": "number"
-    }
-  ],
-  "total_outgoing_calls": "number",
-  "total_incoming_calls": "number",
-  "total_unanswered_outgoing_calls": "number",
-  "total_unique_leads_engaged": "number",
-  "total_unique_leads_called": "number"
-}
-```
-
-#### GET `/analytics/call_data/<seller_uuid>`
+#### GET `/api/analytics/call_data/<uuid:seller_uuid>`
 **Description:** Get detailed call analytics for a specific seller
 **Authentication:** JWT required  
-**Input:**
-- Path: `seller_uuid` (UUID)
-- Query: `time_frame` (optional, string, default: "today")
+**Query Parameters:**
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `time_frame` (optional, string, **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
 **Output:**
 ```json
 {
-  "seller_info": {
-    "id": "uuid",
-    "name": "string",
-    "email": "string"
-  },
-  "time_frame": "string",
-  "call_analytics": {
-    "total_calls": "number",
-    "outgoing_calls": "number", 
-    "incoming_calls": "number",
-    "answered_calls": "number",
-    "missed_calls": "number",
-    "average_call_duration": "number",
-    "unique_contacts": "number"
-  },
-  "performance_trends": "object"
+  "outgoing_calls": "number",
+  "outgoing_calls_answered": "number",
+  "outgoing_calls_unanswered": "number",
+  "incoming_calls": "number",
+  "incoming_calls_answered": "number",
+  "incoming_calls_unanswered": "number",
+  "total_calls": "number",
+  "unique_leads_engaged": "number"
 }
 ```
 
-#### GET `/analytics/seller_call_analytics`
+#### GET `/api/analytics/seller_call_analytics`
 **Description:** Get seller-specific call analytics summary
 **Authentication:** JWT required
 **Query Parameters:**
-- `time_frame` (optional): Time period filter (default: "today")
-**Input:** None (parameters in query string)
+- `team_member_ids` (required): Array of team member UUIDs
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `time_frame` (optional, string, **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
 **Output:**
 ```json
 {
-  "seller_analytics": {
-    "total_calls_made": "number",
-    "calls_answered": "number",
-    "calls_missed": "number", 
-    "unique_contacts": "number",
-    "call_success_rate": "number",
-    "average_call_duration": "number"
-  },
-  "time_frame": "string",
-  "period_comparison": "object"
+  "seller_data": [
+    {
+      "seller_id": "uuid",
+      "seller_name": "string", 
+      "seller_phone": "string",
+      "seller_email": "string",
+      "outgoing_calls": "number",
+      "outgoing_calls_answered": "number",
+      "outgoing_calls_unanswered": "number",
+      "incoming_calls": "number",
+      "incoming_calls_answered": "number",
+      "incoming_calls_unanswered": "number",
+      "total_calls": "number",
+      "unique_leads_engaged": "number"
+    }
+  ]
 }
 ```
 
-#### GET `/analytics/seller_call_data/<seller_uuid>`
+#### GET `/api/analytics/seller_call_data/<uuid:seller_uuid>`
 **Description:** Get comprehensive call data for a specific seller with detailed breakdowns
 **Authentication:** JWT required
-**Input:**
-- Path: `seller_uuid` (UUID)
-- Query: `time_frame` (optional, string, default: "today")
+**Query Parameters:**
+- `start_date` (optional, string, format: YYYY-MM-DD) - Start date for filtering
+- `end_date` (optional, string, format: YYYY-MM-DD) - End date for filtering  
+- `time_frame` (optional, string, **DEPRECATED**) - Values: "today", "yesterday", "this_week", "last_week", "this_month", "last_month"
 **Output:**
 ```json
 {
-  "seller_info": {
-    "id": "uuid", 
-    "name": "string",
-    "email": "string",
-    "phone": "string"
+  "seller_id": "uuid",
+  "seller_name": "string",
+  "seller_phone": "string",
+  "sales_data": {
+    "hour0": {
+      "outgoing_calls": "number",
+      "incoming_calls": "number",
+      "unique_leads_engaged": "number"
+    }
   },
-  "call_summary": {
-    "total_calls": "number",
-    "outgoing_calls": "number",
-    "incoming_calls": "number",
-    "call_duration_total": "number",
-    "average_call_duration": "number"
-  },
-  "call_status_breakdown": {
-    "answered": "number",
-    "missed": "number",
-    "rejected": "number",
-    "not_answered": "number"
-  },
-  "time_frame": "string",
-  "detailed_calls": "array"
+  "total_outgoing_calls": "number",
+  "total_incoming_calls": "number",
+  "total_unique_leads": "number"
 }
 ```
 
 ---
 
-## 11. Extended Agency Management
+## 11. Performance Analytics
 
-### 11.1 Product Management
-
-#### POST `/agency/create_product`
-**Description:** Create a new product for an agency
-**Authentication:** None
-**Input:**
-```json
-{
-  "agency_name": "string",
-  "name": "string",
-  "description": "string",
-  "features": "object"
-}
-```
-**Output:**
-```json
-{
-  "message": "Product created successfully",
-  "product_id": "uuid",
-  "product_name": "string", 
-  "agency_id": "uuid",
-  "agency_name": "string",
-  "description": "string",
-  "features": "object"
-}
-```
-
-#### GET `/agency/product_catalogue`
-**Description:** Get product catalogue for an agency
-**Authentication:** None
-**Query Parameters:**
-- `agency_id` (optional): Agency UUID
-- `agency_name` (optional): Agency name
-**Input:** None (parameters in query string)
-**Output:**
-```json
-{
-  "agency": {
-    "id": "uuid",
-    "name": "string",
-    "description": "string",
-    "total_products": "number"
-  },
-  "products": [
-    {
-      "id": "uuid",
-      "name": "string",
-      "description": "string",
-      "category": "string",
-      "features": "array"
-    }
-  ],
-  "categories": "object",
-  "generated_at": "ISO datetime",
-  "data_source": "string"
-}
-```
-
-#### PUT `/agency/update_product/<product_id>`
-**Description:** Update an existing product
-**Authentication:** None
-**Input:**
-- Path: `product_id` (UUID)
-- Body:
-```json
-{
-  "name": "string",
-  "description": "string", 
-  "features": "object"
-}
-```
-**Output:**
-```json
-{
-  "message": "Product updated successfully",
-  "product": {
-    "id": "uuid",
-    "name": "string",
-    "description": "string",
-    "features": "object",
-    "agency_id": "uuid"
-  }
-}
-```
-
-### 11.2 Agency Information & Management
-
-#### GET `/agency/sellers`
-**Description:** Get all sellers for an agency
-**Authentication:** None
-**Query Parameters:**
-- `agency_id` (optional): Agency UUID
-- `agency_name` (optional): Agency name
-**Input:** None (parameters in query string)
-**Output:**
-```json
-{
-  "agency": {
-    "id": "uuid",
-    "name": "string"
-  },
-  "sellers": [
-    {
-      "id": "uuid",
-      "name": "string",
-      "email": "string",
-      "phone": "string",
-      "role": "string",
-      "created_at": "ISO datetime"
-    }
-  ],
-  "total_sellers": "number"
-}
-```
-
-#### GET `/agency/details`
-**Description:** Get detailed agency information
-**Authentication:** None  
-**Query Parameters:**
-- `agency_id` (optional): Agency UUID
-- `agency_name` (optional): Agency name
-**Input:** None (parameters in query string)
-**Output:**
-```json
-{
-  "agency": {
-    "id": "uuid",
-    "name": "string", 
-    "description": "string",
-    "created_at": "ISO datetime"
-  },
-  "statistics": {
-    "total_sellers": "number",
-    "total_products": "number",
-    "total_buyers": "number"
-  }
-}
-```
-
-#### PUT `/agency/update_description`
-**Description:** Update agency description
-**Authentication:** None
-**Input:**
-```json
-{
-  "agency_id": "uuid",
-  "description": "string"
-}
-```
-**Output:**
-```json
-{
-  "message": "Agency description updated successfully",
-  "agency": {
-    "id": "uuid",
-    "name": "string",
-    "description": "string"
-  }
-}
-```
-
-#### POST `/agency/add_seller`
-**Description:** Add a seller to an agency
-**Authentication:** None
-**Input:**
-```json
-{
-  "agency_id": "uuid",
-  "seller_email": "string"
-}
-```
-**Output:**
-```json
-{
-  "message": "Seller added to agency successfully",
-  "seller": {
-    "id": "uuid", 
-    "email": "string",
-    "name": "string"
-  },
-  "agency": {
-    "id": "uuid",
-    "name": "string"
-  }
-}
-```
-
----
-
-## 12. Performance Analytics
-
-### 12.1 Call Performance Metrics
-
-#### POST `/performance/call/<meeting_id>/metrics`
+#### POST `/api/performance/call/<meeting_id>/metrics`
 **Description:** Create or update call performance metrics for a specific meeting (used by external analysis services)
 **Authentication:** None
 **Input:**
@@ -1430,10 +1366,9 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/performance/call/<meeting_id>/metrics`
+#### GET `/api/performance/call/<meeting_id>/metrics`
 **Description:** Get call performance metrics for a specific meeting
 **Authentication:** JWT Required
-**Input:** None (meeting_id in URL path)
 **Output:**
 ```json
 {
@@ -1447,22 +1382,15 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
         "score": 8.5,
         "date": "2024-01-15",
         "reason": "Excellent value proposition"
-      },
-      "rapport_building": {
-        "score": 7.2,
-        "date": "2024-01-15", 
-        "reason": "Good connection established"
       }
-      // ... other metrics
     }
   }
 }
 ```
 
-#### DELETE `/performance/call/<meeting_id>/metrics`
+#### DELETE `/api/performance/call/<meeting_id>/metrics`
 **Description:** Delete call performance metrics for a specific meeting (Admin/Manager only)
 **Authentication:** JWT Required (Admin/Manager role)
-**Input:** None (meeting_id in URL path)
 **Output:**
 ```json
 {
@@ -1470,13 +1398,12 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 }
 ```
 
-#### GET `/performance/user/<user_id>/metrics`
+#### GET `/api/performance/user/<user_id>/metrics`
 **Description:** Get call performance metrics for a user within a date range with daily averages
 **Authentication:** JWT Required
 **Query Parameters:**
 - `start_date` (optional): Start date in YYYY-MM-DD format (defaults to 30 days ago)
 - `end_date` (optional): End date in YYYY-MM-DD format (defaults to today)
-**Input:** None (user_id in URL path, dates in query params)
 **Output:**
 ```json
 {
@@ -1493,46 +1420,131 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
   "daily_metrics": {
     "2024-01-01": {
       "intro": 8.5,
-      "rapport_building": 7.2,
-      "need_realization": 6.8,
-      "script_adherance": 8.0,
-      "objection_handling": 7.5,
-      "pricing_and_negotiation": 6.5,
-      "closure_and_next_steps": 8.2,
-      "conversation_structure_and_flow": 7.8,
       "overall_score": 7.5,
       "calls_count": 3
-    },
-    "2024-01-02": {
-      "intro": 7.8,
-      "rapport_building": 8.1,
-      "overall_score": 7.7,
-      "calls_count": 2
-    },
-    "2024-01-03": null
+    }
   },
   "period_summary": {
     "total_calls": 15,
     "days_with_data": 8,
-    "days_in_range": 31,
     "overall_averages": {
       "intro": 8.1,
-      "rapport_building": 7.6,
       "overall_score": 7.4
     }
   }
 }
 ```
 
-### 12.2 Validation Rules
-- All performance scores must be between 0 and 10
-- Date format must be YYYY-MM-DD
-- Meeting must exist and user must have access
-- Only meeting owner, admin, or manager can update metrics
-- Only admin or manager can delete metrics
-- Users can view their own performance data; admin/manager can view any user's data
-- Date range cannot exceed 365 days
-- Daily metrics show null for days with no call data
+#### GET `/api/performance/user/<uuid:user_id>/calls`
+**Description:** Get detailed per-call performance metrics for a specific seller within a date range with pagination support
+**Authentication:** JWT required
+**Query Parameters:**
+- `start_date` (optional): Start date in YYYY-MM-DD format (default: 30 days ago)
+- `end_date` (optional): End date in YYYY-MM-DD format (default: today)
+- `page` (optional, integer, default: 1) - Page number (1-based)
+- `limit` (optional, integer, default: 50, max: 100) - Number of records per page
+**Output:**
+```json
+{
+  "message": "User performance calls retrieved successfully",
+  "user_info": {
+    "user_id": "uuid",
+    "name": "string",
+    "email": "string"
+  },
+  "date_range": {
+    "start_date": "YYYY-MM-DD",
+    "end_date": "YYYY-MM-DD"
+  },
+  "calls": [
+    {
+      "meeting_id": "uuid",
+      "call_title": "string",
+      "buyer_name": "string",
+      "buyer_phone": "string",
+      "call_start_time": "ISO datetime",
+      "duration_minutes": 45.5,
+      "detected_products": "array",
+      "overall_score": 7.5,
+      "analyzed_at": "ISO datetime",
+      "metrics": {
+        "intro": {
+          "score": 8.5,
+          "reason": "string"
+        }
+      },
+      "analysis": {
+        "product_details_analysis": "object",
+        "objection_handling_analysis": "object",
+        "overall_performance_summary": "object"
+      }
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "total_pages": 10,
+    "total_count": 500,
+    "limit": 50,
+    "has_next": true,
+    "has_previous": false
+  }
+}
+```
+
+---
+
+## 12. Search & Knowledge Management
+
+#### POST `/api/search/`
+**Description:** Semantic search across agency data (meetings, buyers, etc.)
+**Authentication:** JWT required
+**Input:**
+```json
+{
+  "query": "string",
+  "k": 8,
+  "types": "array (optional)",
+  "seller_id": "uuid (optional)"
+}
+```
+**Output:**
+```json
+{
+  "results": [
+    {
+      "id": "uuid",
+      "content": "string",
+      "score": "number",
+      "type": "string",
+      "metadata": "object"
+    }
+  ]
+}
+```
+
+#### POST `/api/search/answer`
+**Description:** Get AI-powered answers to questions based on agency data
+**Authentication:** JWT required
+**Input:**
+```json
+{
+  "query": "string"
+}
+```
+**Output:**
+```json
+{
+  "answer": "string",
+  "sources": [
+    {
+      "id": "uuid",
+      "content": "string",
+      "type": "string",
+      "metadata": "object"
+    }
+  ]
+}
+```
 
 ---
 
@@ -1571,6 +1583,88 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 
 ---
 
+## Audio Streaming Endpoints
+
+### GET `/api/audio/meetings/<uuid:meeting_id>/audio/stream`
+**Description:** Get presigned URL for audio streaming with security and rate limiting
+**Authentication:** JWT required
+**Query Parameters:**
+- `type` (optional): "stream" (default) for inline playback or "download" for file download
+**Rate Limit:** 10 requests per minute per user per meeting
+**Output:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://presigned-s3-url...",
+    "expires_in": 3600,
+    "expires_at": "2024-01-15T15:30:00Z",
+    "file_size": 2048576,
+    "content_type": "audio/mpeg",
+    "last_modified": "2024-01-15T10:30:00Z",
+    "meeting_id": "uuid",
+    "meeting_title": "Meeting with John Doe",
+    "request_type": "stream"
+  },
+  "rate_limit": {
+    "requests_made": 1,
+    "requests_remaining": 9,
+    "reset_time": "2024-01-15T11:31:00Z"
+  }
+}
+```
+
+### GET `/api/audio/meetings/<uuid:meeting_id>/audio/download`
+**Description:** Get presigned URL for audio download (convenience endpoint)
+**Authentication:** JWT required
+**Rate Limit:** 5 requests per 5 minutes per user per meeting
+**Output:** Same as stream endpoint with download-specific headers
+
+### GET `/api/audio/audio/service/status`
+**Description:** Get audio streaming service health status
+**Authentication:** JWT required
+**Output:**
+```json
+{
+  "success": true,
+  "data": {
+    "service_name": "AudioStreamingService",
+    "bucket_name": "chirp-call-recordings",
+    "url_expiry_seconds": 3600,
+    "aws_region": "ap-south-1",
+    "service_status": "active",
+    "s3_connectivity": "ok",
+    "rate_limiting": "active"
+  }
+}
+```
+
+### GET `/api/audio/audio/user/stats`
+**Description:** Get user's audio streaming statistics and rate limit status
+**Authentication:** JWT required
+**Output:**
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "uuid",
+    "rate_limiting": "active",
+    "active_limits": [
+      {
+        "meeting_id": "uuid",
+        "requests_made": 3,
+        "ttl_seconds": 45,
+        "reset_time": "2024-01-15T11:31:00Z"
+      }
+    ],
+    "stream_limit": "10 requests per minute per meeting",
+    "download_limit": "5 requests per 5 minutes per meeting"
+  }
+}
+```
+
+---
+
 ## Notes
 
 1. All UUIDs are returned as strings in JSON responses
@@ -1582,4 +1676,30 @@ This document provides a comprehensive list of all API endpoints in the Chirp ap
 7. Performance metrics are scored on a 0-10 scale for standardized evaluation
 8. Jobs are processed through multiple stages: recording → transcription → analysis → completion
 9. External services (transcription, analysis) use dedicated endpoints for status updates and data exchange
-10. Analytics endpoints provide comprehensive reporting with flexible time-based filtering 
+10. Analytics endpoints provide comprehensive reporting with flexible time-based filtering
+11. Search functionality provides semantic search and AI-powered answers across agency data
+12. Date parameters support YYYY-MM-DD format, with time_frame parameters being deprecated in favor of precise date ranges
+13. **Pagination Support**: The following endpoints support pagination via `page` and `limit` query parameters:
+    - `/api/meetings/call_history` 
+    - `/api/buyers/all`
+    - `/api/actions/`
+    - `/api/performance/user/<uuid>/calls`
+    
+    **Pagination Parameters:**
+    - `page` (optional): Page number, 1-based (default: 1)
+    - `limit` (optional): Records per page (default: 50, max: 100)
+    
+    **Pagination Response Format:**
+    ```json
+    {
+      "pagination": {
+        "current_page": 1,
+        "total_pages": 10,
+        "total_count": 500,
+        "limit": 50,
+        "has_next": true,
+        "has_previous": false
+      }
+    }
+14. Audio streaming uses presigned S3 URLs for secure, direct browser access without server storage. URLs expire after 1 hour and are rate limited to prevent abuse. Managers can access team member meeting audio.
+    ```

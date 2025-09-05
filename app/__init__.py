@@ -18,6 +18,7 @@ from app.models.exotel_calls import ExotelCall
 from app.models.mobile_app_calls import MobileAppCall
 from app.models.jwt_token_blocklist import TokenBlocklist
 from app.models.semantic_document import SemanticDocument
+from app.models.search_analytics import SearchAnalytics
 from app.external.aws.ecs_client import ECSClient
 
 from flask import Flask

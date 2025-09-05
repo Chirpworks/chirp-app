@@ -3,7 +3,7 @@ import traceback
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
-from app.services import BuyerService, SellerService, MeetingService, ActionService
+from app.services import BuyerService, BuyerSearchService, SellerService, MeetingService, ActionService
 from app.utils.call_recording_utils import denormalize_phone_number
 
 buyers_bp = Blueprint("buyers", __name__)
@@ -22,24 +22,37 @@ def get_agency_buyers():
         user_id = get_jwt_identity()
         logging.info(f"Fetching agency buyers for user {user_id}")
 
+        # Parse pagination parameters
+        page = request.args.get("page", type=int, default=1)
+        limit = request.args.get("limit", type=int, default=50)
+        
+        # Validate pagination parameters
+        if page < 1:
+            return jsonify({"error": "Page number must be 1 or greater"}), 400
+        if limit < 1 or limit > 100:
+            return jsonify({"error": "Limit must be between 1 and 100"}), 400
+
         # Get current seller to determine agency
         seller = SellerService.get_by_id(user_id)
         if not seller:
             return jsonify({"error": "User not found"}), 404
 
-        # Get buyers with last contact information for the seller's agency
-        buyers = BuyerService.get_buyers_with_last_contact(str(seller.agency_id))
+        # Get buyers with last contact information for the seller's agency with pagination
+        buyers_response = BuyerService.get_buyers_with_last_contact(str(seller.agency_id), page, limit)
         
         # Denormalize phone numbers for display
-        for buyer in buyers:
+        for buyer in buyers_response["data"]:
             if buyer['phone']:
                 buyer['phone'] = denormalize_phone_number(buyer['phone'])
 
-        return jsonify({
-            "buyers": buyers,
-            "total_count": len(buyers),
+        # Update response structure to match existing API format
+        response = {
+            "buyers": buyers_response["data"],
+            "pagination": buyers_response["pagination"],
             "agency_id": str(seller.agency_id)
-        }), 200
+        }
+
+        return jsonify(response), 200
 
     except Exception as e:
         logging.error(f"Failed to fetch agency buyers for user {user_id}: {e}")
@@ -144,14 +157,17 @@ def update_buyer_profile(buyer_id):
 
         logging.info(f"[BUYER_UPDATE] Successfully updated buyer profile for buyer_id {buyer_id}")
 
-        # Return updated profile
+        # Calculate averaged interest levels from all meetings for response
+        processed_products_discussed = BuyerService._calculate_averaged_products_discussed(buyer_id)
+
+        # Return updated profile with averaged interest levels
         result = {
             "id": str(updated_buyer.id),
             "phone": denormalize_phone_number(updated_buyer.phone),
             "name": updated_buyer.name,
             "email": updated_buyer.email,
             "risks": updated_buyer.risks,
-            "products_discussed": updated_buyer.products_discussed,
+            "products_discussed": processed_products_discussed,  # Use averaged data
             "key_highlights": updated_buyer.key_highlights
         }
 
@@ -177,10 +193,13 @@ def get_buyer_products_catalogue(buyer_id):
         if not buyer:
             return jsonify({"error": "Buyer not found"}), 404
 
-        # Return only the products_discussed data
+        # Calculate averaged interest levels from all meetings instead of using stored data
+        processed_products_discussed = BuyerService._calculate_averaged_products_discussed(buyer_id)
+        
+        # Return processed products_discussed data with interest_level
         result = {
             "id": str(buyer.id),
-            "products_discussed": buyer.products_discussed
+            "products_discussed": processed_products_discussed
         }
 
         return jsonify(result), 200
@@ -247,6 +266,85 @@ def get_buyer_actions(buyer_id):
         logging.error(f"Failed to fetch actions for buyer_id {buyer_id}: {e}")
         logging.error(f"Traceback: {traceback.format_exc()}")
         return jsonify({"error": f"Failed to fetch actions: {str(e)}"}), 500
+
+
+@buyers_bp.route("/search", methods=["GET"])
+@jwt_required()
+def search_buyers():
+    """
+    Search buyers with fuzzy matching and suggestions.
+    
+    Query Parameters:
+        - q (string, required): Search query (minimum 2 characters)
+        - limit (integer, optional, default: 20, max: 50): Maximum results
+        - suggestion_limit (integer, optional, default: 5): Maximum suggestions
+    
+    Returns:
+        JSON response with search results, suggestions, and metadata
+        
+    Rate Limited: 10 searches per minute per user
+    """
+    try:
+        user_id = get_jwt_identity()
+        logging.info(f"Buyer search request from user {user_id}")
+
+        # Get current seller to determine agency
+        seller = SellerService.get_by_id(user_id)
+        if not seller:
+            return jsonify({"error": "User not found"}), 404
+
+        # Get query parameters
+        query = request.args.get("q", "").strip()
+        limit = request.args.get("limit", type=int, default=20)
+        suggestion_limit = request.args.get("suggestion_limit", type=int, default=5)
+        
+        # Validate query parameter
+        if not query:
+            return jsonify({"error": "Query parameter 'q' is required"}), 400
+        
+        # Validate limit parameters
+        if limit < 1 or limit > 50:
+            return jsonify({"error": "Limit must be between 1 and 50"}), 400
+        
+        if suggestion_limit < 0 or suggestion_limit > 10:
+            return jsonify({"error": "Suggestion limit must be between 0 and 10"}), 400
+
+        # Check rate limiting
+        is_allowed, rate_info = BuyerSearchService.check_rate_limit(user_id)
+        
+        if not is_allowed:
+            logging.warning(f"Search rate limit exceeded: user={user_id}")
+            return jsonify({
+                "error": "Search rate limit exceeded. Try again later.",
+                "code": "RATE_LIMIT_EXCEEDED",
+                "rate_limit": rate_info
+            }), 429
+
+        # Perform the search
+        search_results = BuyerSearchService.search_buyers(
+            query=query,
+            agency_id=str(seller.agency_id),
+            user_id=user_id,
+            limit=limit,
+            suggestion_limit=suggestion_limit
+        )
+        
+        # Add rate limit info to response
+        search_results["rate_limit"] = rate_info
+        
+        logging.info(f"Search completed: user={user_id}, query='{query}', "
+                    f"results={search_results['total_count']}, "
+                    f"time={search_results['search_time_ms']}ms")
+
+        return jsonify(search_results), 200
+
+    except Exception as e:
+        logging.error(f"Failed to search buyers for user {user_id}: {e}")
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            "error": "Search service temporarily unavailable",
+            "code": "SEARCH_SERVICE_ERROR"
+        }), 500
 
 
 @buyers_bp.route("/create", methods=["POST"])

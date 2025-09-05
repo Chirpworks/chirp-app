@@ -6,6 +6,7 @@ from .seller_service import SellerService
 from .meeting_service import MeetingService
 from .job_service import JobService
 from .buyer_service import BuyerService
+from .buyer_search_service import BuyerSearchService
 from .action_service import ActionService
 from .call_service import CallService
 from .agency_service import AgencyService
@@ -20,6 +21,7 @@ __all__ = [
     'MeetingService',
     'JobService',
     'BuyerService',
+    'BuyerSearchService',
     'ActionService',
     'CallService',
     'AgencyService',
